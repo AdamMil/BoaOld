@@ -172,7 +172,7 @@ public sealed class _md5
       if(inputLen >= partLen)
       { Array.Copy(bytes, 0, buffer, (int)index, (int)partLen);
         fixed(byte* bp=buffer) Transform((uint*)bp);
-        fixed(byte* bp=(byte[])bytes.Clone()) for(i=partLen; i+63<inputLen; i+=64) Transform((uint*)(bp+i));
+        fixed(byte* bp=bytes) for(i=partLen; i+63<inputLen; i+=64) Transform((uint*)(bp+i));
         index=0;
       }
       else i=0;
