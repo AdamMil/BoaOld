@@ -109,6 +109,11 @@
                     BuildAction = "Compile"
                 />
                 <File
+                    RelPath = "AutoCompleteBox.resx"
+                    DependentUpon = "AutoCompleteBox.cs"
+                    BuildAction = "EmbeddedResource"
+                />
+                <File
                     RelPath = "frmEdit.cs"
                     SubType = "Form"
                     BuildAction = "Compile"

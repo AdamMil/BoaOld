@@ -1095,7 +1095,7 @@ cannot be altered at runtime.")]
     { ReflectedEvent re = (ReflectedEvent)o;
       sb.Append(re.info.Name).Append(" is an event that takes a ")
         .Append(TypeName(re.info.EventHandlerType)).Append(" object\n");
-      helptext(re.info.EventHandlerType, sb);
+      helptext(ReflectedType.FromType(re.info.EventHandlerType), sb);
     }
     else if(o is ReflectedField)
     { ReflectedField rf = (ReflectedField)o;
@@ -1122,8 +1122,9 @@ cannot be altered at runtime.")]
       if(rp.state.set==null) sb.Append("and no set accessors\n");
       else { sb.Append("and the following set accessors:\n"); helptext(rp.state.set, sb); }
     }
-    else if(o is ReflectedType)
-    { Type type = ((ReflectedType)o).Type;
+    else if(o is ReflectedType) helptext(((ReflectedType)o).Type, sb);
+    else if(o is Type)
+    { Type type = (Type)o;
       if(type.IsEnum)
       { int nameLen=0;
         string[] names = Enum.GetNames(type);
@@ -1144,7 +1145,7 @@ cannot be altered at runtime.")]
         sb.Append('\n');
       }
       else
-      { o = ((ReflectedType)o).Constructor;
+      { o = ReflectedType.FromType(type).Constructor;
         if(o!=null) helptext(o, sb);
         else goto noHelp;
       }

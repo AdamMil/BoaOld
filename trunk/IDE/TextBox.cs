@@ -70,11 +70,12 @@ public class BoaBox : TextEditorControl
       return false;
     }
     else if(!AcBox.Visible)
-    { if(code==Keys.I && control && !alt && !shift)
+    { if(code==Keys.I && control && !alt && !shift) // ctrl-I
       { string ident = ActiveTextAreaControl.SelectionManager.SelectedText.Trim();
+        if(ident=="") ident = PreviousIdentifier(false);
         if(ident!="")
         { object obj;
-          if(GetObject(ident, false, out obj)) Immediate.Document.Insert(0, EmbedHelpers.HelpText(obj));
+          if(GetObject(ident, Get.RawSlot, out obj)) Immediate.Document.Insert(0, EmbedHelpers.HelpText(obj));
           else Immediate.Document.Insert(0, "No such object.\n");
         }
         return true;
@@ -173,19 +174,27 @@ public class BoaBox : TextEditorControl
   }
   #endregion
 
-  object GetObject(string ident, bool ignoreLast)
+  enum Get { Normal, IgnoreLast, RawSlot }
+
+  object GetObject(string ident) { return GetObject(ident, Get.Normal); }
+
+  object GetObject(string ident, Get type)
   { object ret;
-    return GetObject(ident, ignoreLast, out ret) ? ret : null;
+    return GetObject(ident, type, out ret) ? ret : null;
   }
 
-  bool GetObject(string ident, bool ignoreLast, out object ret)
+  bool GetObject(string ident, Get type, out object ret)
   { ret=null;
     if(ident==null || ident=="") return false;
     string[] bits = ident.Split('.');
     try
     { object obj=BoaFrame.Module;
-      for(int i=0,len=bits.Length-(ignoreLast ? 1 : 0); i<len; i++)
+      for(int i=0,len=bits.Length-(type==Get.Normal ? 0 : 1); i<len; i++)
         if(!Ops.GetAttr(obj, bits[i], out obj) || obj==null) return false;
+      if(obj!=null && type==Get.RawSlot)
+      { obj=Ops.GetRawAttr(obj, bits[bits.Length-1]);
+        if(obj==Ops.Missing) obj=null;
+      }
       ret=obj;
     }
     catch { return false; }
@@ -200,20 +209,20 @@ public class BoaBox : TextEditorControl
   void PopulateMembers()
   { AutoCompleteBox acbox = AcBox;
     acbox.Items.Clear();
-    object obj = GetObject(PreviousIdentifier(true), false);
-    if(obj!=null) foreach(string s in Modules.__builtin__.dir(obj)) acbox.Items.Add(s);
+    object obj = GetObject(PreviousIdentifier(true));
+    if(obj!=null) foreach(string s in Modules.__builtin__.dir(obj)) acbox.Items.Add(new AutoCompleteItem(obj, s));
   }
 
   string PopulatePartial()
   { AutoCompleteBox acbox = AcBox;
     acbox.Items.Clear();
     string ident = PreviousIdentifier(false);
-    object obj = GetObject(ident, true);
+    object obj = GetObject(ident, Get.IgnoreLast);
     if(obj!=null)
     { int index=ident.LastIndexOf('.');
       if(index!=-1) ident = ident.Substring(index+1);
       foreach(string s in Modules.__builtin__.dir(obj))
-        if(string.Compare(s, 0, ident, 0, ident.Length, true)==0) acbox.Items.Add(s);
+        if(string.Compare(s, 0, ident, 0, ident.Length, true)==0) acbox.Items.Add(new AutoCompleteItem(obj, s));
     }
     return ident;
   }
