@@ -446,6 +446,7 @@ public sealed class __builtin__
   public static readonly object NameError = ReflectedType.FromType(typeof(NameErrorException));
   //public static readonly object NotImplementedError = ReflectedType.FromType(typeof(NotImplementedErrorException));
   //public static readonly object OverflowError = ReflectedType.FromType(typeof(OverflowErrorException));
+  public static readonly object RuntimeError = ReflectedType.FromType(typeof(RuntimeException));
   public static readonly object StopIteration = ReflectedType.FromType(typeof(StopIterationException));
   public static readonly object SyntaxError = ReflectedType.FromType(typeof(SyntaxErrorException));
   public static readonly object SystemExit = ReflectedType.FromType(typeof(SystemExitException));

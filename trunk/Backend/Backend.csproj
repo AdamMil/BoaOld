@@ -219,6 +219,11 @@
                     BuildAction = "Compile"
                 />
                 <File
+                    RelPath = "Runtime\ReflectedPackage.cs"
+                    SubType = "Code"
+                    BuildAction = "Compile"
+                />
+                <File
                     RelPath = "Runtime\ReflectedType.cs"
                     SubType = "Code"
                     BuildAction = "Compile"

@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Reflection;
 using Boa.AST;
 using Boa.Runtime;
 
@@ -18,6 +19,9 @@ public sealed class sys
 
   public static void exit() { exit(0); }
   public static void exit(object obj) { throw new SystemExitException(obj); }
+  
+  public static void loadAssemblyByName(string name) { ReflectedPackage.LoadAssemblyByName(name); }
+  public static void loadAssemblyFromFile(string filename) { ReflectedPackage.LoadAssemblyFromFile(filename); }
 
   public static readonly object __displayhook__ =
     new CompiledFunctionN("displayhook", new Parameter[] { new Parameter("value") }, null, new CallTargetN(display));
