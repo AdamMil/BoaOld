@@ -374,11 +374,6 @@
                     BuildAction = "Compile"
                 />
                 <File
-                    RelPath = "Runtime\ClosedVar.cs"
-                    SubType = "Code"
-                    BuildAction = "Compile"
-                />
-                <File
                     RelPath = "Runtime\Complex.cs"
                     SubType = "Code"
                     BuildAction = "Compile"

@@ -20,6 +20,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 
 using System;
+using System.Collections;
 using System.Globalization;
 
 namespace Boa.Runtime
@@ -33,6 +34,7 @@ public sealed class IntegerOps
     switch(Convert.GetTypeCode(b))
     { case TypeCode.Boolean: ret = (bool)b ? a+1 : a; break;
       case TypeCode.Byte: ret = a + (byte)b; break;
+      case TypeCode.Char: ret = a + (int)(char)b; break; // TODO: see whether this should return int or char
       case TypeCode.Double: return a.ToDouble() + (double)b;
       case TypeCode.Decimal: return a.ToDecimal() + (Decimal)b;
       case TypeCode.Int16: ret = a + (short)b; break;
@@ -268,9 +270,11 @@ public sealed class IntegerOps
       case TypeCode.Object:
         if(b is Integer) return a * (Integer)b;
         if(b is Complex) return a.ToDouble() * (Complex)b;
+        if(b is ICollection || b is ISequence) return ArrayOps.Multiply(b, a);
         IConvertible ic = b as IConvertible;
         return ic!=null ? a * ic.ToInt64(NumberFormatInfo.InvariantInfo) : Ops.Invoke(b, "__rmul__", a);
       case TypeCode.SByte: return a * (sbyte)b;
+      case TypeCode.String: return StringOps.Multiply((string)b, a);
       case TypeCode.UInt16: return a * (ushort)b;
       case TypeCode.UInt32: return a * (uint)b;
       case TypeCode.UInt64: return a * (ulong)b;
@@ -381,6 +385,7 @@ public sealed class IntegerOps
     switch(Convert.GetTypeCode(b))
     { case TypeCode.Boolean: ret = (bool)b ? a-1 : a; break;
       case TypeCode.Byte: ret = a - (byte)b; break;
+      case TypeCode.Char: ret = a - (int)(char)b; break; // TODO: see whether this should return int or char
       case TypeCode.Double: return a.ToDouble() - (double)b;
       case TypeCode.Decimal: return a.ToDecimal() - (Decimal)b;
       case TypeCode.Int16: ret = a - (short)b; break;

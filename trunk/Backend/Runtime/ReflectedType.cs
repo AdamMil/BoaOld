@@ -317,7 +317,7 @@ public class ReflectedMember
 // TODO: allow extra keyword parameters to set properties
 #region ReflectedConstructor
 public sealed class ReflectedConstructor : ReflectedMethodBase
-{ public ReflectedConstructor(ConstructorInfo ci) : base(ci) { }
+{ public ReflectedConstructor(MethodBase ci) : base(ci) { }
   public override string ToString()
   { return string.Format("<constructor for '{0}'>", sigs[0].DeclaringType.FullName);
   }
@@ -764,6 +764,7 @@ public sealed class ReflectedType : BoaType
     foreach(MethodInfo mi in type.GetMethods()) AddMethod(mi);
     foreach(PropertyInfo pi in type.GetProperties()) AddProperty(pi);
 
+    // dictionary enumerator
     if(typeof(IDictionaryEnumerator).IsAssignableFrom(type))
     { if(!dict.Contains("key")) dict["key"] = dict["Key"];
       if(!dict.Contains("value")) dict["value"] = dict["Value"];
@@ -794,6 +795,23 @@ public sealed class ReflectedType : BoaType
       dict["lower"] = dict["ToLower"];
       dict["upper"] = dict["ToUpper"];
     }
+    else if(type==typeof(bool)) // bool
+    { AddFakeConstructor(typeof(Modules.__builtin__).GetMethod("_bool", BindingFlags.Static|BindingFlags.NonPublic, null, CallingConventions.Standard, Type.EmptyTypes, null));
+      AddFakeConstructor(typeof(Modules.__builtin__).GetMethod("_bool", BindingFlags.Static|BindingFlags.NonPublic, null, CallingConventions.Standard, new Type[] { typeof(object) }, null));
+    }
+    else if(type==typeof(double)) // double
+    { AddFakeConstructor(typeof(Modules.__builtin__).GetMethod("_float", BindingFlags.Static|BindingFlags.NonPublic, null, CallingConventions.Standard, Type.EmptyTypes, null));
+      AddFakeConstructor(typeof(Modules.__builtin__).GetMethod("_float", BindingFlags.Static|BindingFlags.NonPublic, null, CallingConventions.Standard, new Type[] { typeof(object) }, null));
+    }
+    else if(type==typeof(int)) // int
+    { AddFakeConstructor(typeof(Modules.__builtin__).GetMethod("_int", BindingFlags.Static|BindingFlags.NonPublic, null, CallingConventions.Standard, Type.EmptyTypes, null));
+      AddFakeConstructor(typeof(Modules.__builtin__).GetMethod("_int", BindingFlags.Static|BindingFlags.NonPublic, null, CallingConventions.Standard, new Type[] { typeof(object) }, null));
+      AddFakeConstructor(typeof(Modules.__builtin__).GetMethod("_int", BindingFlags.Static|BindingFlags.NonPublic, null, CallingConventions.Standard, new Type[] { typeof(string), typeof(int) }, null));
+    }
+    else if(type==typeof(IEnumerator)) // IEnumerator
+    { AddFakeConstructor(typeof(Modules.__builtin__).GetMethod("_iter", BindingFlags.Static|BindingFlags.NonPublic, null, CallingConventions.Standard, new Type[] { typeof(object) }, null));
+      AddFakeConstructor(typeof(Modules.__builtin__).GetMethod("_iter", BindingFlags.Static|BindingFlags.NonPublic, null, CallingConventions.Standard, new Type[] { typeof(object), typeof(object) }, null));
+    }
     else if(type==typeof(System.Text.RegularExpressions.Match))
     { foreach(MethodInfo mi in typeof(Boa.Modules.re_internal.match).GetMethods()) AddMethod(mi);
       foreach(PropertyInfo pi in typeof(Boa.Modules.re_internal.match).GetProperties()) AddProperty(pi);
@@ -819,6 +837,11 @@ public sealed class ReflectedType : BoaType
   { if(!ci.IsPublic) return;
     if(cons==null) cons = new ReflectedConstructor(ci);
     else cons.Add(ci);
+  }
+
+  void AddFakeConstructor(MethodInfo mi)
+  { if(cons==null) cons = new ReflectedConstructor(mi);
+    else cons.Add(mi);
   }
 
   void AddEvent(EventInfo ei) { dict[ei.Name] = new ReflectedEvent(ei); }
