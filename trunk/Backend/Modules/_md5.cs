@@ -37,14 +37,14 @@ public sealed class _md5
 
   public const int digest_size = 16;
 
-  public byte[] digest(string str) { return Encoding.Default.GetBytes(str); }
-  public byte[] digest(byte[] bytes)
+  public static byte[] digest(string str) { return digest(Encoding.Default.GetBytes(str)); }
+  public static byte[] digest(byte[] bytes)
   { MD5CryptoServiceProvider hash = new MD5CryptoServiceProvider();
     hash.Initialize();
     return hash.ComputeHash(bytes);
   }
-  public string hexdigest(string str) { return Misc.ArrayToHex(digest(str)); }
-  public string hexdigest(byte[] bytes) { return Misc.ArrayToHex(digest(bytes)); }
+  public static string hexdigest(string str) { return Misc.ArrayToHex(digest(str)); }
+  public static string hexdigest(byte[] bytes) { return Misc.ArrayToHex(digest(bytes)); }
 
   public static md5 @new() { return new md5(); }
   public static md5 @new(byte[] bytes) { return new md5(bytes); }

@@ -870,14 +870,15 @@ public class ImportStatement : Statement
   public override void Emit(CodeGenerator cg)
   { foreach(ImportName n in Names)
     { cg.EmitString(n.Name);
-      cg.EmitCall(typeof(Importer), "ImportTop", new Type[] { typeof(string) });
+      cg.EmitCall(typeof(Importer), n.AsName==null ? "ImportTop" : "Import", new Type[] { typeof(string) });
       cg.EmitSet(new Name(n.AsName==null ? n.Name : n.AsName, Scope.Local));
     }
   }
 
   public override void Execute(Frame frame)
   { foreach(ImportName n in Names)
-      frame.Set(n.AsName==null ? n.Name : n.AsName, Importer.ImportTop(n.Name));
+      if(n.AsName==null) frame.Set(n.Name, Importer.ImportTop(n.Name));
+      else frame.Set(n.AsName, Importer.ImportTop(n.Name));
   }
 
   public override void ToCode(System.Text.StringBuilder sb, int indent)
