@@ -56,7 +56,7 @@ public sealed class binascii
   public static string b2a_base64(string data) { return b2a_base64(Encoding.ASCII.GetBytes(data)); }
   public unsafe static string b2a_base64(byte[] data)
   { int left = data.Length%3;
-    char[] output = new char[(left==0 ? data.Length : (data.Length+(3-left)))/3*4 + (data.Length+75)/76];
+    char[] output = new char[(data.Length+2)/3*4 + (data.Length+75)/76];
 
     fixed(char* cp=b64e)
     fixed(char* op=output)
@@ -82,7 +82,7 @@ public sealed class binascii
         *o++ = '=';
         *o++ = '=';
       }
-      else // left==2
+      else if(left==2)
       { a=*p++; b=*p;
         *o++ = cp[a>>2];
         *o++ = cp[((a&3)<<4) | (b>>4)];
@@ -95,7 +95,7 @@ public sealed class binascii
     return new string(output);
   }
   
-  static char[] b64e = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/".ToCharArray();
+  static const string b64e = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
   #endregion
 
   #region hex (base16)
