@@ -134,7 +134,7 @@ public class NamedFrameSlot : Slot
   }
   
   public override void EmitGetAddr(CodeGenerator cg)
-  { throw new NotImplementedException("address of frame slot");
+  { throw new NotSupportedException("address of frame slot");
   }
 
   public override void EmitSet(CodeGenerator cg)

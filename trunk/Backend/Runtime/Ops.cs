@@ -485,7 +485,7 @@ public sealed class Ops
   { if(o==null) return "null";
 
     string s = o as string;
-    if(s!=null) return StringOps.Quote(s);
+    if(s!=null) return StringOps.Escape(s);
     
     IRepresentable ir = o as IRepresentable;
     if(ir!=null) return ir.__repr__();

@@ -17,6 +17,7 @@ public abstract class BoaType : DynamicType, IDynamicObject, ICallable, IHasAttr
 
     if(type==typeof(object)) __name__ = "object";
     else if(type==typeof(string)) __name__ = "string";
+    else if(type==typeof(int)) __name__ = "int";
     else
     { BoaTypeAttribute attr = (BoaTypeAttribute)Attribute.GetCustomAttribute(type, typeof(BoaTypeAttribute), false);
       __name__ = attr==null ? type.FullName : attr.Name;

@@ -67,7 +67,7 @@ public class StringRepr : IDescriptor, ICallable
   public object __get__(object instance) { return instance==null ? this : new StringRepr((string)instance); }
   public object Call(params object[] args)
   { if(args.Length!=0) throw Ops.WrongNumArgs("__repr__", args.Length, 0);
-    return StringOps.Quote(instance);
+    return instance==null ? ReflectedType.FromType(typeof(string)).ToString() : StringOps.Escape(instance);
   }
 
   string instance;
@@ -289,7 +289,7 @@ public abstract class ReflectedMethodBase : ICallable
     public static bool operator!=(Match a, Match b) { return a.Conv!=b.Conv || a.APA!=b.APA || a.PA!=b.PA; }
     
     public override bool Equals(object obj) { return  obj is Match ? this==(Match)obj : false; }
-    public override int GetHashCode() { throw new NotImplementedException(); }
+    public override int GetHashCode() { throw new NotSupportedException(); }
 
     public Conversion Conv;
     public ParameterInfo[] Parms;

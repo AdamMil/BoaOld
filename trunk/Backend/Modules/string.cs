@@ -10,6 +10,9 @@ namespace Boa.Modules
 public sealed class @string
 { @string() { }
 
+  public static string __repr__() { return __str__(); }
+  public static string __str__() { return "<module 'string' (built-in)>"; }
+
   public static string capitalize(string word)
   { if(word.Length==0) return word;
     StringBuilder sb = new StringBuilder(word.Length);

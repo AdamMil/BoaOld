@@ -108,29 +108,33 @@ public class List : IMutableSequence, IList, IComparable, ICloneable
 
     ISequence seq = value as ISequence;
     if(seq==null && value is string) seq = new StringOps.SequenceWrapper((string)value);
-    if(seq!=null)
-    { int len = seq.__len__();
-      if(step==1 || step==-1)
-      { int diff = Math.Abs(len-slen);
-        if(step==1)
-        { if(len<slen) RemoveRange(start+len, diff);
-          else if(len>slen) Insert(start+slen, diff);
-          for(int i=0; i<len; i++) items[i+start] = seq.__getitem__(i);
-        }
-        else
-        { if(len>slen) { Insert(stop+1, diff); start += diff; }
-          else if(len<slen) { RemoveRange(stop+1, diff); start -= diff; }
-          for(int i=0; i<len; i++) items[start-i] = seq.__getitem__(i);
-        }
+
+    int len = seq==null ? Ops.ToInt(Ops.Invoke(value, "__len__")) : seq.__len__();
+    if(step==1 || step==-1)
+    { int diff = Math.Abs(len-slen);
+      if(step==1)
+      { if(len<slen) RemoveRange(start+len, diff);
+        else if(len>slen) Insert(start+slen, diff);
       }
-      else
-      { if(len!=slen)
-          throw Ops.ValueError("can't assign sequence of size {0} to extended slice of size {1}", len, slen);
-        if(step>0) for(int i=0; start<stop; i++,start+=step) items[start] = seq.__getitem__(i);
-        else for(int i=0; start>stop; i++,start+=step) items[start] = seq.__getitem__(i);
-      }
+      else if(len>slen) { Insert(stop+1, diff); start += diff; }
+      else if(len<slen) { RemoveRange(stop+1, diff); start -= diff; }
     }
-    else throw new NotImplementedException();
+    else if(len!=slen)
+      throw Ops.ValueError("can't assign sequence of size {0} to extended slice of size {1}", len, slen);
+
+    if(seq!=null)
+    { if(step==1) for(int i=0; i<len; i++) items[i+start] = seq.__getitem__(i);
+      else if(step==-1) for(int i=0; i<len; i++) items[start-i] = seq.__getitem__(i);
+      else if(step>0) for(int i=0; start<stop; i++,start+=step) items[start] = seq.__getitem__(i);
+      else for(int i=0; start>stop; i++,start+=step) items[start] = seq.__getitem__(i);
+    }
+    else
+    { object getitem = Ops.GetAttr(value, "__getitem__");
+      if(step==1) for(int i=0; i<len; i++) items[i+start] = Ops.Call(getitem, i);
+      else if(step==-1) for(int i=0; i<len; i++) items[start-i] = Ops.Call(getitem, i);
+      else if(step>0) for(int i=0; start<stop; i++,start+=step) items[start] = Ops.Call(getitem, i);
+      else for(int i=0; start>stop; i++,start+=step) items[start] = Ops.Call(getitem, i);
+    }
   }
   #endregion
 
