@@ -397,9 +397,8 @@ eval() or execfile().")]
 
   [DocString(@"exec(code[, globals[, locals]])
 
-This function is similar implements the exec statement.
-The arguments are an object and two optional dictionaries.
-The return value is null.
+This function implements the exec statement. The arguments are an object
+and two optional dictionaries. The return value is null.
 
 'code' should be either a string, an open file object, or a code object.
 If it is a string, the string is parsed as a suite of Python statements
@@ -564,108 +563,7 @@ name of a module, function, class, method, keyword, or documentation topic,
 and a help page is printed on the console. If the argument is any other kind
 of object, a help page on the object is generated.")]
   public static void help() { throw new NotImplementedException(); }
-  public static void help(object o)
-  { object doc;
-    if(o is FunctionWrapper) o = ((FunctionWrapper)o).func;
-    restart:
-    if(o is Function)
-    { Function f = (Function)o;
-      Console.Write("def ");
-      Console.Write(f.Name);
-      Console.Write('(');
-      int i=0;
-      for(; i<f.NumRequired; i++)
-      { if(i!=0) Console.Write(", ");
-        Console.Write(f.ParamNames[i]);
-      }
-      for(int j=0, end=f.ParamNames.Length-(f.HasDict?1:0)-(f.HasList?1:0); i<end; i++,j++)
-      { if(i!=0) Console.Write(", ");
-        Console.Write(f.ParamNames[i]);
-        Console.Write('=');
-        Console.Write(Ops.Repr(f.Defaults[j]));
-      }
-
-      if(f.HasList)
-      { if(i++!=0) Console.Write(", ");
-        Console.Write('*');
-        Console.Write(f.ParamNames[f.ParamNames.Length-(f.HasDict?2:1)]);
-      }
-      if(f.HasDict)
-      { if(i!=0) Console.Write(", ");
-        Console.Write("**");
-        Console.Write(f.ParamNames[f.ParamNames.Length-1]);
-      }
-      Console.WriteLine("):");
-      if(Ops.GetAttr(o, "__doc__", out doc) && doc!=null && Ops.Str(doc)!="") Console.WriteLine(doc);
-    }
-    else if(Ops.GetAttr(o, "__doc__", out doc) && doc!=null && Ops.Str(doc)!="") Console.WriteLine(doc);
-    else if(o is ReflectedEvent)
-    { ReflectedEvent re = (ReflectedEvent)o;
-      Console.WriteLine("'{0}' is an event that takes a '{1}' object",
-                        re.info.Name, TypeName(re.info.EventHandlerType));
-      o = re.info.EventHandlerType;
-      goto restart;
-    }
-    else if(o is ReflectedField)
-    { ReflectedField rf = (ReflectedField)o;
-      Console.WriteLine("'{0}' is a field of type '{1}'", rf.info.Name, TypeName(rf.info.FieldType));
-    }
-    else if(o is ReflectedMethodBase)
-    { ReflectedMethodBase rm = (ReflectedMethodBase)o;
-      foreach(System.Reflection.MethodBase mb in rm.sigs)
-      { Console.Write(rm.__name__);
-        Console.Write('(');
-        WriteParameters(mb.GetParameters());
-        Console.Write(mb.IsStatic ? ")" : ") (method)");
-        if(!mb.IsConstructor)
-        { Type ret = ((System.Reflection.MethodInfo)mb).ReturnType;
-          if(ret!=typeof(void)) Console.Write(" -> "+TypeName(ret));
-        }
-        Console.WriteLine();
-      }
-    }
-    else if(o is ReflectedProperty)
-    { ReflectedProperty rp = (ReflectedProperty)o;
-      Console.Write("{0} is a property with ", rp.state.info.Name);
-      if(rp.state.get==null) Console.Write("no get accessors ");
-      else { Console.WriteLine("the following get accessors:"); help(rp.state.get); }
-      if(rp.state.set==null) Console.WriteLine("and no set accessors");
-      else { Console.WriteLine("and the following set accessors:"); help(rp.state.set); }
-    }
-    else if(o is ReflectedType)
-    { Type type = ((ReflectedType)o).Type;
-      if(type.IsEnum)
-      { int nameLen=0;
-        string[] names = Enum.GetNames(type);
-        Array values = Enum.GetValues(type);
-        for(int i=0; i<names.Length; i++) if(names[i].Length>nameLen) nameLen=names[i].Length;
-        nameLen += 2;
-
-        Console.WriteLine("{0} is an enum with the following values:", type.FullName);
-        for(int i=0; i<names.Length; i++)
-        { Console.Write(names[i].PadRight(nameLen));
-          Console.WriteLine(Ops.ToInt(values.GetValue(i)));
-        }
-      }
-      else if(type.IsSubclassOf(typeof(Delegate)))
-      { System.Reflection.MethodInfo mi = type.GetMethod("Invoke");
-        Console.Write(type.Name);
-        Console.Write('(');
-        WriteParameters(mi.GetParameters());
-        Console.Write(") (delegate)");
-        if(mi.ReturnType!=typeof(void)) Console.Write(" -> "+TypeName(mi.ReturnType));
-        Console.WriteLine();
-      }
-      else
-      { o = ((ReflectedType)o).Constructor;
-        if(o!=null) goto restart;
-        else goto noHelp;
-      }
-    }
-    else goto noHelp;
-    return;
-    noHelp: Console.WriteLine("No help available for {0}.", Ops.GetDynamicType(o).__name__);
-  }
+  public static void help(object o) { Console.Write(helptext(o)); }
 
   [DocString(@"hex(number) -> str
 
@@ -1158,7 +1056,107 @@ cannot be altered at runtime.")]
   public static readonly ReflectedType ValueError = ReflectedType.FromType(typeof(ValueErrorException));
   public static readonly ReflectedType ZeroDivisionError = ReflectedType.FromType(typeof(DivideByZeroException));
   #endregion
-  
+
+  internal static string helptext(object o) { return helptext(o, new System.Text.StringBuilder()); }
+  static string helptext(object o, System.Text.StringBuilder sb)
+  { object doc;
+    string docstr;
+
+    if(o is FunctionWrapper) o = ((FunctionWrapper)o).func;
+    if(o==null) sb.Append("This is a null value.\n");
+    else if(o is Function)
+    { Function f = (Function)o;
+      sb.Append("def ").Append(f.Name).Append('(');
+      int i=0;
+      for(; i<f.NumRequired; i++)
+      { if(i!=0) sb.Append(", ");
+        sb.Append(f.ParamNames[i]);
+      }
+      for(int j=0, end=f.ParamNames.Length-(f.HasDict?1:0)-(f.HasList?1:0); i<end; i++,j++)
+      { if(i!=0) sb.Append(", ");
+        sb.Append(f.ParamNames[i]).Append('=').Append(Ops.Repr(f.Defaults[j]));
+      }
+
+      if(f.HasList)
+      { if(i++!=0) sb.Append(", ");
+        sb.Append('*').Append(f.ParamNames[f.ParamNames.Length-(f.HasDict?2:1)]);
+      }
+      if(f.HasDict)
+      { if(i!=0) sb.Append(", ");
+        sb.Append("**").Append(f.ParamNames[f.ParamNames.Length-1]);
+      }
+      sb.Append("):\n");
+      if(Ops.GetAttr(o, "__doc__", out doc) && doc!=null && (docstr=Ops.Str(doc))!="")
+        sb.Append(docstr).Append('\n');
+    }
+    else if(Ops.GetAttr(o, "__doc__", out doc) && doc!=null && (docstr=Ops.Str(doc))!="")
+      sb.Append(docstr).Append('\n');
+    else if(o is ReflectedEvent)
+    { ReflectedEvent re = (ReflectedEvent)o;
+      sb.Append(re.info.Name).Append(" is an event that takes a ")
+        .Append(TypeName(re.info.EventHandlerType)).Append(" object\n");
+      helptext(re.info.EventHandlerType, sb);
+    }
+    else if(o is ReflectedField)
+    { ReflectedField rf = (ReflectedField)o;
+      sb.Append(rf.info.Name).Append(" is a field of type ").Append(TypeName(rf.info.FieldType)).Append('\n');
+    }
+    else if(o is ReflectedMethodBase)
+    { ReflectedMethodBase rm = (ReflectedMethodBase)o;
+      foreach(System.Reflection.MethodBase mb in rm.sigs)
+      { sb.Append(rm.__name__).Append('(');
+        WriteParameters(mb.GetParameters(), sb);
+        sb.Append(mb.IsStatic ? ")" : ") (method)");
+        if(!mb.IsConstructor)
+        { Type ret = ((System.Reflection.MethodInfo)mb).ReturnType;
+          if(ret!=typeof(void)) sb.Append(" -> ").Append(TypeName(ret));
+        }
+        sb.Append('\n');
+      }
+    }
+    else if(o is ReflectedProperty)
+    { ReflectedProperty rp = (ReflectedProperty)o;
+      sb.Append(rp.state.info.Name).Append(" is a property with ");
+      if(rp.state.get==null) sb.Append("no get accessors ");
+      else { sb.Append("the following get accessors:\n"); helptext(rp.state.get, sb); }
+      if(rp.state.set==null) sb.Append("and no set accessors\n");
+      else { sb.Append("and the following set accessors:\n"); helptext(rp.state.set, sb); }
+    }
+    else if(o is ReflectedType)
+    { Type type = ((ReflectedType)o).Type;
+      if(type.IsEnum)
+      { int nameLen=0;
+        string[] names = Enum.GetNames(type);
+        Array values = Enum.GetValues(type);
+        for(int i=0; i<names.Length; i++) if(names[i].Length>nameLen) nameLen=names[i].Length;
+        nameLen += 2;
+
+        sb.Append(type.FullName).Append(" is an enum with the following values:\n");
+        for(int i=0; i<names.Length; i++)
+          sb.Append(names[i].PadRight(nameLen)).Append(Ops.ToInt(values.GetValue(i))).Append('\n');
+      }
+      else if(type.IsSubclassOf(typeof(Delegate)))
+      { System.Reflection.MethodInfo mi = type.GetMethod("Invoke");
+        sb.Append(type.Name).Append('(');
+        WriteParameters(mi.GetParameters(), sb);
+        sb.Append(") (delegate)");
+        if(mi.ReturnType!=typeof(void)) sb.Append(" -> "+TypeName(mi.ReturnType));
+        sb.Append('\n');
+      }
+      else
+      { o = ((ReflectedType)o).Constructor;
+        if(o!=null) helptext(o, sb);
+        else goto noHelp;
+      }
+    }
+    else goto noHelp;
+    return sb.ToString();
+
+    noHelp:
+    sb.Append("No help available for ").Append(Ops.GetDynamicType(o).__name__).Append(".\n");
+    return sb.ToString();
+  }
+
   static string TypeName(Type type)
   { if(type.IsArray) return TypeName(type.GetElementType())+"[]";
     if(type==typeof(object)) return "object";
@@ -1168,14 +1166,15 @@ cannot be altered at runtime.")]
     return type.FullName;
   }
 
-  static void WriteParameters(System.Reflection.ParameterInfo[] parms)
+  static void WriteParameters(System.Reflection.ParameterInfo[] parms, System.Text.StringBuilder sb)
   { bool sep=false;
     foreach(System.Reflection.ParameterInfo pi in parms)
-    { if(sep) Console.Write(", ");
+    { if(sep) sb.Append(", ");
       else sep=true;
-      Console.Write("{0} {1}{2}", TypeName(pi.ParameterType),
-                    pi.IsDefined(typeof(ParamArrayAttribute), false) ? "*" : "", pi.Name);
-      if(pi.IsOptional) Console.Write("="+Ops.Repr(pi.DefaultValue));
+      sb.Append(TypeName(pi.ParameterType)).Append(' ');
+      if(pi.IsDefined(typeof(ParamArrayAttribute), false)) sb.Append('*');
+      sb.Append(pi.Name);
+      if(pi.IsOptional) sb.Append('=').Append(Ops.Repr(pi.DefaultValue));
     }
   }
 }

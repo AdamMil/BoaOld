@@ -399,6 +399,11 @@
                     BuildAction = "Compile"
                 />
                 <File
+                    RelPath = "Runtime\Embed.cs"
+                    SubType = "Code"
+                    BuildAction = "Compile"
+                />
+                <File
                     RelPath = "Runtime\Enumerator.cs"
                     SubType = "Code"
                     BuildAction = "Compile"

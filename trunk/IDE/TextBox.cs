@@ -13,10 +13,10 @@ namespace Boa.IDE
 #region BoaBox
 public class BoaBox : TextEditorControl
 { public BoaBox()
-  { AllowDrop = ConvertTabsToSpaces = true;
+  { ConvertTabsToSpaces = true;
     EnableFolding = ShowEOLMarkers = ShowInvalidLines = ShowLineNumbers = ShowSpaces = ShowTabs = ShowVRuler = false;
     TabIndent = 2;
-    
+
     ActiveTextAreaControl.TextArea.DoProcessDialogKey += new DialogKeyProcessor(TextArea_DialogKey);
     ActiveTextAreaControl.TextArea.KeyEventHandler += new ICSharpCode.TextEditor.KeyEventHandler(TextArea_KeyEventHandler);
 
@@ -27,7 +27,7 @@ public class BoaBox : TextEditorControl
   public void AppendLine(string format, params object[] args) { AppendLine(string.Format(format, args)); }
   public void AppendLine(string text)
   { int end = Document.TextLength;
-    if(Document.GetCharAt(end-1) != '\n') Document.Insert(end++, "\n");
+    if(end!=0 && Document.GetCharAt(end-1) != '\n') Document.Insert(end++, "\n");
     ActiveTextAreaControl.TextArea.Document.Insert(end, text+"\n");
   }
 
@@ -43,6 +43,7 @@ public class BoaBox : TextEditorControl
   protected AutoCompleteBox AcBox { get { return EditForm.acbox; } }
   protected Frame BoaFrame { get { return EditForm.boaFrame; } }
   protected EditForm EditForm { get { return (EditForm)ParentForm; } }
+  protected ImmediateBox Immediate { get { return EditForm.immediate; } }
 
   #region Event handlers
   bool TextArea_DialogKey(Keys key)
@@ -57,46 +58,57 @@ public class BoaBox : TextEditorControl
       else
       { if(AcBox.SelectedIndex!=-1) SelectItem();
         PopulateMembers();
-        if(AcBox.Items.Count==0) AcBox.Hide();
+        if(AcBox.Items.Count==0) HideCompletionBox();
+        else typed="";
       }
-      typed = "";
       return false;
     }
     else if(code==Keys.Back)
     { if(typed.Length!=0) typed = typed.Substring(0, typed.Length-1);
       int curPos = ActiveTextAreaControl.Caret.Offset;
-      if(curPos>0 && Document.GetCharAt(curPos-1)=='.') AcBox.Hide();
+      if(curPos>0 && Document.GetCharAt(curPos-1)=='.') HideCompletionBox();
       return false;
     }
     else if(!AcBox.Visible)
-    { if(code==Keys.Return && alt && !control && !shift) // Alt-enter
+    { if(code==Keys.I && control && !alt && !shift)
+      { string ident = ActiveTextAreaControl.SelectionManager.SelectedText.Trim();
+        if(ident!="")
+        { object obj;
+          if(GetObject(ident, false, out obj)) Immediate.Document.Insert(0, EmbedHelpers.HelpText(obj));
+          else Immediate.Document.Insert(0, "No such object.\n");
+        }
+        return true;
+      }
+      else if(code==Keys.Return && alt && !control && !shift) // Alt-enter
       { TextAreaControl txt = ActiveTextAreaControl;
         Caret caret = txt.Caret;
         string source = txt.SelectionManager.SelectedText;
-        bool nextline;
+        int nextline;
         if(source=="")
         { source = Document.GetText(Document.GetLineSegmentForOffset(caret.Offset)).Trim();
-          nextline = true;
+          ICSharpCode.TextEditor.Document.LineSegment seg = Document.GetLineSegmentForOffset(caret.Offset);
+          nextline = caret.Offset==seg.Offset+seg.TotalLength ? 2 : 1;
           if(source=="") goto move;
         }
-        else nextline = false;
+        else nextline=0;
         EditForm.Run(source, true);
 
         move:
-        int line = 1+(nextline ? caret.Line : txt.SelectionManager.GetSelectionAt(caret.Offset).EndPosition.Y);
+        if(nextline==2) return false;
+
+        int line = 1 + (nextline==0 ? txt.SelectionManager.GetSelectionAt(caret.Offset).EndPosition.Y : caret.Line);
         if(line==Document.TotalNumberOfLines) Document.Insert(Document.TextLength, "\n");
         caret.Position = new Point(0, line);
-
+        txt.SelectionManager.ClearSelection();
         return true;
       }
-      else if(code==Keys.Space && control && !shift && !alt)
+      else if(code==Keys.Space && control && !shift && !alt) // ctrl-space
       { string text = PopulatePartial();
-        if(AcBox.Items.Count==1) { typed=text; AcBox.SelectedIndex=0; SelectItem(); }
+        if(AcBox.Items.Count==1) { typed=text; AcBox.SelectedIndex=0; SelectItem(); typed=""; }
         else if(AcBox.Items.Count!=0) ShowCompletionBox();
-        typed = "";
         return true;
       }
-      else if(code==Keys.OemCloseBrackets && control && !shift && !alt)
+      else if(code==Keys.OemCloseBrackets && control && !shift && !alt) // ctrl-]
       { int index=ActiveTextAreaControl.Caret.Offset;
         if(index!=Document.TextLength)
         { char c = Document.GetCharAt(index), other;
@@ -136,6 +148,7 @@ public class BoaBox : TextEditorControl
     else if(code==Keys.End)
     { AcBox.SelectedIndex = AcBox.Items.Count-1;
     }
+    else if(code==Keys.Escape) HideCompletionBox();
     else return false;
     
     return true;
@@ -145,12 +158,9 @@ public class BoaBox : TextEditorControl
   { if(!AcBox.Visible || ch=='.' || ch=='\b') return false;
     else if(ch<127 && !char.IsLetterOrDigit(ch) && ch!='_')
     { bool handled=false;
-      if(ch=='(' || ch=='[' || ch=='\n' || ch=='\r' || ch=='\t' || ch==' ')
-      { if(AcBox.SelectedIndex!=-1) SelectItem();
-        if((int)ch<32) handled=true;
-      }
-      AcBox.Hide();
-      typed = "";
+      if(AcBox.SelectedIndex!=-1) SelectItem();
+      if(ch=='\n' || ch=='\r' || ch=='\t') handled=true;
+      HideCompletionBox();
       return handled;
     }
     else if(ch>32 && ch<127)
@@ -163,15 +173,27 @@ public class BoaBox : TextEditorControl
   #endregion
 
   object GetObject(string ident, bool ignoreLast)
-  { if(ident==null || ident=="") return null;
+  { object ret;
+    return GetObject(ident, ignoreLast, out ret) ? ret : null;
+  }
+
+  bool GetObject(string ident, bool ignoreLast, out object ret)
+  { ret=null;
+    if(ident==null || ident=="") return false;
     string[] bits = ident.Split('.');
     try
     { object obj=BoaFrame.Module;
       for(int i=0,len=bits.Length-(ignoreLast ? 1 : 0); i<len; i++)
-        if(!Ops.GetAttr(obj, bits[i], out obj) || obj==null) return null;
-      return obj;
+        if(!Ops.GetAttr(obj, bits[i], out obj) || obj==null) return false;
+      ret=obj;
     }
-    catch { return null; }
+    catch { return false; }
+    return true;
+  }
+
+  void HideCompletionBox()
+  { AcBox.Hide();
+    typed="";
   }
 
   void PopulateMembers()
