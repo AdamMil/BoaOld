@@ -29,6 +29,7 @@ public class Tuple : ISequence, ICollection, IComparable
   }
 
   public object __getitem__(int index) { return items[Ops.FixIndex(index, items.Length)]; }
+  public object __getitem__(Slice slice) { return Ops.SequenceSlice(this, slice); }
   public int __len__() { return items.Length; }
   public bool __contains__(object value)
   { for(int i=0; i<items.Length; i++) if(Ops.Compare(items[i], value)==0) return true;

@@ -4,7 +4,6 @@ using System.IO;
 using Boa.Runtime;
 
 // TODO: allow nonparenthesized tuples
-// TODO: change === and !== to 'is' and 'is not'
 // TODO: allow chained assignment (eg, a = b = c)
 namespace Boa.AST
 {
@@ -23,7 +22,7 @@ enum Token
   
   // keywords
   Def, Print, Return, And, Or, Not, While, If, Elif, Else, Pass, Break, Continue, Global, Import, From, For, In,
-  Lambda, Try, Except, Finally, Raise, Class, Assert,
+  Lambda, Try, Except, Finally, Raise, Class, Assert, Is, Del,
   
   // abstract
   Identifier, Literal, Assign, Compare, Call, Member, Index, Slice, Hash, List, Tuple, Suite,
@@ -45,7 +44,8 @@ public class Parser
     Token[] tokens =
     { Token.Def, Token.Print, Token.Return, Token.And, Token.Or, Token.Not, Token.While, Token.Import, Token.From,
       Token.For, Token.If,  Token.Elif, Token.Else, Token.Pass, Token.Break, Token.Continue, Token.Global, Token.In,
-      Token.Lambda, Token.Try, Token.Except, Token.Finally, Token.Raise, Token.Class, Token.Assert,
+      Token.Lambda, Token.Try, Token.Except, Token.Finally, Token.Raise, Token.Class, Token.Assert, Token.Is,
+      Token.Del,
     };
     foreach(Token token in tokens) stringTokens.Add(Enum.GetName(typeof(Token), token).ToLower(), token);
   }
@@ -207,7 +207,18 @@ public class Parser
       { expr = AP(new CallExpression(expr, ParseArguments()));
         Eat(Token.RParen);
       }
-      else if(TryEat(Token.LBracket)) throw new NotImplementedException();
+      else if(TryEat(Token.LBracket))
+      { Expression start = token==Token.Colon ? new ConstantExpression(0) : ParseExpression();
+        if(TryEat(Token.Colon))
+        { Expression stop = token==Token.Colon || token==Token.RBracket ? new ConstantExpression(int.MaxValue)
+                                                                        : ParseExpression();
+          Expression step = null;
+          if(TryEat(Token.Colon)) step=ParseExpression();
+          start = new SliceExpression(start, stop, step);
+        }
+        Eat(Token.RBracket);
+        return new IndexExpression(expr, start);
+      }
       else return expr;
     }
   }
@@ -232,12 +243,14 @@ public class Parser
   }
 
   // compare    := <bitwise> (<compare_op> <bitwise>)*
-  // compare_op := '==' | '!=' | '<' | '>' | '<=' | '>=' | '===' | '!=='
+  // compare_op := '==' | '!=' | '<' | '>' | '<=' | '>=' | '===' | '!==' | 'is' | 'is not'
   Expression ParseCompare()
   { Expression expr = ParseBitwise();
-    while(token==Token.Compare)
-    { BinaryOperator op = (BinaryOperator)value;
-      NextToken();
+    while(token==Token.Compare || token==Token.Is)
+    { BinaryOperator op;
+      if(token==Token.Is)
+        op = NextToken()==Token.Not ? BinaryOperator.NotIdentical : (BinaryOperator)BinaryOperator.Identical;
+      else { op = (BinaryOperator)value; NextToken(); }
       expr = AP(new BinaryOpExpression(op, expr, ParseBitwise()));
     }
     return expr;
@@ -260,15 +273,23 @@ public class Parser
     return ret;
   }
 
-  // expr_stmt  := <expression> | <lvalue> '=' (<expression> | <tuple>)
+  // expr_stmt  := (<lvalue> '=')* <expression>
   // assignable := <name> | <index> | <slice>
   // lvalue     := <assignable> | <tuple of <assignable>>
   Statement ParseExprStmt()
   { Expression lhs = ParseExpression();
-    if(TryEat(Token.Assign))
-    { if(lhs is NameExpression || lhs is AttrExpression || lhs is TupleExpression)
-        return AP(new AssignStatement(lhs, ParseExpression()));
-      SyntaxError("can't assign to {0}", lhs.GetType()); return null;
+    if(token==Token.Assign)
+    { ArrayList list = new ArrayList();
+      AssignStatement ass = (AssignStatement)AP(new AssignStatement());
+      while(TryEat(Token.Assign))
+      { if(!(lhs is NameExpression || lhs is AttrExpression || lhs is TupleExpression || lhs is IndexExpression))
+          SyntaxError("can't assign to {0}", lhs.GetType());
+        list.Add(lhs);
+        lhs = ParseExpression();
+      }
+      ass.LHS = (Expression[])list.ToArray(typeof(Expression));
+      ass.RHS = lhs;
+      return ass;
     }
     else return AP(new ExpressionStatement(lhs));
   }
@@ -563,13 +584,14 @@ public class Parser
   }
 
   // simple_stmt := <expr_stmt> | <print_stmt> | <break_stmt> | <continue_stmt> | <pass_stmt> | <return_stmt>
-  //                <assert_stmt>
+  //                <assert_stmt> | <del_stmt>
   // break_stmt    := 'break' EOL
   // continue_stmt := 'continue' EOL
   // pass_stmt     := 'pass' EOL
   // raise_stmt    := 'raise' <expression>?
   // return_stmt   := 'return' <expression>?
   // assert_stmt   := 'assert' <expression>
+  // del_stmt      := 'del' <lvalue>
   Statement ParseSimpleStmt()
   { switch(token)
     { case Token.Print: return ParsePrintStmt();
@@ -592,6 +614,13 @@ public class Parser
         return AP(token==Token.EOL || token==Token.Semicolon ? new RaiseStatement()
                                                              : new RaiseStatement(ParseExpression()));
       case Token.Assert: NextToken(); return AP(new AssertStatement(ParseExpression()));
+      case Token.Del:
+      { NextToken();
+        Expression e = ParseExpression();
+        if(!(e is NameExpression || e is AttrExpression || e is TupleExpression || e is IndexExpression))
+          SyntaxError("can't assign to {0}", e.GetType());
+        return AP(new DelStatement(e));
+      }
       default: return ParseExprStmt();
     }
   }
@@ -802,22 +831,12 @@ public class Parser
           return Token.Compare;
         case '=':
           c = ReadChar();
-          if(c=='=')
-          { c = ReadChar();
-            if(c=='=') value = BinaryOperator.Identical;
-            else { lastChar=c; value=BinaryOperator.Equal; }
-            return Token.Compare;
-          }
-          lastChar=c; value=null; return Token.Assign;
+          if(c=='=') { value=BinaryOperator.Equal; return Token.Compare; }
+          else { lastChar=c; value=null; return Token.Assign; }
         case '!':
           c = ReadChar();
-          if(c=='=')
-          { c = ReadChar();
-            if(c=='=') value=BinaryOperator.NotIdentical;
-            else { lastChar=c; value=BinaryOperator.NotEqual; }
-            return Token.Compare;
-          }
-          lastChar = c; return Token.LogNot;
+          if(c=='=') { value=BinaryOperator.NotEqual; return Token.Compare; }
+          else { lastChar = c; return Token.LogNot; }
         case '&':
           c = ReadChar();
           if(c=='&') return Token.LogAnd;

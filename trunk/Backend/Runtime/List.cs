@@ -5,7 +5,7 @@ namespace Boa.Runtime
 {
 
 [BoaType("list")]
-public class List : IMutableSequence, IList, IComparable
+public class List : IMutableSequence, IList, IComparable, ICloneable
 { public List() { items = new object[16]; }
   public List(int capacity) { items = new object[Math.Max(capacity, 4)]; }
   public List(ICollection c) : this(c.Count) { c.CopyTo(items, 0); size=c.Count; }
@@ -54,7 +54,15 @@ public class List : IMutableSequence, IList, IComparable
   }
 
   public void remove(object item) { RemoveAt(index(item)); }
+
+  public void RemoveRange(int start, int count)
+  { if(start<0 || start+count>size) throw Ops.ValueError("RemoveRange(): indices out of range");
+    size -= count;
+    for(; start<size; start++) items[start] = items[start+count];
+  }
+  
   public void reverse() { Array.Reverse(items, 0, size); }
+
   public void sort() { Array.Sort(items, 0, size, Ops.DefaultComparer); }
   public void sort(object cmpfunc) { Array.Sort(items, 0, size, new FunctionComparer(cmpfunc)); }
 
@@ -67,10 +75,59 @@ public class List : IMutableSequence, IList, IComparable
   }
 
   public bool __contains__(object value) { return IndexOf(value, 0, size) != -1; }
+
   public void __delitem__(int index) { RemoveAt(Ops.FixIndex(index, size)); }
+  public void __delitem__(Slice slice)
+  { Tuple tup = slice.indices(size);
+    int start=(int)tup.items[0], stop=(int)tup.items[1], step=(int)tup.items[2];
+    if(start==stop) return;
+
+    if(step==1) RemoveRange(start, stop-start);
+    else if(step==-1) RemoveRange(stop+1, start-stop);
+    else
+    { int off=1;
+      for(int i=start,next=start+step; i<size; i++)
+      { if(i+off==next) { if((next+=step)>=stop) next=0; else off++; }
+        items[i] = items[i+off];
+      }
+      size -= off;
+    }
+  }
+
   public object __getitem__(int index) { return items[Ops.FixIndex(index, size)]; }
+  public object __getitem__(Slice slice) { return Ops.SequenceSlice(this, slice); }
+
   public int __len__() { return size; }
+
   public void __setitem__(int index, object value) { items[Ops.FixIndex(index, size)] = value; }
+  public void __setitem__(Slice slice, object value)
+  { Tuple tup = slice.indices(size);
+    int start=(int)tup.items[0], stop=(int)tup.items[1], step=(int)tup.items[2];
+
+    if(step<0)
+    { int t = start;
+      start = start + (((stop-start+step+1)/step)-1)*step;
+      stop  = t;
+      step  = -step;
+    }
+    int slen=(stop-start+step-1)/step;
+
+    if(value is ISequence)
+    { ISequence seq = (ISequence)value;
+      int len = seq.__len__();
+      if(step==1)
+      { if(len<slen) RemoveRange(start+len, slen-len);
+        else if(len>slen) Insert(start+slen, len-slen);
+        for(int i=0; i<len; i++) items[i+start] = seq.__getitem__(i);
+      }
+      else
+      { if(len!=slen)
+          throw Ops.ValueError("can't assign sequence of size {0} to extended slice of size {1}", len, slen);
+        for(int i=0; start<stop; i++,start+=step) items[start] = seq.__getitem__(i);
+      }
+    }
+    else throw new NotImplementedException();
+  }
   #endregion
 
   #region IList Members
@@ -151,6 +208,10 @@ public class List : IMutableSequence, IList, IComparable
   }
   #endregion
 
+  #region ICloneable Members
+  public object Clone() { return new List(this); }
+  #endregion
+
   public override string ToString()
   { System.Text.StringBuilder sb = new System.Text.StringBuilder();
     sb.Append('[');
@@ -171,6 +232,12 @@ public class List : IMutableSequence, IList, IComparable
   int IndexOrError(int index)
   { if(index<0) throw Ops.ValueError("item not in list");
     return index;
+  }
+
+  void Insert(int start, int count)
+  { ResizeTo(size+count);
+    for(int i=size-1; i>=start; i--) items[i+count] = items[i];
+    size += count;
   }
 
   void ResizeTo(int capacity)
