@@ -23,16 +23,15 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 using System;
 using System.IO;
+using Boa.Runtime;
 
 namespace Boa.IDE
 {
 
 class App
 { static void Main()
-  { MemoryStream ms = new MemoryStream(System.Text.Encoding.ASCII.GetBytes("hello, world!"));
-    PieceTable pt = new PieceTable(ms, System.Text.Encoding.ASCII);
-
-    
+  { Importer.ImportStandardModules();
+    System.Windows.Forms.Application.Run(new MainForm());
   }
 }
 

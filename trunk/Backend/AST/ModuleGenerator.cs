@@ -131,9 +131,7 @@ public sealed class ModuleGenerator
         ecg.EmitString("__main__");
         ecg.EmitCall(typeof(Runtime.Module), "__setattr__");
 
-        ecg.EmitString("string");
-        ecg.EmitCall(typeof(Importer), "Import", new Type[] { typeof(string) });
-        ecg.ILG.Emit(OpCodes.Pop);
+        ecg.EmitCall(typeof(Importer), "ImportStandardModules");
 
         mod.EmitGet(ecg);
         frame.EmitGet(ecg);
