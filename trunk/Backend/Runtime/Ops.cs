@@ -1206,7 +1206,7 @@ public sealed class Ops
         case TypeCode.Single: return checked((int)(float)o);
         case TypeCode.String:
           try { return int.Parse((string)o); }
-          catch(FormatException) { ValueError("string does not contain a valid int"); break; }
+          catch(FormatException) { throw ValueError("string does not contain a valid int"); }
         case TypeCode.UInt16: return (int)(ushort)o;
         case TypeCode.UInt32: return checked((int)(uint)o);
         case TypeCode.UInt64: return checked((int)(ulong)o);
@@ -1233,7 +1233,7 @@ public sealed class Ops
         case TypeCode.Single: return checked((uint)(float)o);
         case TypeCode.String:
           try { return uint.Parse((string)o); }
-          catch(FormatException) { ValueError("string does not contain a value uint"); goto default; }
+          catch(FormatException) { throw ValueError("string does not contain a value uint"); }
         case TypeCode.UInt16: return (uint)(ushort)o;
         case TypeCode.UInt32: return (uint)o;
         case TypeCode.UInt64: return checked((uint)(ulong)o);
@@ -1259,7 +1259,7 @@ public sealed class Ops
         case TypeCode.Single: return checked((long)(float)o);
         case TypeCode.String:
           try { return long.Parse((string)o); }
-          catch(FormatException) { ValueError("string does not contain a valid long"); goto default; }
+          catch(FormatException) { throw ValueError("string does not contain a valid long"); }
         case TypeCode.UInt16: return (long)(ushort)o;
         case TypeCode.UInt32: return (long)(uint)o;
         case TypeCode.UInt64: return checked((long)(ulong)o);
@@ -1285,7 +1285,7 @@ public sealed class Ops
         case TypeCode.Single: return checked((ulong)(float)o);
         case TypeCode.String:
           try { return ulong.Parse((string)o); }
-          catch(FormatException) { ValueError("string does not contain a valid ulong"); goto default; }
+          catch(FormatException) { throw ValueError("string does not contain a valid ulong"); }
         case TypeCode.UInt16: return (ushort)o;
         case TypeCode.UInt32: return (uint)o;
         case TypeCode.UInt64: return (ulong)o;

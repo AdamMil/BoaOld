@@ -54,7 +54,7 @@ enum Token
   
   // keywords
   Def, Print, Return, While, If, Elif, Else, Pass, Break, Continue, Global, Import, From, For, In, Not,
-  Lambda, Try, Except, Finally, Raise, Class, Assert, Is, Del, Yield, Exec,
+  Lambda, Try, Except, Finally, Raise, Class, Assert, Is, Del, Yield, Lock, Using,
   
   // abstract
   Identifier, Literal, Assign, Compare, Call, Member, Index, Slice, Hash, List, Tuple, Suite,
@@ -83,7 +83,7 @@ public class Parser
     { Token.Def, Token.Print, Token.Return, Token.While, Token.Import, Token.From,
       Token.For, Token.If,  Token.Elif, Token.Else, Token.Pass, Token.Break, Token.Continue, Token.Global, Token.In,
       Token.Lambda, Token.Try, Token.Except, Token.Finally, Token.Raise, Token.Class, Token.Assert, Token.Is,
-      Token.Del, Token.Yield, Token.Exec, Token.Not,
+      Token.Del, Token.Yield, Token.Not, Token.Lock, Token.Using,
     };
     foreach(Token token in tokens) stringTokens.Add(Enum.GetName(typeof(Token), token).ToLower(), token);
     stringTokens.Add("and", Token.LogAnd);
@@ -126,7 +126,7 @@ public class Parser
 
   // statement     := <stmt_line> | <compound_stmt>
   // compount_stmt := <if_stmt> | <while_stmt> | <for_stmt> | <def_stmt> | <try_stmt> | <global_stmt> |
-  //                  <import_stmt> | <class_stmt> | <label_stmt>
+  //                  <import_stmt> | <class_stmt> | <label_stmt> | <lock_stmt> | <using_stmt>
   // label_stmt    := <identitier> <suite>
   public Statement ParseStatement()
   { switch(token)
@@ -138,6 +138,7 @@ public class Parser
       case Token.Global: return ParseGlobal();
       case Token.Class:  return ParseClass();
       case Token.Import: case Token.From: return ParseImport();
+      case Token.Lock: case Token.Using: return ParseUsingBlock(token);
       default:
         if(token==Token.Identifier)
         { string label = (string)value;
@@ -814,7 +815,6 @@ public class Parser
   // assert_stmt   := 'assert' <expression>
   // yield_stmt    := 'yield' <expression>
   // del_stmt      := 'del' <lvalue> (',' <lvalue>)*
-  // exec_stmt     := 'exec' <expression> ('in' <expression> (',' <expression>)?)?
   // goto_stmt     := 'goto' <identifier>
   Statement ParseSimpleStmt()
   { switch(token)
@@ -860,18 +860,6 @@ public class Parser
           list.Add(e);
         } while(TryEat(Token.Comma));
         return AP(new DelStatement((Expression[])list.ToArray(typeof(Expression))));
-      }
-      case Token.Exec:
-      { NextToken();
-        Expression e = ParseExpression(), globals=null, locals=null;
-        if(TryEat(Token.In)) // FIXME: "x in y" is gobbled up by ParseExpression()
-        { bool old = bareTuples;
-          bareTuples = false;
-          globals = ParseExpression();
-          if(TryEat(Token.Comma)) locals = ParseExpression();
-          bareTuples = old;
-        }
-        return new ExecStatement(e, globals, locals);
       }
       default: return ParseExprStmt();
     }
@@ -967,6 +955,15 @@ public class Parser
       return AP(new UnaryExpression(ParseUnary(), op));
     }
     return ParseCIM();
+  }
+
+  // lock_stmt  ::= 'lock' <expression> <suite>
+  // using_stmt ::= 'using' <expression> <suite>
+  Statement ParseUsingBlock(Token token)
+  { Eat(token);
+    Expression expr = ParseExpression();
+    Statement  body = ParseSuite();
+    return AP(token==Token.Lock ? new LockStatement(expr, body) : (Statement)new UsingStatement(expr, body));
   }
 
   // while_stmt := 'while' <expression> <suite>
