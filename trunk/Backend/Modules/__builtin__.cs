@@ -161,9 +161,22 @@ Return the absolute value of a number. The argument may be a plain or long
 integer or a floating point number. If the argument is a complex number, its
 magnitude is returned.")]
   public static object abs(object o)
-  { if(o is int) return Math.Abs((int)o);
-    if(o is double) return Math.Abs((double)o);
-    return Ops.Invoke(o, "__abs__");
+  { switch(Convert.GetTypeCode(o))
+    { case TypeCode.Boolean: return (bool)o ? 1 : 0;
+      case TypeCode.Byte: case TypeCode.UInt16: case TypeCode.UInt32: case TypeCode.UInt64: return o;
+      case TypeCode.Decimal: return Math.Abs((Decimal)o);
+      case TypeCode.Double: return Math.Abs((double)o);
+      case TypeCode.Int16: return Math.Abs((short)o);
+      case TypeCode.Int32: return Math.Abs((int)o);
+      case TypeCode.Int64: return Math.Abs((long)o);
+      case TypeCode.Object:
+        if(o is Integer) return ((Integer)o).abs();
+        if(o is Complex) return ((Complex)o).abs();
+        return Ops.Invoke(o, "__abs__");
+      case TypeCode.SByte: return Math.Abs((sbyte)o);
+      case TypeCode.Single: return Math.Abs((float)o);
+      default: throw Ops.TypeError("invalid operand type for abs(): got '{0}'", Ops.TypeName(o));
+    }
   }
 
   [DocString(@"bool([x]) -> bool
@@ -938,13 +951,14 @@ runtime.")]
   // (perhaps by modifying ReflectedType.cons)
   #region Data types
   //public static readonly object @bool   = ReflectedType.FromType(typeof(bool));
-  // TODO: complex([real[, imag]])
+  public static readonly object complex = ReflectedType.FromType(typeof(Complex));
   public static readonly object dict    = ReflectedType.FromType(typeof(Dict));
   public static readonly object file    = ReflectedType.FromType(typeof(BoaFile));
   //public static readonly object @float  = ReflectedType.FromType(typeof(double));
   //public static readonly object @int    = ReflectedType.FromType(typeof(int));
   //public static readonly object iter    = ReflectedType.FromType(typeof(IEnumerator));
   public static readonly object list    = ReflectedType.FromType(typeof(List));
+  public static readonly object @long   = ReflectedType.FromType(typeof(Integer));
   public static readonly object @object = ReflectedType.FromType(typeof(object));
   public static readonly object slice   = ReflectedType.FromType(typeof(Slice));
   public static readonly object @string = ReflectedType.FromType(typeof(string)); // FIXME: this should be 'str'
@@ -952,25 +966,33 @@ runtime.")]
   public static readonly object xrange  = ReflectedType.FromType(typeof(XRange));
   #endregion
 
+  // TODO: add the proper python base types to these (eg, IOError should derive from EnvironmentError)
   #region Exceptions
+  public static readonly object ApplicationError = ReflectedType.FromType(typeof(ApplicationException));
+  public static readonly object ArithmeticError = ReflectedType.FromType(typeof(ArithmeticException));
   public static readonly object AssertionError = ReflectedType.FromType(typeof(AssertionErrorException));
-  public static readonly object EOFError = ReflectedType.FromType(typeof(EOFErrorException));
-  //public static readonly object FloatingPointError = ReflectedType.FromType(typeof(FloatingPointErrorException));
+  public static readonly object EOFError = ReflectedType.FromType(typeof(System.IO.EndOfStreamException));
+  public static readonly object Exception = ReflectedType.FromType(typeof(Exception));
+  public static readonly object EnvironmentError = ReflectedType.FromType(typeof(EnvironmentErrorException));
+  public static readonly object FloatingPointError = ReflectedType.FromType(typeof(FloatingPointErrorException));
   public static readonly object ImportError = ReflectedType.FromType(typeof(ImportErrorException));
   public static readonly object IndexError = ReflectedType.FromType(typeof(IndexErrorException));
-  public static readonly object IOError = ReflectedType.FromType(typeof(IOErrorException));
+  public static readonly object IOError = ReflectedType.FromType(typeof(System.IO.IOException));
   public static readonly object KeyError = ReflectedType.FromType(typeof(KeyErrorException));
   public static readonly object LookupError = ReflectedType.FromType(typeof(LookupErrorException));
+  public static readonly object MemoryError = ReflectedType.FromType(typeof(OutOfMemoryException));
   public static readonly object NameError = ReflectedType.FromType(typeof(NameErrorException));
-  //public static readonly object NotImplementedError = ReflectedType.FromType(typeof(NotImplementedErrorException));
+  public static readonly object NotImplementedError = ReflectedType.FromType(typeof(NotImplementedException));
   public static readonly object OSError = ReflectedType.FromType(typeof(OSErrorException));
-  //public static readonly object OverflowError = ReflectedType.FromType(typeof(OverflowErrorException));
+  public static readonly object OverflowError = ReflectedType.FromType(typeof(OverflowException));
   public static readonly object RuntimeError = ReflectedType.FromType(typeof(RuntimeException));
+  public static readonly object StandardError = ReflectedType.FromType(typeof(StandardErrorException));
   public static readonly object StopIteration = ReflectedType.FromType(typeof(StopIterationException));
   public static readonly object SyntaxError = ReflectedType.FromType(typeof(SyntaxErrorException));
   public static readonly object SystemExit = ReflectedType.FromType(typeof(SystemExitException));
   public static readonly object TypeError = ReflectedType.FromType(typeof(TypeErrorException));
   public static readonly object ValueError = ReflectedType.FromType(typeof(ValueErrorException));
+  public static readonly object ZeroDivisionError = ReflectedType.FromType(typeof(DivideByZeroException));
   #endregion
   
   static string typeName(Type type)

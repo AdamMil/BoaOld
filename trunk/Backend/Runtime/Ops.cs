@@ -114,9 +114,7 @@ public sealed class Ops
   }
 
   public static AssertionErrorException AssertionError(Boa.AST.Node node, string format, params object[] args)
-  { AssertionErrorException e = new AssertionErrorException(string.Format(format, args));
-    e.SetPosition(node);
-    return e;
+  { return new AssertionErrorException(Source(node)+string.Format(format, args));
   }
 
   public static AttributeErrorException AttributeError(string format, params object[] args)
@@ -555,8 +553,8 @@ public sealed class Ops
     return new Tuple(Divide(Subtract(a, mod), b), mod);
   }
 
-  public static EOFErrorException EOFError(string format, params object[] args)
-  { return new EOFErrorException(string.Format(format, args));
+  public static System.IO.EndOfStreamException EOFError(string format, params object[] args)
+  { return new System.IO.EndOfStreamException(string.Format(format, args));
   }
 
   public static object Equal(object a, object b)
@@ -755,8 +753,8 @@ public sealed class Ops
     return ret;
   }
 
-  public static IOErrorException IOError(string format, params object[] args)
-  { return new IOErrorException(string.Format(format, args));
+  public static System.IO.IOException IOError(string format, params object[] args)
+  { return new System.IO.IOException(string.Format(format, args));
   }
 
   public static bool IsTrue(object a)
@@ -1112,9 +1110,7 @@ public sealed class Ops
   }
 
   public static SyntaxErrorException SyntaxError(Boa.AST.Node node, string format, params object[] args)
-  { SyntaxErrorException e = new SyntaxErrorException(string.Format(format, args));
-    e.SetPosition(node);
-    return e;
+  { return new SyntaxErrorException(Source(node)+string.Format(format, args));
   }
 
   public static double ToFloat(object o)
@@ -1182,9 +1178,7 @@ public sealed class Ops
   { return new TypeErrorException(string.Format(format, args));
   }
   public static TypeErrorException TypeError(Boa.AST.Node node, string format, params object[] args)
-  { TypeErrorException e = new TypeErrorException(string.Format(format, args));
-    e.SetPosition(node);
-    return e;
+  { return new TypeErrorException(Source(node)+string.Format(format, args));
   }
 
   public static string TypeName(object o) { return GetDynamicType(o).__name__.ToString(); }
@@ -1193,9 +1187,7 @@ public sealed class Ops
   { return new ValueErrorException(string.Format(format, args));
   }
   public static ValueErrorException ValueError(Boa.AST.Node node, string format, params object[] args)
-  { ValueErrorException e = new ValueErrorException(string.Format(format, args));
-    e.SetPosition(node);
-    return e;
+  { return new ValueErrorException(Source(node)+string.Format(format, args));
   }
 
   public static TypeErrorException WrongNumArgs(string name, int expected, int got)
@@ -1209,6 +1201,10 @@ public sealed class Ops
   static bool IsIn(Type[] typeArr, Type type)
   { for(int i=0; i<typeArr.Length; i++) if(typeArr[i]==type) return true;
     return false;
+  }
+
+  static string Source(Boa.AST.Node node)
+  { return string.Format("{0}({1},{2}): ", node.Source, node.Line, node.Column);
   }
 
   static readonly ReflectedType StringType = ReflectedType.FromType(typeof(string));

@@ -9,7 +9,7 @@ namespace Boa.AST
 {
 
 // TODO: possibly rework compiled closures
-// TODO: add versions optimized for System.Array ?
+// TODO: add versions optimized for System.Array?
 // TODO: disallow 'yield' and 'return' outside of functions
 /* TODO:
 If a variable is referenced in an enclosing scope, it is illegal
@@ -20,10 +20,11 @@ contains or is a nested block with free variables, the compiler will raise a Syn
 
 If exec is used in a function and the function contains or is a nested block with free
 variables, the compiler will raise a SyntaxError unless the exec explicitly specifies the local
-namespace for the exec. (In other words, "exec obj"would be illegal, but "exec obj in ns" would be legal.) 
+namespace for the exec. (In other words, "exec obj" would be illegal, but "exec obj in ns" would be legal.)
 */
 // TODO: make sure all enumerators can handle the underlying collection being changed, if possible
 // TODO: implement 'break' and 'continue' inside 'finally' blocks
+// TODO: allow 'import' inside functions/class defs
 
 // TODO: using exceptions is very slow
 #region Exceptions (used to aid implementation)
@@ -127,10 +128,7 @@ public abstract class Statement : Node
           foreach(Name dname in dec.names.Values)
             if(dname.Scope==Scope.Free)
             { Name name = (Name)names[dname.String];
-              if(name==null)
-              { names[dname.String] = dname;
-                inherit.Add(dname);
-              }
+              if(name==null) names[dname.String] = dname;
               else if(name.Scope==Scope.Local)
               { name.Scope=Scope.Closed;
                 inherit.Add(name);
@@ -543,6 +541,7 @@ public class BreakStatement : JumpStatement
 }
 #endregion
 
+// TODO: http://www.python.org/2.2.3/descrintro.html#metaclasses
 #region ClassStatement
 public class ClassStatement : Statement
 { public ClassStatement(string name, Expression[] bases, Statement body)
@@ -757,7 +756,7 @@ public class ExecStatement : Statement
 
 #region ExpressionStatement
 public class ExpressionStatement : Statement
-{ public ExpressionStatement(Expression expr) { Expression=expr; }
+{ public ExpressionStatement(Expression expr) { Expression=expr; SetLocation(expr); }
 
   public override void Emit(CodeGenerator cg)
   { if(!Options.Debug && Expression.IsConstant) return; // TODO: don't return if it's at the top level
@@ -942,6 +941,7 @@ public class ForStatement : Statement
     Expression.Emit(cg);
     cg.EmitCall(typeof(Ops), "GetEnumerator", new Type[] { typeof(object) });
     list.EmitSet(cg);
+    cg.ILG.BeginExceptionBlock();
     cg.ILG.MarkLabel(start);
     list.EmitGet(cg);
     cg.ILG.Emit(OpCodes.Dup);
@@ -953,6 +953,9 @@ public class ForStatement : Statement
     cg.ILG.Emit(OpCodes.Br, start);
     cg.ILG.MarkLabel(end);
     cg.ILG.Emit(OpCodes.Pop);
+    cg.ILG.BeginCatchBlock(typeof(StopIterationException));
+    cg.ILG.Emit(OpCodes.Pop);
+    cg.ILG.EndExceptionBlock();
     cg.FreeLocalTemp(list);
   }
 
@@ -961,14 +964,17 @@ public class ForStatement : Statement
     AssignStatement ass = new AssignStatement(Names, ce);
     ass.Optimize();
 
-    IEnumerator e = Ops.GetEnumerator(Expression.Evaluate(frame));
-    while(e.MoveNext())
-    { ce.Value=e.Current;
-      ass.Execute(frame);
-      try { Body.Execute(frame); }
-      catch(BreakException) { break; }
-      catch(ContinueException) { }
+    try
+    { IEnumerator e = Ops.GetEnumerator(Expression.Evaluate(frame));
+      while(e.MoveNext())
+      { ce.Value=e.Current;
+        ass.Execute(frame);
+        try { Body.Execute(frame); }
+        catch(BreakException) { break; }
+        catch(ContinueException) { }
+      }
     }
+    catch(StopIterationException) { }
   }
   
   public override void ToCode(System.Text.StringBuilder sb, int indent)
@@ -1393,6 +1399,7 @@ public class WhileStatement : Statement
 
     Label start=cg.ILG.DefineLabel(), end=cg.ILG.DefineLabel();
     Body.Walk(new JumpFinder(start, end));
+    cg.ILG.BeginExceptionBlock();
     cg.ILG.MarkLabel(start);
     if(Options.Debug || !Test.IsConstant)
     { Test.Emit(cg);
@@ -1402,13 +1409,19 @@ public class WhileStatement : Statement
     Body.Emit(cg);
     cg.ILG.Emit(OpCodes.Br, start);
     cg.ILG.MarkLabel(end);
+    cg.ILG.BeginCatchBlock(typeof(StopIterationException));
+    cg.ILG.Emit(OpCodes.Pop);
+    cg.ILG.EndExceptionBlock();
   }
 
   public override void Execute(Frame frame)
-  { while(Ops.IsTrue(Test.Evaluate(frame)))
-      try { Body.Execute(frame); }
-      catch(BreakException) { break; }
-      catch(ContinueException) { }
+  { try
+    { while(Ops.IsTrue(Test.Evaluate(frame)))
+        try { Body.Execute(frame); }
+        catch(BreakException) { break; }
+        catch(ContinueException) { }
+    }
+    catch(StopIterationException) { }
   }
 
   public override void ToCode(System.Text.StringBuilder sb, int indent)
