@@ -757,7 +757,7 @@ public sealed class Ops
       case TypeCode.Int32:   return (int)a!=0;
       case TypeCode.Int64:   return (long)a!=0;
       case TypeCode.Object:
-        if(a is Integer) return IntegerOps.NonZero((Integer)a);
+        if(a is Integer) return !((Integer)a).IsZero;
         if(a is Complex) return ComplexOps.NonZero((Complex)a);
         if(a is ICollection) return ((ICollection)a).Count>0;
         if(a is ISequence) return ((ISequence)a).__len__()>0;

@@ -13,6 +13,7 @@ using Boa.Runtime;
 // FIXME: having 'and', 'or', and 'not' be low precedence operators may screw up python code in subtle ways
 // TODO: add <=> operator
 // TODO: add support for complex numbers: 5j == complex(0, 5)
+// TODO: add parsing for numbers without whole parts: (eg, .5)
 namespace Boa.AST
 {
 

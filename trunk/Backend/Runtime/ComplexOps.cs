@@ -19,7 +19,7 @@ public sealed class ComplexOps
       case TypeCode.Int64: return a + (long)b;
       case TypeCode.Object:
         IConvertible ic = b as IConvertible;
-        return ic==null ? a + ic.ToDouble(System.Globalization.NumberFormatInfo.InvariantInfo)
+        return ic!=null ? a + ic.ToDouble(System.Globalization.NumberFormatInfo.InvariantInfo)
                         : Ops.Invoke(b, "__radd__", a);
       case TypeCode.SByte: return a + (sbyte)b;
       case TypeCode.Single: return a + (float)b;
@@ -27,7 +27,7 @@ public sealed class ComplexOps
       case TypeCode.UInt32: return a + (uint)b;
       case TypeCode.UInt64: return a + (ulong)b;
     }
-    return Ops.TypeError("invalid operand types for +: '{0}' and '{1}'", Ops.TypeName(a), Ops.TypeName(b));
+    throw Ops.TypeError("invalid operand types for +: '{0}' and '{1}'", Ops.TypeName(a), Ops.TypeName(b));
   }
 
   public int Compare(Complex a, object b)
@@ -47,15 +47,16 @@ public sealed class ComplexOps
       case TypeCode.Int64: return a / (long)b;
       case TypeCode.Object:
         IConvertible ic = b as IConvertible;
-        return ic==null ? a / ic.ToDouble(System.Globalization.NumberFormatInfo.InvariantInfo)
-                        : Ops.Invoke(b, "__rdiv__", a);
+        object ret;
+        return ic!=null ? a / ic.ToDouble(System.Globalization.NumberFormatInfo.InvariantInfo)
+                        : Ops.TryInvoke(b, "__rtruediv__", out ret, a) ? ret : Ops.Invoke(b, "__rdiv__", a);
       case TypeCode.SByte: return a / (sbyte)b;
       case TypeCode.Single: return a / (float)b;
       case TypeCode.UInt16: return a / (ushort)b;
       case TypeCode.UInt32: return a / (uint)b;
       case TypeCode.UInt64: return a / (ulong)b;
     }
-    return Ops.TypeError("invalid operand types for /: '{0}' and '{1}'", Ops.TypeName(a), Ops.TypeName(b));
+    throw Ops.TypeError("invalid operand types for /: '{0}' and '{1}'", Ops.TypeName(a), Ops.TypeName(b));
   }
 
   public Complex Multiply(Complex a, object b)
@@ -71,7 +72,7 @@ public sealed class ComplexOps
       case TypeCode.Int64: return a * (long)b;
       case TypeCode.Object:
         IConvertible ic = b as IConvertible;
-        return ic==null ? a * ic.ToDouble(System.Globalization.NumberFormatInfo.InvariantInfo)
+        return ic!=null ? a * ic.ToDouble(System.Globalization.NumberFormatInfo.InvariantInfo)
                         : Ops.Invoke(b, "__rmul__", a);
       case TypeCode.SByte: return a * (sbyte)b;
       case TypeCode.Single: return a * (float)b;
@@ -79,34 +80,34 @@ public sealed class ComplexOps
       case TypeCode.UInt32: return a * (uint)b;
       case TypeCode.UInt64: return a * (ulong)b;
     }
-    return Ops.TypeError("invalid operand types for *: '{0}' and '{1}'", Ops.TypeName(a), Ops.TypeName(b));
+    throw Ops.TypeError("invalid operand types for *: '{0}' and '{1}'", Ops.TypeName(a), Ops.TypeName(b));
   }
 
   public bool NonZero(Complex a) { return a.real!=0 && a.imag!=0; }
 
   public Complex Power(Complex a, object b)
-  { if(b is Complex) return a.pow((Complex)b);
+  { if(b is Complex) return a.Pow((Complex)b);
 
     switch(Convert.GetTypeCode(b))
-    { case TypeCode.Boolean: return a.pow((bool)b ? 1 : 0);
-      case TypeCode.Byte: return a.pow((byte)b);
+    { case TypeCode.Boolean: return a.Pow((bool)b ? 1 : 0);
+      case TypeCode.Byte: return a.Pow((byte)b);
       case TypeCode.Decimal:
-        return a.pow(((IConvertible)b).ToDouble(System.Globalization.NumberFormatInfo.InvariantInfo);
-      case TypeCode.Double: return a.pow((double)b);
-      case TypeCode.Int16: return a.pow((short)b);
-      case TypeCode.Int32: return a.pow((int)b);
-      case TypeCode.Int64: return a.pow((long)b);
+        return a.Pow(((IConvertible)b).ToDouble(System.Globalization.NumberFormatInfo.InvariantInfo);
+      case TypeCode.Double: return a.Pow((double)b);
+      case TypeCode.Int16: return a.Pow((short)b);
+      case TypeCode.Int32: return a.Pow((int)b);
+      case TypeCode.Int64: return a.Pow((long)b);
       case TypeCode.Object:
         IConvertible ic = b as IConvertible;
-        return ic==null ? a.pow(ic.ToDouble(System.Globalization.NumberFormatInfo.InvariantInfo))
+        return ic!=null ? a.Pow(ic.ToDouble(System.Globalization.NumberFormatInfo.InvariantInfo))
                         : Ops.Invoke(b, "__rpow__", a);
-      case TypeCode.SByte: return a.pow((sbyte)b);
-      case TypeCode.Single: return a.pow((float)b);
-      case TypeCode.UInt16: return a.pow((ushort)b);
-      case TypeCode.UInt32: return a.pow((uint)b);
-      case TypeCode.UInt64: return a.pow((ulong)b);
+      case TypeCode.SByte: return a.Pow((sbyte)b);
+      case TypeCode.Single: return a.Pow((float)b);
+      case TypeCode.UInt16: return a.Pow((ushort)b);
+      case TypeCode.UInt32: return a.Pow((uint)b);
+      case TypeCode.UInt64: return a.Pow((ulong)b);
     }
-    return Ops.TypeError("invalid operand types for **: '{0}' and '{1}'", Ops.TypeName(a), Ops.TypeName(b));
+    throw Ops.TypeError("invalid operand types for **: '{0}' and '{1}'", Ops.TypeName(a), Ops.TypeName(b));
   }
 
   public Complex Subtract(Complex a, object b)
@@ -122,7 +123,7 @@ public sealed class ComplexOps
       case TypeCode.Int64: return a - (long)b;
       case TypeCode.Object:
         IConvertible ic = b as IConvertible;
-        return ic==null ? a - ic.ToDouble(System.Globalization.NumberFormatInfo.InvariantInfo)
+        return ic!=null ? a - ic.ToDouble(System.Globalization.NumberFormatInfo.InvariantInfo)
                         : Ops.Invoke(b, "__rsub__", a);
       case TypeCode.SByte: return a - (sbyte)b;
       case TypeCode.Single: return a - (float)b;
@@ -130,7 +131,7 @@ public sealed class ComplexOps
       case TypeCode.UInt32: return a - (uint)b;
       case TypeCode.UInt64: return a - (ulong)b;
     }
-    return Ops.TypeError("invalid operand types for -: '{0}' and '{1}'", Ops.TypeName(a), Ops.TypeName(b));
+    throw Ops.TypeError("invalid operand types for -: '{0}' and '{1}'", Ops.TypeName(a), Ops.TypeName(b));
   }
 }
 

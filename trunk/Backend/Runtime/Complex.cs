@@ -6,7 +6,6 @@ namespace Boa.Runtime
 public struct Complex : IRepresentable
 { public Complex(double real) { this.real=real; }
   public Complex(double real, double imag) { this.real=real; this.imag=imag; }
-  public Complex(Complex c) { real=c.real; imag=c.imag; }
 
   public Complex Conjugate { get { return new Complex(real, -imag); } }
 
@@ -22,37 +21,6 @@ public struct Complex : IRepresentable
   public double abs() { return Math.Sqrt(real*real+imag*imag); }
   public Complex conjugate() { return new Complex(real, -imag); }
 
-  public Complex pow(Complex power)
-  { double r, i;
-	  if(power.real==0 && power.imag==0) { r=1; i=0; }
-	  else if(real==0 && imag==0)
-	  { if(power.imag!=0 || power.real<0) throw Ops.DivideByZero("complex pow(): division by zero");
-	    r=i=0;
-	  }
-	  else
-	  { double vabs=Math.Sqrt(real*real, imag*imag), len=Math.Pow(vabs, power.real), at=Math.Atan2(imag, real),
-	           phase=at*power.real;
-		  if(power.imag!=0)
-		  { len /= Math.Exp(at*power.imag);
-			  phase += power.imag*Math.Log(vabs);
-			}
-  		r = len*Math.Cos(phase);
-	  	i = len*Math.Sin(phase);
-	  }
-	  return new Complex(r, i);
-  }
-  
-  public Complex pow(int power)
-  { if(power>100 || power<-100) return pow(new Complex(power));
-    else if(power>0) return powu(power);
-	  else return new Complex(1, 0) / powu(-power);
-  }
-
-  public Complex pow(double power)
-  { int p = (int)power;
-    return p==power ? pow(p) : pow(new Complex(power));
-  }
-
   public override string ToString()
   { return '(' + real.ToString() + '+' + imag.ToString() + "j)";
   }
@@ -62,8 +30,6 @@ public struct Complex : IRepresentable
   }
 
   public double real, imag;
-
-  public static Complex pow(double a, Complex b) { return new Complex(a).pow(b); }
 
   public static Complex operator+(Complex a, Complex b) { return new Complex(a.real+b.real, a.imag+b.imag); }
   public static Complex operator+(Complex a, double  b) { return new Complex(a.real+b, a.imag); }
@@ -114,6 +80,39 @@ public struct Complex : IRepresentable
   public static Complex operator!=(Complex a, double b)  { return a.real!=b || a.imag!=0; }
   public static Complex operator!=(double a, Complex b)  { return a!=b.real || b.imag!=0; }
   
+  internal Complex Pow(Complex power)
+  { double r, i;
+	  if(power.real==0 && power.imag==0) { r=1; i=0; }
+	  else if(real==0 && imag==0)
+	  { if(power.imag!=0 || power.real<0) throw Ops.DivideByZero("Complex Pow(): division by zero");
+	    r=i=0;
+	  }
+	  else
+	  { double vabs=Math.Sqrt(real*real, imag*imag), len=Math.Pow(vabs, power.real), at=Math.Atan2(imag, real),
+	           phase=at*power.real;
+		  if(power.imag!=0)
+		  { len /= Math.Exp(at*power.imag);
+			  phase += power.imag*Math.Log(vabs);
+			}
+  		r = len*Math.Cos(phase);
+	  	i = len*Math.Sin(phase);
+	  }
+	  return new Complex(r, i);
+  }
+  
+  internal Complex Pow(int power)
+  { if(power>100 || power<-100) return pow(new Complex(power));
+    else if(power>0) return powu(power);
+	  else return new Complex(1, 0) / powu(-power);
+  }
+
+  internal Complex Pow(double power)
+  { int p = (int)power;
+    return p==power ? pow(p) : pow(new Complex(power));
+  }
+
+  internal static Complex Pow(double a, Complex b) { return new Complex(a).pow(b); }
+
   void powu(int power)
   { Complex r = new Complex(1, 0);
 	  int mask = 1;
