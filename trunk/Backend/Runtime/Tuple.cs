@@ -5,7 +5,7 @@ namespace Boa.Runtime
 {
 
 public class Tuple : ISequence, ICollection, IComparable
-{ public Tuple() { items = new object[0]; }
+{ public Tuple() { items = Misc.EmptyArray; }
   public Tuple(params object[] items) { this.items=items; }
 
   #region ISequence Members

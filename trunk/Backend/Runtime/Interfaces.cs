@@ -4,7 +4,7 @@ namespace Boa.Runtime
 {
 
 public interface ICallable
-{ object Call(params object[] parms);
+{ object Call(params object[] args);
 }
 
 public interface IContainer
@@ -17,12 +17,12 @@ public interface IRepresentable
 }
 
 public interface IDescriptor
-{ object __get__(object o);
+{ object __get__(object instance);
 }
 
 public interface IDataDescriptor : IDescriptor
-{ void __set__(object o, object value);
-  void __delete__(object o);
+{ void __set__(object instance, object value);
+  void __delete__(object instance);
 }
 
 public interface IDynamicObject

@@ -1,3 +1,7 @@
+// TODO: make use of 'readonly' attribute
+// TODO: make use of 'sealed' attribute
+// TODO: unify variable names
+
 using System;
 
 namespace Boa
@@ -11,6 +15,8 @@ public sealed class Misc
     for(int i=0; i<length; i++) arr[i] = type;
     return arr;
   }
+  
+  public static readonly object[] EmptyArray = new object[0];
 }
 
 public sealed class Options
