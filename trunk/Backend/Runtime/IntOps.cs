@@ -141,6 +141,7 @@ public sealed class IntOps
       { double av=a, bv = (double)b;
         return av<bv ? -1 : av>bv ? 1 : 0;
       }
+      case TypeCode.Empty: return 1;
       case TypeCode.Int16: return a - (short)b;
       case TypeCode.Int32: return a - (int)b;
       case TypeCode.Int64: return (int)(a - (long)b);

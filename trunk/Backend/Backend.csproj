@@ -244,6 +244,11 @@
                     BuildAction = "Compile"
                 />
                 <File
+                    RelPath = "Modules\binascii.cs"
+                    SubType = "Code"
+                    BuildAction = "Compile"
+                />
+                <File
                     RelPath = "Modules\codecs.cs"
                     SubType = "Code"
                     BuildAction = "Compile"

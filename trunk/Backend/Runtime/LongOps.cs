@@ -37,6 +37,7 @@ public sealed class LongOps
         case TypeCode.Char: return a + (char)b; // TODO: see whether this should return int or char
         case TypeCode.Decimal: return a + (Decimal)b;
         case TypeCode.Double: return a + (double)b;
+        case TypeCode.Empty: return 1;
         case TypeCode.Int16: return checked(a + (short)b);
         case TypeCode.Int32: return checked(a + (int)b);
         case TypeCode.Int64: return checked(a + (long)b);
