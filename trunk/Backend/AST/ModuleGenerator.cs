@@ -33,16 +33,18 @@ public sealed class ModuleGenerator
 
   public static Runtime.Module Generate(string name, string filename, Statement body)
   { return Generate(new AssemblyGenerator(name, filename), name, filename, body,
-                    false, false, PEFileKinds.ConsoleApplication);
+                    false, false, false, PEFileKinds.ConsoleApplication);
   }
 
   public static Runtime.Module Generate(string name, string filename, Statement body, PEFileKinds type)
-  { return Generate(new AssemblyGenerator(name, filename), name, filename, body, true, true, type);
+  { return Generate(new AssemblyGenerator(name, filename), name, filename, body, false, true, true, type);
   }
 
   public static Runtime.Module Generate(AssemblyGenerator ag, string name, string filename, Statement body,
-                                        bool staticCompile, bool entryPoint, PEFileKinds type)
-  { body.PostProcessForCompile();
+                                        bool staticCompile, bool saveModule, bool entryPoint, PEFileKinds type)
+  { if(staticCompile) throw new NotImplementedException("Static compilation is not implemented.");
+
+    body.PostProcessForCompile();
     bool interactive = Options.Interactive;
     Options.Interactive = false;
     try
@@ -149,7 +151,8 @@ public sealed class ModuleGenerator
       }
 
       Type mtype = tg.FinishType();
-      return staticCompile ? null : (Runtime.Module)mtype.GetConstructor(Type.EmptyTypes).Invoke(null);
+      if(saveModule) { ag.Save(); return null; }
+      return (Runtime.Module)mtype.GetConstructor(Type.EmptyTypes).Invoke(null);
     }
     finally { Options.Interactive = interactive; }
   }

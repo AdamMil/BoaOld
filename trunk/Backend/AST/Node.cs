@@ -82,6 +82,13 @@ public struct ImportName
 { public ImportName(string name) { Name=name; AsName=null; }
   public ImportName(string name, string asName) { Name=name; AsName=asName; }
 
+  public string SlotName
+  { get
+    { int index = Name.IndexOf('.');
+      return index==-1 ? Name : Name.Substring(0, index);
+    }
+  }
+
   public void ToCode(System.Text.StringBuilder sb)
   { sb.Append(Name);
     if(AsName!=null)
