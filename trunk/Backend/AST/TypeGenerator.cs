@@ -49,7 +49,7 @@ public class TypeGenerator
   }
 
   public Slot GetConstant(object value)
-  { Slot slot = (Slot)constants[value]; FIXNOW: // this will throw an exception if value is a List or Dict
+  { Slot slot = (Slot)constants[value]; FIXNOW; // this will throw an exception if value is a List or Dict
     if(slot!=null) return slot;
 
     FieldBuilder fb = TypeBuilder.DefineField("c$"+constants.Count, typeof(object), FieldAttributes.Static);

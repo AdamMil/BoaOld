@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 
 namespace Boa.Runtime
 {
@@ -8,7 +9,7 @@ public sealed class IntOps
 
   public static object Add(int a, object b)
   { try
-    { if(b is int) return checked(a+(int)b); // TODO: make sure this is worthwhile
+    { if(b is int) return checked(a+(int)b);
       switch(Convert.GetTypeCode(b))
       { case TypeCode.Boolean: return (bool)b ? checked(a+1) : a;
         case TypeCode.Byte: return checked(a + (byte)b);
@@ -16,11 +17,12 @@ public sealed class IntOps
         case TypeCode.Decimal: return a + (Decimal)b;
         case TypeCode.Double: return a + (double)b;
         case TypeCode.Int16: return checked(a + (short)b);
+        case TypeCode.Int32: return checked(a + (int)b); // TODO: add these elsewhere
         case TypeCode.Int64: return checked(a + (long)b);
         case TypeCode.Object:
           if(b is Integer) return (Integer)b + a;
           IConvertible ic = b as IConvertible;
-          return ic!=null ? checked(a + ic.ToInt32(System.Globalization.NumberFormatInfo.InvariantInfo))
+          return ic!=null ? checked(a + ic.ToInt32(NumberFormatInfo.InvariantInfo))
                           : Ops.Invoke(b, "__radd__", a);
         case TypeCode.SByte: return checked(a + (sbyte)b);
         case TypeCode.Single: return a + (float)b;
@@ -39,12 +41,13 @@ public sealed class IntOps
     { case TypeCode.Boolean: return (bool)b ? a&1 : 0;
       case TypeCode.Byte: return a & (byte)b;
       case TypeCode.Int16: return a & (short)b;
+      case TypeCode.Int32: return a & (int)b;
       case TypeCode.Int64: return a & (long)b;
       case TypeCode.Object:
         if(b is Integer) return (Integer)b & a;
         IConvertible ic = b as IConvertible;
         if(ic==null) return Ops.Invoke(b, "__rand__", a);
-        long lv = ic.ToInt64(System.Globalization.NumberFormatInfo.InvariantInfo);
+        long lv = ic.ToInt64(NumberFormatInfo.InvariantInfo);
         return lv>int.MaxValue || lv<int.MinValue ? lv&a : (int)lv&a;
       case TypeCode.SByte: return a & (sbyte)b;
       case TypeCode.UInt16: return a & (ushort)b;
@@ -60,12 +63,13 @@ public sealed class IntOps
     { case TypeCode.Boolean: return (bool)b ? a|1 : a;
       case TypeCode.Byte: return a | (byte)b;
       case TypeCode.Int16: return a | (short)b;
+      case TypeCode.Int32: return a | (int)b;
       case TypeCode.Int64: return a | (long)b;
       case TypeCode.Object:
         if(b is Integer) return (Integer)b | a;
         IConvertible ic = b as IConvertible;
         if(ic==null) return Ops.Invoke(b, "__ror__", a);
-        long lv = ic.ToInt64(System.Globalization.NumberFormatInfo.InvariantInfo);
+        long lv = ic.ToInt64(NumberFormatInfo.InvariantInfo);
         return lv>int.MaxValue || lv<int.MinValue ? lv|a : (int)lv|a;
       case TypeCode.SByte: return a | (sbyte)b;
       case TypeCode.UInt16: return a | (ushort)b;
@@ -81,12 +85,13 @@ public sealed class IntOps
     { case TypeCode.Boolean: return (bool)b ? a^1 : a;
       case TypeCode.Byte: return a ^ (byte)b;
       case TypeCode.Int16: return a ^ (short)b;
+      case TypeCode.Int32: return a ^ (int)b;
       case TypeCode.Int64: return a ^ (long)b;
       case TypeCode.Object:
         if(b is Integer) return (Integer)b ^ a;
         IConvertible ic = b as IConvertible;
         if(ic==null) return Ops.Invoke(b, "__rxor__", a);
-        long lv = ic.ToInt64(System.Globalization.NumberFormatInfo.InvariantInfo);
+        long lv = ic.ToInt64(NumberFormatInfo.InvariantInfo);
         return lv>int.MaxValue || lv<int.MinValue ? lv^a : (int)lv^a;
       case TypeCode.SByte: return a ^ (sbyte)b;
       case TypeCode.UInt16: return a ^ (ushort)b;
@@ -111,6 +116,7 @@ public sealed class IntOps
         return av<bv ? -1 : av>bv ? 1 : 0;
       }
       case TypeCode.Int16: return a - (short)b;
+      case TypeCode.Int32: return a - (int)b;
       case TypeCode.Int64: return (int)(a - (long)b);
       case TypeCode.Object:
         if(b is Integer)
@@ -118,7 +124,7 @@ public sealed class IntOps
           return v>a ? -1 : v<a ? 1 : 0;
         }
         IConvertible ic = b as IConvertible;
-        return ic==null ? (int)(a - ic.ToInt64(System.Globalization.NumberFormatInfo.InvariantInfo))
+        return ic==null ? (int)(a - ic.ToInt64(NumberFormatInfo.InvariantInfo))
                         : -Ops.ToInt(Ops.Invoke(b, "__cmp__", a));
       case TypeCode.SByte: return a - (sbyte)b;
       case TypeCode.Single:
@@ -164,7 +170,7 @@ public sealed class IntOps
         }
         IConvertible ic = b as IConvertible;
         if(ic==null) return Ops.Invoke(b, "__rfloordiv__", a);
-        long lv = ic.ToInt64(System.Globalization.NumberFormatInfo.InvariantInfo);
+        long lv = ic.ToInt64(NumberFormatInfo.InvariantInfo);
         if(lv>int.MaxValue || lv<int.MinValue) return LongOps.FloorDivide(a, b);
         bv = (int)lv;
         break;
@@ -199,6 +205,7 @@ public sealed class IntOps
     { case TypeCode.Boolean: if((bool)b) shift=1; else return a; break;
       case TypeCode.Byte: shift = (byte)b; break;
       case TypeCode.Int16: shift = (short)b; break;
+      case TypeCode.Int32: shift = (int)b; break;
       case TypeCode.Int64:
       { long lv = (long)b;
         if(lv>int.MaxValue || lv<int.MinValue) throw Ops.OverflowError("long int too large to convert to int");
@@ -209,7 +216,7 @@ public sealed class IntOps
         if(b is Integer) shift = ((Integer)b).ToInt32();
         IConvertible ic = b as IConvertible;
         if(ic==null) return Ops.Invoke(b, "__rlshift__", a);
-        shift = ic.ToInt32(System.Globalization.NumberFormatInfo.InvariantInfo);
+        shift = ic.ToInt32(NumberFormatInfo.InvariantInfo);
         break;
       case TypeCode.SByte: shift = (sbyte)b;
       case TypeCode.UInt16: shift = (ushort)b;
@@ -229,10 +236,9 @@ public sealed class IntOps
     }
     
     if(shift<0) throw Ops.ValueError("negative shift count");
-    if(shift>32) return new Integer(a)<<shift;
-    long res = (long)a << shift;
-    int ires = (int)res;
-    return res!=ires || (a&0x80000000) != (ires&0x80000000) ? (object)res : (object)ires;
+    if(shift>31) return LongOps.LeftShift(a, shift);
+    int res = a << shift;
+    return res<a || (a&0x80000000) != (ires&0x80000000) ? LongOps.LeftShift(a, shift) : res;
   }
 
   public static object Modulus(int a, object b)
@@ -242,6 +248,7 @@ public sealed class IntOps
     { case TypeCode.Boolean: bv = (bool)b ? 1 : 0; break;
       case TypeCode.Byte: bv = (byte)b; break;
       case TypeCode.Int16: bv = (short)b; break;
+      case TypeCode.Int32: bv = (int)b; break;
       case TypeCode.Int64: int64:
       { long lv = (long)b;
         if(lv<0)
@@ -265,7 +272,7 @@ public sealed class IntOps
           bv = iv.ToInt32();
         }
         IConvertible ic = b as IConvertible;
-        if(ic!=null) { b = ic.ToInt64(System.Globalization.NumberFormatInfo.InvariantInfo); goto int64; }
+        if(ic!=null) { b = ic.ToInt64(NumberFormatInfo.InvariantInfo); goto int64; }
         return Ops.Invoke(b, "__rmod__", a);
       case TypeCode.SByte: bv = (sbyte)b; break;
       case TypeCode.UInt16: bv = (ushort)b; break;
@@ -292,7 +299,7 @@ public sealed class IntOps
   
   public static object Multiply(int a, object b)
   { try
-    { if(b is int) return checked(a*(int)b); // TODO: make sure this is worthwhile
+    { if(b is int) return checked(a*(int)b);
       switch(Convert.GetTypeCode(b))
       { case TypeCode.Boolean: return (bool)b ? checked(a*1) : a;
         case TypeCode.Byte: return checked(a * (byte)b);
@@ -303,7 +310,7 @@ public sealed class IntOps
         case TypeCode.Object:
           if(b is Integer) return (Integer)b * a;
           IConvertible ic = b as IConvertible;
-          return ic!=null ? checked(a * ic.ToInt32(System.Globalization.NumberFormatInfo.InvariantInfo))
+          return ic!=null ? checked(a * ic.ToInt32(NumberFormatInfo.InvariantInfo))
                           : Ops.Invoke(b, "__rmul__", a);
         case TypeCode.SByte: return checked(a * (sbyte)b);
         case TypeCode.Single: return a * (float)b;
@@ -322,7 +329,10 @@ public sealed class IntOps
     else switch(Convert.GetTypeCode(b))
     { case TypeCode.Boolean: return (bool)b ? a : a<0 ? -1 : 1;
       case TypeCode.Byte: bv = (byte)b; break;
+      case TypeCode.Decimal: return Math.Pow(a, ((IConvertible)b).ToDouble(NumberFormatInfo.InvariantInfo));
+      case TypeCode.Double: return Math.Pow(a, (double)b);
       case TypeCode.Int16: bv = (short)b; break;
+      case TypeCode.Int32: bv = (int)b; break;
       case TypeCode.Int64: int64:
       { long v = (long)b;
         if(v<0 || v>int.MaxValue) return new IntegerOps(new Integer(a), b);
@@ -336,9 +346,10 @@ public sealed class IntOps
           bv = iv.ToInt32();
         }
         IConvertible ic = b as IConvertible;
-        if(ic!=null) { b = ic.ToInt64(System.Globalization.NumberFormatInfo.InvariantInfo); goto int64; }
+        if(ic!=null) { b = ic.ToInt64(NumberFormatInfo.InvariantInfo); goto int64; }
         return Ops.Invoke(b, "__rpow__", a);
       case TypeCode.SByte: bv = (sbyte)b; break;
+      case TypeCode.Single: return Math.Pow(a, (float)b);
       case TypeCode.UInt16: bv = (ushort)b; break;
       case TypeCode.UInt32:
       { uint v = (uint)b;
@@ -397,7 +408,7 @@ public sealed class IntOps
         case TypeCode.Object:
           if(b is Integer) return (Integer)b - a;
           IConvertible ic = b as IConvertible;
-          return ic!=null ? checked(a - ic.ToInt32(System.Globalization.NumberFormatInfo.InvariantInfo))
+          return ic!=null ? checked(a - ic.ToInt32(NumberFormatInfo.InvariantInfo))
                           : Ops.Invoke(b, "__rsub__", a);
         case TypeCode.SByte: return checked(a - (sbyte)b);
         case TypeCode.Single: return a - (float)b;
@@ -427,7 +438,7 @@ public sealed class IntOps
         if(b is Integer) shift = ((Integer)b).ToInt32();
         IConvertible ic = b as IConvertible;
         if(ic==null) return Ops.Invoke(b, "__rrshift__", a);
-        shift = ic.ToInt32(System.Globalization.NumberFormatInfo.InvariantInfo);
+        shift = ic.ToInt32(NumberFormatInfo.InvariantInfo);
         break;
       case TypeCode.SByte: shift = (sbyte)b;
       case TypeCode.UInt16: shift = (ushort)b;
@@ -447,7 +458,7 @@ public sealed class IntOps
     }
 
     if(shift<0) throw Ops.ValueError("negative shift count");
-    return shift>31 ? a>>31 : a>>shift;
+    return shift>31 ? 0 : a>>shift;
   }
 }
 

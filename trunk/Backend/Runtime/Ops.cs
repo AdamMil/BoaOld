@@ -151,7 +151,7 @@ public sealed class Ops
       }
       case TypeCode.UInt64:
       { ulong v = (ulong)a;
-        return v<=long.MaxValue ? LongOps.Add((long)v, b) : new Integer(v).Add(b);
+        return v<=long.MaxValue ? LongOps.Add((long)v, b) : IntegerOps.Add(new Integer(v), b);
       }
     }
     throw TypeError("unsupported operand types for +: '{0}' and '{1}'", TypeName(a), TypeName(b));
@@ -179,7 +179,7 @@ public sealed class Ops
       }
       case TypeCode.UInt64:
       { ulong v = (ulong)a;
-        return v<=long.MaxValue ? LongOps.BitwiseAnd((long)v, b) : new Integer(v).BitwiseAnd(b);
+        return v<=long.MaxValue ? LongOps.BitwiseAnd((long)v, b) : IntegerOps.BitwiseAnd(new Integer(v), b);
       }
     }
     throw TypeError("unsupported operand types for &: '{0}' and '{1}'", TypeName(a), TypeName(b));
@@ -207,7 +207,7 @@ public sealed class Ops
       }
       case TypeCode.UInt64:
       { ulong v = (ulong)a;
-        return v<=long.MaxValue ? LongOps.BitwiseOr((long)v, b) : new Integer(v).BitwiseOr(b);
+        return v<=long.MaxValue ? LongOps.BitwiseOr((long)v, b) : IntegerOps.BitwiseOr(new Integer(v), b);
       }
     }
     throw TypeError("unsupported operand types for |: '{0}' and '{1}'", TypeName(a), TypeName(b));
@@ -235,7 +235,7 @@ public sealed class Ops
       }
       case TypeCode.UInt64:
       { ulong v = (ulong)a;
-        return v<=long.MaxValue ? LongOps.BitwiseXor((long)v, b) : new Integer(v).BitwiseXor(b);
+        return v<=long.MaxValue ? LongOps.BitwiseXor((long)v, b) : IntegerOps.BitwiseXor(new Integer(v), b);
       }
     }
     throw TypeError("unsupported operand types for ^: '{0}' and '{1}'", TypeName(a), TypeName(b));
@@ -383,7 +383,7 @@ public sealed class Ops
 
   public static object Call(object func, object[] positional, string[] names, object[] values)
   { IFancyCallable ic = func as IFancyCallable;
-    if(ic==null) throw Ops.NotImplemented("This object does not support named arguments.");
+    if(ic==null) throw Ops.NotImplementedError("This object does not support named arguments.");
     return ic.Call(positional, names, values);
   }
   
@@ -430,12 +430,12 @@ public sealed class Ops
         if(a is Complex) return ComplexOps.Compare((Complex)a, b);
         if(a is ICollection || a is ISequence) return ArrayOps.Compare(a, b);
         object ret;
-        return TryInvoke(a, "__cmp__", out ret, b) ? ret : Invoke(b, "__cmp__", a);
+        return Ops.ToInt(TryInvoke(a, "__cmp__", out ret, b) ? ret : Invoke(b, "__cmp__", a));
       case TypeCode.SByte: return IntOps.Compare((int)(sbyte)a, b);
       case TypeCode.Single: return FloatOps.Compare((float)a, b);
       case TypeCode.String:
       { string sa=(string)a, sb = b as string;
-        if(sb!=null) return a<b ? -1 : a>b ? 1 : 0;
+        if(sb!=null) return sa<sb ? -1 : sa>sb ? 1 : 0; // TODO: maybe this isn't an optimal way to compare string
         break;
       }
       case TypeCode.UInt16: return IntOps.Compare((int)(short)a, b);
@@ -445,7 +445,7 @@ public sealed class Ops
       }
       case TypeCode.UInt64:
       { ulong v = (ulong)a;
-        return v<=long.MaxValue ? LongOps.Compare((long)v, b) : new Integer(v).Compare(b);
+        return v<=long.MaxValue ? LongOps.Compare((long)v, b) : IntegerOps.Compare(new Integer(v), b);
       }
     }
     throw TypeError("can't compare '{0}' to '{1}'", TypeName(a), TypeName(b));
@@ -472,18 +472,18 @@ public sealed class Ops
     // TODO: check whether it's possible to speed up this big block of checks up somehow
     // TODO: add support for Integer, Complex, and Decimal
     if(from.IsPrimitive && to.IsPrimitive)
-    { if(from==typeof(int))    return IsIn(typeConv[4], to)   ? Conversion.Unsafe : Conversion.Safe;
+    { if(from==typeof(int))    return IsIn(typeConv[4], to)   ? Conversion.Safe : Conversion.Unsafe;
       if(to  ==typeof(bool))   return IsIn(typeConv[9], from) ? Conversion.None : Conversion.Safe;
       if(from==typeof(double)) return Conversion.None;
-      if(from==typeof(long))   return IsIn(typeConv[6], to) ? Conversion.Unsafe : Conversion.Safe;
-      if(from==typeof(char))   return IsIn(typeConv[8], to) ? Conversion.Unsafe : Conversion.Safe;
-      if(from==typeof(byte))   return IsIn(typeConv[1], to) ? Conversion.Unsafe : Conversion.Safe;
-      if(from==typeof(uint))   return IsIn(typeConv[5], to) ? Conversion.Unsafe : Conversion.Safe;
+      if(from==typeof(long))   return IsIn(typeConv[6], to) ? Conversion.Safe : Conversion.Unsafe;
+      if(from==typeof(char))   return IsIn(typeConv[8], to) ? Conversion.Safe : Conversion.Unsafe;
+      if(from==typeof(byte))   return IsIn(typeConv[1], to) ? Conversion.Safe : Conversion.Unsafe;
+      if(from==typeof(uint))   return IsIn(typeConv[5], to) ? Conversion.Safe : Conversion.Unsafe;
       if(from==typeof(float))  return to==typeof(double) ? Conversion.Safe : Conversion.None;
-      if(from==typeof(short))  return IsIn(typeConv[2], to) ? Conversion.Unsafe : Conversion.Safe;
-      if(from==typeof(ushort)) return IsIn(typeConv[3], to) ? Conversion.Unsafe : Conversion.Safe;
-      if(from==typeof(sbyte))  return IsIn(typeConv[0], to) ? Conversion.Unsafe : Conversion.Safe;
-      if(from==typeof(ulong))  return IsIn(typeConv[7], to) ? Conversion.Unsafe : Conversion.Safe;
+      if(from==typeof(short))  return IsIn(typeConv[2], to) ? Conversion.Safe : Conversion.Unsafe;
+      if(from==typeof(ushort)) return IsIn(typeConv[3], to) ? Conversion.Safe : Conversion.Unsafe;
+      if(from==typeof(sbyte))  return IsIn(typeConv[0], to) ? Conversion.Safe : Conversion.Unsafe;
+      if(from==typeof(ulong))  return IsIn(typeConv[7], to) ? Conversion.Safe : Conversion.Unsafe;
     }
     if(from.IsArray && to.IsArray && to.GetElementType().IsAssignableFrom(from.GetElementType()))
       return Conversion.Reference;
@@ -540,14 +540,17 @@ public sealed class Ops
     throw TypeError("unsupported operand types for /: '{0}' and '{1}'", TypeName(a), TypeName(b));
   }
 
+  public static DivideByZeroException DivideByZeroError(string format, params object[] args)
+  { return new DivideByZeroException(string.Format(format, args));
+  }
+
   public static EOFErrorException EOFError(string format, params object[] args)
   { return new EOFErrorException(string.Format(format, args));
   }
 
   public static object Equal(object a, object b)
   { if(a==b) return TRUE;
-    Complex c = a as Complex;
-    return FromBool(c==null ? Compare(a, b)==0 : c.Equals(b));
+    return FromBool(a is Complex ? ((Complex)a).Equals(b) : Compare(a, b)==0);
   }
 
   public static int FixIndex(int index, int length)
@@ -589,7 +592,7 @@ public sealed class Ops
       }
       case TypeCode.UInt64:
       { ulong v = (ulong)a;
-        return v<=long.MaxValue ? LongOps.FloorDivide((long)v, b) : new Integer(v).FloorDivide(b);
+        return v<=long.MaxValue ? LongOps.FloorDivide((long)v, b) : IntegerOps.FloorDivide(new Integer(v), b);
       }
     }
     throw TypeError("unsupported operand types for /: '{0}' and '{1}'", TypeName(a), TypeName(b));
@@ -757,7 +760,7 @@ public sealed class Ops
       case TypeCode.Int32:   return (int)a!=0;
       case TypeCode.Int64:   return (long)a!=0;
       case TypeCode.Object:
-        if(a is Integer) return !((Integer)a).IsZero;
+        if(a is Integer) return (Integer)a!=0;
         if(a is Complex) return ComplexOps.NonZero((Complex)a);
         if(a is ICollection) return ((ICollection)a).Count>0;
         if(a is ISequence) return ((ISequence)a).__len__()>0;
@@ -790,10 +793,10 @@ public sealed class Ops
         return TryInvoke(a, "__lshift__", out ret, b) ? ret : Invoke(b, "__rlshift__", a);
       case TypeCode.SByte: return IntOps.LeftShift((int)(sbyte)a, b);
       case TypeCode.UInt16: return IntOps.LeftShift((int)(short)a, b);
-      case TypeCode.UInt32: return LongOps.LeftShift((long)(uint)v, b);
+      case TypeCode.UInt32: return LongOps.LeftShift((long)(uint)a, b);
       case TypeCode.UInt64:
       { ulong v = (ulong)a;
-        return v<=long.MaxValue ? LongOps.LeftShift((long)v, b) : new Integer(v).LeftShift(b);
+        return v<=long.MaxValue ? LongOps.LeftShift((long)v, b) : IntegerOps.LeftShift(new Integer(v), b);
       }
     }
     throw TypeError("unsupported operand types for <<: '{0}' and '{1}'",
@@ -818,7 +821,6 @@ public sealed class Ops
   { switch(Convert.GetTypeCode(a))
     { case TypeCode.Boolean: return IntOps.Modulus((bool)a ? 1 : 0, b);
       case TypeCode.Byte:    return IntOps.Modulus((int)(byte)a, b);
-      case TypeCode.Double:  return FloatOps.Modulus((double)a, b);
       case TypeCode.Int16:   return IntOps.Modulus((int)(short)a, b);
       case TypeCode.Int32:   return IntOps.Modulus((int)a, b);
       case TypeCode.Int64:   return LongOps.Modulus((long)a, b);
@@ -827,7 +829,6 @@ public sealed class Ops
         object ret;
         return TryInvoke(a, "__mod__", out ret, b) ? ret : Invoke(b, "__rmod__", a);
       case TypeCode.SByte: return IntOps.Modulus((int)(sbyte)a, b);
-      case TypeCode.Single: return FloatOps.Modulus((float)a, b);
       case TypeCode.String: return StringOps.PrintF((string)a, b);
       case TypeCode.UInt16: return IntOps.Modulus((int)(short)a, b);
       case TypeCode.UInt32: 
@@ -836,7 +837,7 @@ public sealed class Ops
       }
       case TypeCode.UInt64:
       { ulong v = (ulong)a;
-        return v<=long.MaxValue ? LongOps.Modulus((long)v, b) : new Integer(v).Modulus(b);
+        return v<=long.MaxValue ? LongOps.Modulus((long)v, b) : IntegerOps.Modulus(new Integer(v), b);
       }
     }
     throw TypeError("unsupported operand types for %: '{0}' and '{1}'", TypeName(a), TypeName(b));
@@ -857,7 +858,7 @@ public sealed class Ops
       case TypeCode.Object:
         if(a is Integer) return IntegerOps.Multiply((Integer)a, b);
         if(a is Complex) return ComplexOps.Multiply((Complex)a, b);
-        if(a is ICollection || a is ISequence) return ArrayOps.Multiply((Array)a, b);
+        if(a is ICollection || a is ISequence) return ArrayOps.Multiply(a, b);
         object ret;
         return TryInvoke(a, "__mul__", out ret, b) ? ret : Invoke(b, "__rmul__", a);
       case TypeCode.SByte: return IntOps.Multiply((int)(sbyte)a, b);
@@ -870,7 +871,7 @@ public sealed class Ops
       }
       case TypeCode.UInt64:
       { ulong v = (ulong)a;
-        return v<=long.MaxValue ? LongOps.Multiply((long)v, b) : new Integer(v).Multiply(b);
+        return v<=long.MaxValue ? LongOps.Multiply((long)v, b) : IntegerOps.Multiply(new Integer(v), b);
       }
     }
     throw TypeError("unsupported operand types for *: '{0}' and '{1}'", TypeName(a), TypeName(b));
@@ -900,7 +901,7 @@ public sealed class Ops
       }
       case TypeCode.UInt64:
       { ulong v = (ulong)a;
-        return v<=long.MaxValue ? -(long)v : new Integer(v).Negate();
+        return v<=long.MaxValue ? -(long)v : -new Integer(v);
       }
     }
     throw TypeError("unsupported operand type for unary -: '{0}'", TypeName(a));
@@ -908,8 +909,7 @@ public sealed class Ops
 
   public static object NotEqual(object a, object b)
   { if(a==b) return FALSE;
-    Complex c = a as Complex;
-    return FromBool(c==null ? Compare(a, b)!=0 : !c.Equals(b));
+    return FromBool(a is Complex ? !((Complex)a).Equals(b) : Compare(a, b)!=0);
   }
 
   public static NotImplementedException NotImplementedError(string format, params object[] args)
@@ -918,6 +918,10 @@ public sealed class Ops
 
   public static OSErrorException OSError(string format, params object[] args)
   { return new OSErrorException(string.Format(format, args));
+  }
+
+  public static OverflowException OverflowError(string format, params object[] args)
+  { return new OverflowException(string.Format(format, args));
   }
 
   public static object Power(object a, object b)
@@ -942,7 +946,7 @@ public sealed class Ops
       }
       case TypeCode.UInt64:
       { ulong v = (ulong)a;
-        return v<=long.MaxValue ? LongOps.Power((long)v, b) : new Integer(v).Power(b);
+        return v<=long.MaxValue ? LongOps.Power((long)v, b) : IntegerOps.Power(new Integer(v), b);
       }
     }
     throw TypeError("unsupported operand types for **: '{0}' and '{1}'", TypeName(a), TypeName(b));
@@ -967,18 +971,20 @@ public sealed class Ops
     { case TypeCode.Boolean: return (bool)o ? "true" : "false";
       case TypeCode.Byte: case TypeCode.Int16: case TypeCode.Int32: case TypeCode.SByte: case TypeCode.UInt16:
         return o.ToString();
+      case TypeCode.Double: return ((double)o).ToString("R");
+      case TypeCode.Empty: return "null";
+      case TypeCode.Int64: case TypeCode.UInt64: return o.ToString()+'L';
+      case TypeCode.Object:
+        if(o is IRepresentable) return ((IRepresentable)o).__repr__();
+        if(o is Array) return ArrayOps.Repr((Array)o);
+        break;
+      case TypeCode.Single: return ((float)o).ToString("R");
+      case TypeCode.String: return StringOps.Escape((string)o);
       case TypeCode.UInt32:
       { string ret = o.ToString();
         if((uint)o>int.MaxValue) ret += 'L';
         return ret;
       }
-      case TypeCode.Int64: case TypeCode.UInt64: return o.ToString()+'L';
-      case TypeCode.Single: case TypeCode.Double: return o.ToString("R");
-      case TypeCode.Object:
-        if(o is IRepresentable) return ((IRepresentable)o).__repr__();
-        if(o is Array) return ArrayOps.Repr((Array)o);
-      case TypeCode.Empty: return "null";
-      case TypeCode.String: return StringOps.Escape((string)o);
     }
     return GetDynamicType(o).Repr(o);
   }
@@ -996,10 +1002,10 @@ public sealed class Ops
         return TryInvoke(a, "__rshift__", out ret, b) ? ret : Invoke(b, "__rrshift__", a);
       case TypeCode.SByte: return IntOps.RightShift((int)(sbyte)a, b);
       case TypeCode.UInt16: return IntOps.RightShift((int)(short)a, b);
-      case TypeCode.UInt32: return LongOps.RightShift((long)(uint)v, b);
+      case TypeCode.UInt32: return LongOps.RightShift((long)(uint)a, b);
       case TypeCode.UInt64:
       { ulong v = (ulong)a;
-        return v<=long.MaxValue ? LongOps.RightShift((long)v, b) : new Integer(v).RightShift(b);
+        return v<=long.MaxValue ? LongOps.RightShift((long)v, b) : IntegerOps.RightShift(new Integer(v), b);
       }
     }
     throw TypeError("unsupported operand types for >>: '{0}' and '{1}'", TypeName(a), TypeName(b));
@@ -1047,7 +1053,7 @@ public sealed class Ops
 
   public static string Str(object o)
   { if(Convert.GetTypeCode(o)==TypeCode.Object)
-    { string ret;
+    { object ret;
       if(TryInvoke(o, "__str__", out ret)) return Ops.ToString(ret);
     }
     return o.ToString();
@@ -1081,7 +1087,7 @@ public sealed class Ops
       }
       case TypeCode.UInt64:
       { ulong v = (ulong)a;
-        return v<=long.MaxValue ? LongOps.Subtract((long)v, b) : new Integer(v).Subtract(b);
+        return v<=long.MaxValue ? LongOps.Subtract((long)v, b) : IntegerOps.Subtract(new Integer(v), b);
       }
     }
     throw TypeError("unsupported operand types for -: '{0}' and '{1}'", TypeName(a), TypeName(b));
@@ -1167,7 +1173,7 @@ public sealed class Ops
     return e;
   }
 
-  public static string TypeName(object o) { return GetDynamicType(o).__name__; }
+  public static string TypeName(object o) { return GetDynamicType(o).__name__.ToString(); }
 
   public static ValueErrorException ValueError(string format, params object[] args)
   { return new ValueErrorException(string.Format(format, args));
@@ -1196,7 +1202,8 @@ public sealed class Ops
   { // FROM
     new Type[] { typeof(int), typeof(double), typeof(short), typeof(long), typeof(float) }, // sbyte
     new Type[] // byte
-    { typeof(int), typeof(double), typeof(short), typeof(ushort), typeof(long), typeof(ulong), typeof(float)
+    { typeof(int), typeof(double), typeof(uint), typeof(short), typeof(ushort), typeof(long), typeof(ulong),
+      typeof(float)
     },
     new Type[] { typeof(int), typeof(double), typeof(long), typeof(float) }, // short
     new Type[] { typeof(int), typeof(double), typeof(uint), typeof(long), typeof(ulong), typeof(float) }, // ushort
