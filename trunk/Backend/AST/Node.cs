@@ -15,6 +15,23 @@ public struct Argument
   public Expression Expression;
 }
 
+public class ExceptClause : Node
+{ public ExceptClause(Expression type, NameExpression target, Statement body) { Type=type; Target=target; Body=body; }
+
+  public override void Walk(IWalker w)
+  { if(w.Walk(this))
+    { if(Type!=null) Type.Walk(w);
+      if(Target!=null) Target.Walk(w);
+      Body.Walk(w);
+    }
+    w.PostWalk(this);
+  }
+
+  public Expression Type;
+  public NameExpression Target;
+  public Statement  Body;
+}
+
 public struct ImportName
 { public ImportName(string name) { Name=name; AsName=null; }
   public ImportName(string name, string asName) { Name=name; AsName=asName; }

@@ -1,4 +1,4 @@
-#define COMPILED
+//#define COMPILED
 
 using System;
 using Boa.AST;
@@ -29,7 +29,7 @@ public class Text
 
         try { stmt = Parser.FromString(source).Parse(); }
         catch(SyntaxErrorException e)
-        { if(e.Message.IndexOf("expected indent")==-1) throw;
+        { if(e.Message.IndexOf("expected indent")==-1 && e.Message.IndexOf("expecting 'except'")==-1) throw;
           source += '\n';
           while(true)
           { Console.Write(sys.ps2);
