@@ -19,11 +19,16 @@ public class EditForm : System.Windows.Forms.Form
 
 	  InitializeComponent();
 	  edit.Focus();
+	  
+	  timer = new Timer();
+	  timer.Interval = 5000;
+	  timer.Tick += new EventHandler(highLight_Tick);
+	  timer.Enabled = true;
 	}
 
-  public string Filename { get { return fileName; } }
+  public string Filename { get { return filename; } }
   public bool Modified { get { return modified; } }
-  
+
   public new void Load(string path)
   { if(modified && MessageBox.Show("The current document has been modified. Loading a file will discard these changes. Discard changes?",
                                    "Discard changes?", MessageBoxButtons.YesNo, MessageBoxIcon.Warning,
@@ -36,13 +41,41 @@ public class EditForm : System.Windows.Forms.Form
     SetFilename(Path.GetFullPath(path));
   }
 
+  public void Run()
+  { Run(edit.Text, false);
+    Options.Interactive = false;
+
+    if(edit.Text.Trim()=="") return;
+    try
+    { Statement stmt = Parser.FromString(edit.Text).Parse();
+      stmt.PostProcessForCompile();
+      SnippetMaker.Generate(stmt).Run(boaFrame);
+    }
+    catch(Exception ex) { immediate.AppendLine("Error {0}: {1}", ex.GetType().Name, ex.Message); }
+  }
+
+  public void Run(string code, bool interactive)
+  { if(code.Trim().Length==0) return;
+
+    Options.Interactive = interactive;
+    if(filename!=null && App.MainForm.AutoChdir) Modules.dotnet.chdir(Path.GetDirectoryName(filename));
+
+    try
+    { Statement stmt = Parser.FromString(code).Parse();
+      stmt.PostProcessForCompile();
+      SnippetMaker.Generate(stmt).Run(boaFrame);
+    }
+    catch(Exception ex) { immediate.AppendLine("Error {0}: {1}", ex.GetType().Name, ex.Message); }
+  }
+
   public void Save()
-  { if(fileName==null) SaveAs();
+  { if(filename==null) SaveAs();
     else
-    { StreamWriter sw = new StreamWriter(fileName);
+    { StreamWriter sw = new StreamWriter(filename);
       sw.Write(edit.Text);
       sw.Close();
       modified = false;
+      Text = Path.GetFileName(filename);
     }
   }
 
@@ -50,7 +83,7 @@ public class EditForm : System.Windows.Forms.Form
   { SaveFileDialog fd = new SaveFileDialog();
     fd.DefaultExt = ".boa";
     fd.Filter = "Boa files (*.boa)|*.boa|All files (*.*)|*.*";
-    if(fileName!=null) fd.InitialDirectory = Path.GetDirectoryName(fileName);
+    if(filename!=null) fd.InitialDirectory = Path.GetDirectoryName(filename);
     fd.RestoreDirectory = true;
     fd.Title = "Select destination file...";
     if(fd.ShowDialog()==DialogResult.OK)
@@ -60,15 +93,12 @@ public class EditForm : System.Windows.Forms.Form
   }
 
 	#region Windows Form Designer generated code
-	private void InitializeComponent()
+	void InitializeComponent()
 	{
     System.Resources.ResourceManager resources = new System.Resources.ResourceManager(typeof(EditForm));
     this.AcBox = new Boa.IDE.AutoCompleteBox();
     this.immediate = new Boa.IDE.ImmediateBox();
-    this.edit = new Boa.IDE.TextBox();
-    this.menu = new System.Windows.Forms.MainMenu();
-    this.menuDebug = new System.Windows.Forms.MenuItem();
-    this.menuRun = new System.Windows.Forms.MenuItem();
+    this.edit = new Boa.IDE.BoaBox();
     this.lblCode = new System.Windows.Forms.Label();
     this.lblImmediate = new System.Windows.Forms.Label();
     this.pnlCode = new System.Windows.Forms.Panel();
@@ -115,28 +145,6 @@ public class EditForm : System.Windows.Forms.Form
     this.edit.Text = "";
     this.edit.WordWrap = false;
     this.edit.TextChanged += new System.EventHandler(this.edit_TextChanged);
-    // 
-    // menu
-    // 
-    this.menu.MenuItems.AddRange(new System.Windows.Forms.MenuItem[] {
-                                                                       this.menuDebug});
-    // 
-    // menuDebug
-    // 
-    this.menuDebug.Index = 0;
-    this.menuDebug.MenuItems.AddRange(new System.Windows.Forms.MenuItem[] {
-                                                                            this.menuRun});
-    this.menuDebug.MergeOrder = 1;
-    this.menuDebug.MergeType = System.Windows.Forms.MenuMerge.MergeItems;
-    this.menuDebug.Text = "&Debug";
-    // 
-    // menuRun
-    // 
-    this.menuRun.Index = 0;
-    this.menuRun.MergeOrder = 10;
-    this.menuRun.Shortcut = System.Windows.Forms.Shortcut.F5;
-    this.menuRun.Text = "&Run file";
-    this.menuRun.Click += new System.EventHandler(this.menuRun_Click);
     // 
     // lblCode
     // 
@@ -197,7 +205,6 @@ public class EditForm : System.Windows.Forms.Form
     this.Controls.Add(this.AcBox);
     this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
     this.KeyPreview = true;
-    this.Menu = this.menu;
     this.Name = "EditForm";
     this.Text = "Editor";
     this.pnlCode.ResumeLayout(false);
@@ -207,6 +214,11 @@ public class EditForm : System.Windows.Forms.Form
   }
 	#endregion
 
+  protected override void Dispose(bool disposing)
+  { timer.Dispose();
+    base.Dispose(disposing);
+  }
+
   protected override void OnEnter(EventArgs e)
   { Boa.Modules.sys.displayhook = immediate.displayhook;
     base.OnEnter(e);
@@ -215,7 +227,7 @@ public class EditForm : System.Windows.Forms.Form
   protected override void OnClosing(CancelEventArgs e)
   { if(!e.Cancel && modified)
     { DialogResult res = MessageBox.Show("This window has not been saved. Save before closing?",
-                                         "Save "+(fileName==null ? "file" : Path.GetFileName(fileName))+"?",
+                                         "Save "+(filename==null ? "file" : Path.GetFileName(filename))+"?",
                                          MessageBoxButtons.YesNoCancel, MessageBoxIcon.Warning);
       if(res==DialogResult.Cancel) e.Cancel=true;
       else if(res==DialogResult.Yes)
@@ -238,44 +250,36 @@ public class EditForm : System.Windows.Forms.Form
     base.OnKeyDown(e);
   }
 
-  void menuRun_Click(object sender, System.EventArgs e)
-  { Options.Interactive = false;
-    if(edit.Text.Trim()=="") return;
-    try
-    { Statement stmt = Parser.FromString(edit.Text).Parse();
-      stmt.PostProcessForCompile();
-      SnippetMaker.Generate(stmt).Run(boaFrame);
-    }
-    catch(Exception ex) { immediate.AppendLine("Error {0}: {1}", ex.GetType().Name, ex.Message); }
-  }
-
   void edit_TextChanged(object sender, EventArgs e)
-  { if(!modified)
+  { if(!modified && edit.Modified)
     { modified=true;
       Text += "*";
     }
   }
 
+  void highLight_Tick(object sender, EventArgs e)
+  { edit.PerformSyntaxHighlighting();
+    immediate.PerformSyntaxHighlighting();
+  }
+
   void SetFilename(string path)
-  { fileName = path;
+  { filename = path;
     Text = Path.GetFileName(path);
   }
 
-  internal TextBox edit;
+  internal BoaBox edit;
   internal ImmediateBox immediate;
-  MainMenu menu;
   internal AutoCompleteBox AcBox;
   internal Frame boaFrame;
-  string fileName;
+  Timer timer;
+  string filename;
   bool modified;
 
-  private System.Windows.Forms.Label lblImmediate;
-  private System.Windows.Forms.Label lblCode;
-  private System.Windows.Forms.Panel pnlCode;
-  private System.Windows.Forms.Panel pnlImmediate;
-  private System.Windows.Forms.MenuItem menuDebug;
-  private System.Windows.Forms.MenuItem menuRun;
-  private System.Windows.Forms.Splitter splitter;
+  System.Windows.Forms.Label lblImmediate;
+  System.Windows.Forms.Label lblCode;
+  System.Windows.Forms.Panel pnlCode;
+  System.Windows.Forms.Panel pnlImmediate;
+  System.Windows.Forms.Splitter splitter;
 }
 
 } // namespace Boa.IDE

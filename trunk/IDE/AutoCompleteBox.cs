@@ -6,7 +6,7 @@ namespace Boa.IDE
 public class AutoCompleteBox : ListBox
 { protected override void OnDoubleClick(System.EventArgs e)
   { if(SelectedIndex != -1)
-    { TextBox textbox = (TextBox)Tag;
+    { BoaBox textbox = (BoaBox)Tag;
       textbox.SelectItem();
       Hide();
       textbox.Focus();
@@ -15,12 +15,12 @@ public class AutoCompleteBox : ListBox
   }
 
   protected override void OnKeyDown(KeyEventArgs e)
-  { ((TextBox)Tag).Focus();
+  { ((Control)Tag).Focus();
     base.OnKeyDown(e);
   }
 
   protected override void OnSelectedIndexChanged(System.EventArgs e)
-  { if(Tag!=null) ((TextBox)Tag).Focus();
+  { if(Tag!=null) ((Control)Tag).Focus();
     base.OnSelectedIndexChanged(e);
   }
 }
