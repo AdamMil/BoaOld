@@ -764,6 +764,11 @@ public sealed class ReflectedType : BoaType
     foreach(MethodInfo mi in type.GetMethods()) AddMethod(mi);
     foreach(PropertyInfo pi in type.GetProperties()) AddProperty(pi);
 
+    if(typeof(IDictionaryEnumerator).IsAssignableFrom(type))
+    { if(!dict.Contains("key")) dict["key"] = dict["Key"];
+      if(!dict.Contains("value")) dict["value"] = dict["Value"];
+    }
+
     // iterator protocol
     if(typeof(IEnumerator).IsAssignableFrom(type))
     { if(!dict.Contains("next")) dict["next"] = SpecialAttr.NextMethod.Value;
