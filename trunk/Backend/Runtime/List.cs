@@ -66,6 +66,12 @@ public class List : IMutableSequence, IList, IComparable, ICloneable, IRepresent
   public void sort() { Array.Sort(items, 0, size, Ops.DefaultComparer); }
   public void sort(object cmpfunc) { Array.Sort(items, 0, size, new FunctionComparer(cmpfunc)); }
 
+  public Tuple ToTuple()
+  { object[] ti = new object[size];
+    items.CopyTo(ti, 0);
+    return new Tuple(ti);
+  }
+
   #region IMutableSequence Members
   public object __add__(object o)
   { List list=null;

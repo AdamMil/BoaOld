@@ -443,8 +443,8 @@ public sealed class Ops
   { IDescriptor d = desc as IDescriptor;
     if(d!=null) return d.__get__(instance);
     object ret;
-    if(TryInvoke(desc, "__get__", out ret, instance)) return ret; // TODO: this is expensive.. optimize it.
-    return desc;
+    if(TryInvoke(desc, "__get__", out ret, instance)) return ret; // TODO: this is expensive and happens very often
+    return desc;                                                  // but the common case is that it just returns desc
   }
 
   public static DynamicType GetDynamicType(object o)
@@ -582,6 +582,16 @@ public sealed class Ops
   public static object Multiply(object a, object b)
   { if(a is int && b is int) return (int)a*(int)b;
     if(a is double && b is double) return (double)a*(double)b;
+    if(a is string && b is int)
+    { int count = (int)b;
+      if(count==1) return a;
+      if(count==0) return string.Empty;
+      string s = (string)a;
+      System.Text.StringBuilder sb = new System.Text.StringBuilder(s.Length*count);
+      if(s.Length==1) sb.Append(s[0], count);
+      else while(count-->0) sb.Append(s);
+      return sb.ToString();
+    }
     throw TypeError("unsupported operand type(s) for *: '{0}' and '{1}'", GetDynamicType(a).__name__, GetDynamicType(b).__name__);
   }
 
@@ -619,14 +629,15 @@ public sealed class Ops
 
     string s = o as string;
     if(s!=null) return StringOps.Escape(s);
-    
+
     IRepresentable ir = o as IRepresentable;
     if(ir!=null) return ir.__repr__();
 
+    if(o is bool) return (bool)o ? "true" : "false";
+    if(o is long) return ((long)o).ToString() + "L";
+
     Array a = o as Array;
     if(a!=null) return ArrayOps.Repr(a);
-
-    if(o is long) return ((long)o).ToString() + "L";
 
     return GetDynamicType(o).Repr(o);
   }
@@ -678,6 +689,7 @@ public sealed class Ops
 
   public static string Str(object o)
   { if(o is string) return (string)o;
+    if(o is bool) return (bool)o ? "true" : "false";
     object ret;
     if(TryInvoke(o, "__str__", out ret)) return Ops.ToString(ret);
     return o.ToString();

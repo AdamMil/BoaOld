@@ -152,7 +152,7 @@ sequences or when many of a range's elements are never used.")]
   public static string __repr__() { return __str__(); }
   public static string __str__() { return "<module '__builtin__' (built-in)>"; }
 
-  [DocString(@"abs(object)
+  [DocString(@"abs(object) -> object
 
 Return the absolute value of a number. The argument may be a plain or long
 integer or a floating point number. If the argument is a complex number, its
@@ -163,14 +163,14 @@ magnitude is returned.")]
     return Ops.Invoke(o, "__abs__");
   }
 
-  [DocString(@"bool([x])
+  [DocString(@"bool([x]) -> bool
 
 Convert a value to a Boolean, using the standard truth testing procedure.
 If x is false or omitted, this returns false; otherwise it returns true.")]
   public static object @bool() { return Ops.FALSE; }
   public static object @bool(object o) { return Ops.FromBool(Ops.IsTrue(o)); }
 
-  [DocString(@"callable(object)
+  [DocString(@"callable(object) -> bool
 
 Return true if the object argument appears callable, false if not. If this
 returns true, it is still possible that a call fails, but if it is false,
@@ -180,13 +180,13 @@ a __call__()  method.")]
   public static object callable(object o) { return o is ICallable ? Ops.TRUE : hasattr(o, "__call__"); }
 
   
-  [DocString(@"chr(i)
+  [DocString(@"chr(i) -> str
 
 Return a string of one character whose ASCII code is the integer passed.
 For example, chr(97) returns the string 'a'. This is the inverse of ord().")]
   public static string chr(int value) { return new string((char)value, 1); }
 
-  [DocString(@"cmp(x, y)
+  [DocString(@"cmp(x, y) -> int
 
 Compare the two objects x and y and return an integer according to the
 outcome. The return value is negative if x<y, zero if x==y and strictly
@@ -204,7 +204,7 @@ delattr(x, 'foobar') is equivalent to del x.foobar.")]
   public static void delattr(object o, string name) { Ops.DelAttr(o, name); }
 
   // FIXME: dir() without args should return local variables, not module variables (but this is complicated)
-  [DocString(@"dir([object])
+  [DocString(@"dir([object]) -> list
 
 Without arguments, return the list of names in the current local symbol
 table. With an argument, attempts to return a list of valid attributes
@@ -225,7 +225,7 @@ alphabetically.")]
   }
 
   // FIXME: make this conform to the docstring
-  [DocString(@"divmod(a, b)
+  [DocString(@"divmod(a, b) -> object
 
 Take two (non complex) numbers as arguments and return a pair of numbers
 consisting of their quotient and remainder when using long division. With
@@ -237,7 +237,7 @@ is very close to a, if a % b is non-zero it has the same sign as b, and
 0 <= abs(a % b) < abs(b).")]
   public static Tuple divmod(object a, object b) { return new Tuple(Ops.Divide(a, b), Ops.Modulus(a, b)); }
 
-  [DocString(@"enumerate(object)
+  [DocString(@"enumerate(object) -> iter
 
 Return an enumerator object. The argument must be a sequence, an iterator,
 or some other object which supports iteration. The next() method of the
@@ -247,7 +247,7 @@ enumerate() is useful for obtaining an indexed series:
 (0, seq[0]), (1, seq[1]), (2, seq[2])")]
   public static IEnumerator enumerate(object o) { return new EnumerateEnumerator(Ops.GetEnumerator(o)); }
 
-  [DocString(@"eval(expression[, globals[, locals]])
+  [DocString(@"eval(expression[, globals[, locals]]) -> object
 
 The arguments are a string and two optional dictionaries. The expression
 argument is parsed and evaluated as a Boa expression using the globals and
@@ -287,14 +287,14 @@ eval() or execfile().")]
 
   // TODO: execfile(filename[, globals[, locals]])
 
-  [DocString(@"filter(function, sequence)
+  [DocString(@"filter(function, sequence) -> sequence
 
-Construct a list from those elements of list for which function returns true.
-list may be either a sequence, a container which supports iteration, or an
-iterator, If list  is a string or a tuple, the result also has that type;
-otherwise it is always a list. If function is null, the identity function is
-assumed, that is, all elements of list that are false (zero or empty) are
-removed.
+Construct a sequence from those elements of sequence for which function
+returns true. 'sequence' may be either a sequence, a container which
+supports iteration, or an iterator, If 'sequence' is a string or a tuple,
+the result also has that type; otherwise it is always a list. If function
+is null, the truth function is assumed, that is, all elements of list
+that are false (zero or empty) are removed.
 
 Note that filter(function, list) is equivalent to
 [item for item in list if function(item)] if function is not null and
@@ -320,11 +320,11 @@ Note that filter(function, list) is equivalent to
       { while(e.MoveNext()) if(Ops.IsTrue(e.Current)) ret.append(Ops.ToBoa(e.Current));
       }
       else while(e.MoveNext()) if(Ops.IsTrue(Ops.Call(function, e.Current))) ret.append(Ops.ToBoa(e.Current));
-      return ret;
+      return seq is Tuple ? ret.ToTuple() : (object)ret;
     }
   }
 
-  [DocString(@"float([value])
+  [DocString(@"float([value]) -> float
 
 Convert a string or a number to floating point. If the argument is a string,
 it must contain a possibly signed decimal or floating point number, possibly
@@ -336,7 +336,7 @@ given, returns 0.")]
   public static double @float(string s) { return double.Parse(s); }
   public static double @float(object o) { return Ops.ToFloat(o); }
 
-  [DocString(@"getattr(object, name[, default])
+  [DocString(@"getattr(object, name[, default]) -> object
 
 Return the value of the named attribute of an object. The name must be a
 string. If the string is the name of one of the object's attributes, the
@@ -349,7 +349,7 @@ returned if provided, otherwise AttributeError is raised.")]
     return Ops.GetAttr(o, name, out ret) ? ret : defaultValue;
   }
 
-  [DocString(@"globals()
+  [DocString(@"globals() -> dict
 
 Return a dictionary representing the current global symbol table. This is
 always the dictionary of the current module (inside a function or method,
@@ -357,7 +357,7 @@ this is the module where it is defined, not the module from which it is
 called).")]
   public static object globals() { return Ops.GetExecutingModule().__dict__; }
 
-  [DocString(@"hasattr(object, name)
+  [DocString(@"hasattr(object, name) -> bool
 
 The arguments are an object and a string. The result is true if the string
 is the name of one of the object's attributes, false if not.")]
@@ -367,7 +367,7 @@ is the name of one of the object's attributes, false if not.")]
   }
 
   // FIXME: python says: Numeric values that compare equal have the same hash value (even if they are of different types, as is the case for 1 and 1.0).
-  [DocString(@"hash(object)
+  [DocString(@"hash(object) -> int
 
 Return the hash value of the object (if it has one). Hash values are
 integers. They are used to quickly compare dictionary keys during a
@@ -446,7 +446,7 @@ of object, a help page on the object is generated.")]
     noHelp: Console.WriteLine("No help available for {0}.", Ops.GetDynamicType(o).__name__);
   }
 
-  [DocString(@"hex(number)
+  [DocString(@"hex(number) -> str
 
 Convert an integer number (of any size) to a hexadecimal string. The result
 is a valid Boa expression. Note: this always yields an unsigned literal.
@@ -462,7 +462,7 @@ or raise an OverflowError exception.")]
 
   public static int id(object o) { throw new NotImplementedException(); }
 
-  [DocString(@"input([prompt])
+  [DocString(@"input([prompt]) -> str
 
 If the prompt argument is present, it is written to standard output without
 a trailing newline. The function then reads a line from input, converts it
@@ -476,7 +476,7 @@ read, EOFError is raised.")]
     return line;
   }
 
-  [DocString(@"int([value[, radix])
+  [DocString(@"int([value[, radix]) -> int
 
 Convert a string or number to a plain integer. If the argument is a string,
 it must contain a possibly signed decimal number representable as a Boa
@@ -502,13 +502,13 @@ will be returned instead. If no arguments are given, returns 0.")]
     return Convert.ToInt32(s, radix);
   }
 
-  [DocString(@"intern(string)
+  [DocString(@"intern(string) -> str
 
 Enters the given string into the 'interned' string table. Interned strings
 that compare equal will be shared. That is, they will be the same object.")]
   public static string intern(string s) { return string.Intern(s); }
 
-  [DocString(@"isinstance(object, type)
+  [DocString(@"isinstance(object, type) -> bool
 
 Return true if the object argument is an instance of the type argument,
 or of a (direct or indirect) subclass thereof. Also return true if type
@@ -521,7 +521,7 @@ type, or tuple of classes, types, and such tuples, a TypeError exception is
 raised.")]
   public static bool isinstance(object o, object type) { return issubclass(Ops.GetDynamicType(o), type); }
 
-  [DocString(@"issubclass(type, parent)
+  [DocString(@"issubclass(type, parent) -> bool
 
 Return true if the type argument is a subclass (direct or indirect) of the
 parent argument. A class is considered a subclass of itself. The parent may
@@ -535,7 +535,7 @@ be checked. In any other case, a TypeError exception is raised.")]
     return false;
   }
 
-  [DocString(@"enumerator(object[, sentinel])
+  [DocString(@"enumerator(object[, sentinel]) -> iter
 
 Return an iterator object. The first argument is interpreted very differently
 depending on the presence of the second argument. Without a second argument,
@@ -552,7 +552,7 @@ will be raised, otherwise the value will be returned.")]
   { return new SentinelEnumerator(Ops.GetEnumerator(o), sentinel);
   }
 
-  [DocString(@"len(object)
+  [DocString(@"len(object) -> int
 
 Return the length (the number of items) of an object. The argument may be a
 sequence (string, tuple or list) or a mapping (dictionary).")]
@@ -571,7 +571,7 @@ sequence (string, tuple or list) or a mapping (dictionary).")]
 
   // TODO: locals()
 
-  [DocString(@"map(function, seq1, ...)
+  [DocString(@"map(function, seq1, ...) -> list
 
 Takes a function object (or null) and one or more sequences, and applies the
 function to the items of the sequences and return a list of the results. The
@@ -615,14 +615,14 @@ arguments may be any kind of sequence; the result is always a list.")]
     return ret;
   }
 
-  [DocString(@"max(sequence)
-max(value1, value2, ...)
+  [DocString(@"max(sequence) -> object
+max(value1, value1, ...) -> object
 
 With a single argument s, returns the largest item of a non-empty sequence
 (such as a string, tuple or list). With more than one argument, returns the
 largest of the arguments.")]
-  public static object max(object seq)
-  { IEnumerator e = Ops.GetEnumerator(seq);
+  public static object max(object sequence)
+  { IEnumerator e = Ops.GetEnumerator(sequence);
     if(!e.MoveNext()) throw Ops.ValueError("sequence is empty");
     object ret = e.Current;
     while(e.MoveNext()) if(Ops.IsTrue(Ops.More(e.Current, ret))) ret = e.Current;
@@ -636,14 +636,14 @@ largest of the arguments.")]
     return ret;
   }
 
-  [DocString(@"min(sequence)
-min(value1, value2, ...)
+  [DocString(@"min(sequence) -> object
+min(value1, value2, ...) -> object
 
 With a single argument s, returns the smallest item of a non-empty sequence
 (such as a string, tuple or list). With more than one argument, returns the
 smallest of the arguments.")]
-  public static object min(object seq)
-  { IEnumerator e = Ops.GetEnumerator(seq);
+  public static object min(object sequence)
+  { IEnumerator e = Ops.GetEnumerator(sequence);
     if(!e.MoveNext()) throw Ops.ValueError("sequence is empty");
     object ret = e.Current;
     while(e.MoveNext()) if(Ops.IsTrue(Ops.Less(e.Current, ret))) ret = e.Current;
@@ -657,7 +657,7 @@ smallest of the arguments.")]
     return ret;
   }
 
-  [DocString(@"oct(value)
+  [DocString(@"oct(value) -> str
 
 Convert an integer number (of any size) to an octal string. The result is a
 valid Boa expression. Note: this always yields an unsigned literal. For
@@ -670,7 +670,7 @@ OverflowError exception.")]
     return Ops.Invoke(o, "__oct__");
   }
 
-  [DocString(@"ord(char)
+  [DocString(@"ord(char) -> int
 
 Return the ASCII value of a string of one character. Eg, ord('a') returns
 the integer 97, ord('\u2020') returns 8224. This is the inverse of chr().")]
@@ -679,7 +679,7 @@ the integer 97, ord('\u2020') returns 8224. This is the inverse of chr().")]
     return (int)s[0];
   }
 
-  [DocString(@"pow(x, y[, z])
+  [DocString(@"pow(x, y[, z]) -> object
 
 Returns x to the power y; if z is present, returns x to the power y,
 modulo z (possibly computed more efficiently than pow(x, y) % z). The
@@ -692,7 +692,7 @@ but 10**-2 returns 0.01.")]
   public static object pow(object value, object power) { return Ops.Power(value, power); }
   public static object pow(object value, object power, object mod) { return Ops.PowerMod(value, power, mod); }
 
-  [DocString(@"range([start,] stop[, step])
+  [DocString(@"range([start,] stop[, step]) -> list
 
 This is a versatile function to create lists containing arithmetic
 progressions. It is most often used in for loops. The arguments must be
@@ -729,7 +729,7 @@ Example:
     return ret;
   }
 
-  [DocString(@"reduce(function, sequence[, initializer])
+  [DocString(@"reduce(function, sequence[, initializer]) -> object
 
 Apply function of two arguments cumulatively to the items of sequence, from
 left to right, so as to reduce the sequence to a single value. For example,
@@ -754,7 +754,7 @@ sequence contains only one item, the first item is returned.")]
 
   public static Module reload(Module module) { throw new NotImplementedException(); }
 
-  [DocString(@"repr(object)
+  [DocString(@"repr(object) -> str
 
 Return a string containing a printable representation of an object. This is
 the same value yielded by conversions (reverse quotes). It is sometimes
@@ -763,7 +763,7 @@ types, this function makes an attempt to return a string that would yield an
 object with the same value when passed to eval().")]
   public static string repr(object o) { return Ops.Repr(o); }
 
-  [DocString(@"round(x[, n])
+  [DocString(@"round(x[, n]) -> float
 
 Returns the floating point value x rounded to n digits after the decimal
 point. If n is omitted, it defaults to zero. The result is a floating point
@@ -788,7 +788,7 @@ object allows it. For example, setattr(x, 'foobar', 123) is equivalent to
 x.foobar = 123.")]
   public static void setattr(object o, string name, object value) { Ops.SetAttr(value, o, name); }
 
-  [DocString(@"str([object])
+  [DocString(@"str([object]) -> str
 
 Return a string containing a nicely printable representation of an object.
 For strings, this returns the string itself. The difference with
@@ -798,7 +798,7 @@ no argument is given, returns the empty string, ''.")]
   public static string str() { return string.Empty; }
   public static string str(object o) { return Ops.Str(o); }
 
-  [DocString(@"sum(sequence[, start])
+  [DocString(@"sum(sequence[, start]) -> object
 
 Sums start and the items of a sequence, from left to right, and returns the
 total. start defaults to 0. The sequence's items are normally numbers, but
@@ -812,14 +812,14 @@ to reduce(operator.add, range(n), m).")]
     return start;
   }
   
-  [DocString(@"type(object)
+  [DocString(@"type(object) -> type
 
 Returns the type of an object. The return value is a type object.")]
   public static DynamicType type(object obj) { return Ops.GetDynamicType(obj); }
 
   // TODO: vars()
 
-  [DocString(@"zip(seq1, ...)
+  [DocString(@"zip(seq1, ...) -> list
 
 This function returns a list of tuples, where the i-th tuple contains the
 i-th element from each of the argument sequences. At least one sequence is
@@ -866,6 +866,7 @@ runtime.")]
   // TODO: file(filename[, mode[, bufsize]])
   //public static readonly object @float  = ReflectedType.FromType(typeof(double));
   //public static readonly object @int    = ReflectedType.FromType(typeof(int));
+  //public static readonly object iter    = ReflectedType.FromType(typeof(IEnumerator));
   public static readonly object list    = ReflectedType.FromType(typeof(List));
   public static readonly object @object = ReflectedType.FromType(typeof(object));
   public static readonly object slice   = ReflectedType.FromType(typeof(Slice));
