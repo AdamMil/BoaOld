@@ -32,10 +32,19 @@ public class TypeGenerator
     return new CodeGenerator(this, mb, mb.GetILGenerator());
   }
   
+  public TypeGenerator DefineNestedType(string name, Type parent) { return DefineNestedType(0, name, parent); }
+  public TypeGenerator DefineNestedType(TypeAttributes attrs, string name, Type parent)
+  { if(nestedTypes==null) nestedTypes = new ArrayList();
+    TypeAttributes ta = attrs | TypeAttributes.Class | TypeAttributes.NestedPublic;
+    TypeGenerator ret = new TypeGenerator(Assembly, TypeBuilder.DefineNestedType(name, ta, parent));
+    nestedTypes.Add(ret);
+    return ret;
+  }
+
   public Type FinishType()
   { if(initGen!=null) initGen.ILG.Emit(OpCodes.Ret);
     Type ret = TypeBuilder.CreateType();
-    // finish nested types
+    if(nestedTypes!=null) foreach(TypeGenerator tg in nestedTypes) tg.FinishType();
     return ret;
   }
 
@@ -111,6 +120,7 @@ public class TypeGenerator
   public TypeBuilder TypeBuilder;
 
   HybridDictionary constants = new HybridDictionary();
+  ArrayList nestedTypes;
   CodeGenerator initGen;
   Slot moduleField;
 }

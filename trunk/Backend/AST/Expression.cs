@@ -161,7 +161,8 @@ public class CallExpression : Expression
     Target.Emit(cg);
     if(numlist==0 && numdict==0)
     { if(numnamed==0)
-      { EmitRun(cg, Arguments.Length, 0, Arguments.Length);
+      { if(Arguments.Length==0) cg.EmitNewArray(typeof(object), 0);
+        else EmitRun(cg, Arguments.Length, 0, Arguments.Length);
         cg.EmitCall(typeof(Ops), "Call", new Type[] { typeof(object), typeof(object[]) });
       }
       else
@@ -181,22 +182,19 @@ public class CallExpression : Expression
       { if(Arguments[i].Name!=null || Arguments[i].Type==ArgType.Dict) continue;
         if(Arguments[i].Type==ArgType.Normal) runlen++;
         else
-        { if(runlen>1)
+        { if(runlen>0)
           { cg.ILG.Emit(OpCodes.Dup);
             cg.EmitInt(ri++);
             cg.ILG.Emit(OpCodes.Ldelema, typeof(CallArg));
-            EmitRun(cg, runlen, rsi, i);
-            cg.EmitInt(runlen);
-            cg.ILG.Emit(OpCodes.Box, typeof(int));
-            cg.EmitNew(ci);
-            cg.ILG.Emit(OpCodes.Stobj, typeof(CallArg));
-          }
-          else if(runlen==1)
-          { cg.ILG.Emit(OpCodes.Dup);
-            cg.EmitInt(ri++);
-            cg.ILG.Emit(OpCodes.Ldelema, typeof(CallArg));
-            for(; rsi<i; rsi++) if(Arguments[rsi].Name==null) { Arguments[rsi].Expression.Emit(cg); break; }
-            cg.ILG.Emit(OpCodes.Ldnull);
+            if(runlen>1)
+            { EmitRun(cg, runlen, rsi, i);
+              cg.EmitInt(runlen);
+              cg.ILG.Emit(OpCodes.Box, typeof(int));
+            }
+            else
+            { for(; rsi<i; rsi++) if(Arguments[rsi].Name==null) { Arguments[rsi].Expression.Emit(cg); break; }
+              cg.ILG.Emit(OpCodes.Ldnull);
+            }
             cg.EmitNew(ci);
             cg.ILG.Emit(OpCodes.Stobj, typeof(CallArg));
           }
@@ -209,8 +207,25 @@ public class CallExpression : Expression
           cg.EmitNew(ci);
           cg.ILG.Emit(OpCodes.Stobj, typeof(CallArg));
 
-          runlen=0; rsi=i;
+          runlen=0; rsi=i+1;
         }
+      }
+      if(runlen>0)
+      { cg.ILG.Emit(OpCodes.Dup);
+        cg.EmitInt(ri++);
+        cg.ILG.Emit(OpCodes.Ldelema, typeof(CallArg));
+        if(runlen>1)
+        { EmitRun(cg, runlen, rsi, Arguments.Length);
+          cg.EmitInt(runlen);
+          cg.ILG.Emit(OpCodes.Box, typeof(int));
+        }
+        else
+        { for(; rsi<Arguments.Length; rsi++)
+            if(Arguments[rsi].Name==null) { Arguments[rsi].Expression.Emit(cg); break; }
+          cg.ILG.Emit(OpCodes.Ldnull);
+        }
+        cg.EmitNew(ci);
+        cg.ILG.Emit(OpCodes.Stobj, typeof(CallArg));
       }
       
       if(numnamed>0) // then named arguments
@@ -259,7 +274,10 @@ public class CallExpression : Expression
     numruns += numlist + numdict;
 
     if(numlist==0 && numdict==0)
-    { if(numnamed==0) return Ops.Call(callee, EvaluateRun(frame, Arguments.Length, 0, Arguments.Length));
+    { if(numnamed==0)
+      { object[] args = Arguments.Length==0 ? new object[0] : EvaluateRun(frame, Arguments.Length, 0, Arguments.Length);
+        return Ops.Call(callee, args);
+      }
       else
       { string[] names;
         object[] values;
@@ -285,10 +303,12 @@ public class CallExpression : Expression
           }
 
           cargs[ri++] = new CallArg(Arguments[i].Expression.Evaluate(frame), CallArg.ListType);
-          runlen=0; rsi=i;
+          runlen=0; rsi=i+1;
         }
       }
-      
+      if(runlen>1) cargs[ri++] = new CallArg(EvaluateRun(frame, runlen, rsi, Arguments.Length), runlen);
+      else if(runlen==1) cargs[ri++] = new CallArg(Arguments[rsi].Expression.Evaluate(frame), null);
+
       if(numnamed>0) // then named arguments
       { string[] names;
         object[] values;
@@ -296,9 +316,10 @@ public class CallExpression : Expression
         cargs[ri++] = new CallArg(names, values);
       }
       
-      for(int i=0; i<Arguments.Length; i++)
-        if(Arguments[i].Type==ArgType.Dict)
-          cargs[ri++] = new CallArg(Arguments[i].Expression.Evaluate(frame), CallArg.DictType);
+      if(numdict>0)
+        for(int i=0; i<Arguments.Length; i++)
+          if(Arguments[i].Type==ArgType.Dict)
+            cargs[ri++] = new CallArg(Arguments[i].Expression.Evaluate(frame), CallArg.DictType);
 
       return Ops.Call(callee, cargs);
     }
@@ -315,7 +336,10 @@ public class CallExpression : Expression
   }
 
   public override void Walk(IWalker w)
-  { if(w.Walk(this)) Target.Walk(w);
+  { if(w.Walk(this))
+    { for(int i=0; i<Arguments.Length; i++) if(Arguments[i].Expression!=null) Arguments[i].Expression.Walk(w);
+      Target.Walk(w);
+    }
     w.PostWalk(this);
   }
 
@@ -344,8 +368,8 @@ public class CallExpression : Expression
   void EmitRun(CodeGenerator cg, int length, int start, int end)
   { if(length==0) { cg.ILG.Emit(OpCodes.Ldnull); return; }
     cg.EmitNewArray(typeof(object), length);
-    for(int ai=0; start<end; start++)
-      if(Arguments[start].Name==null)
+    for(int ai=0; ai<length; start++)
+      if(Arguments[start].Type==ArgType.Normal && Arguments[start].Name==null)
       { cg.ILG.Emit(OpCodes.Dup);
         cg.EmitInt(ai++);
         Arguments[start].Expression.Emit(cg);
@@ -367,8 +391,9 @@ public class CallExpression : Expression
   object[] EvaluateRun(Frame frame, int length, int start, int end)
   { if(length==0) return null;
     object[] values = new object[length];
-    for(int ai=0; start<end; start++)
-      if(Arguments[start].Name==null) values[ai++] = Arguments[start].Expression.Evaluate(frame);
+    for(int ai=0; ai<length; start++)
+      if(Arguments[start].Type==ArgType.Normal && Arguments[start].Name==null)
+        values[ai++] = Arguments[start].Expression.Evaluate(frame);
     return values;
   }
 }
@@ -598,7 +623,7 @@ public class ListCompExpression : Expression
     else
     { AssignStatement ass = new AssignStatement(Names);
       Label next = cg.ILG.DefineLabel(), end = cg.ILG.DefineLabel();
-      Slot  list = cg.AllocLocalTemp(typeof(List));
+      Slot  list = cg.AllocLocalTemp(typeof(List), true);
 
       cg.EmitNew(typeof(List), Type.EmptyTypes);
       list.EmitSet(cg);

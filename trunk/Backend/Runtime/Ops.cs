@@ -181,7 +181,7 @@ public sealed class Ops
           while(e.MoveNext()) positional[pi++] = e.Current;
         }
       }
-      else if(args[i].Value is int)
+      else if(args[i].Type is int)
       { object[] items = (object[])args[i].Value;
         items.CopyTo(positional, pi); pi += items.Length;
       }

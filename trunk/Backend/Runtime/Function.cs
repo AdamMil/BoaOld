@@ -43,7 +43,7 @@ public abstract class Function : IFancyCallable
     if(HasDict) newargs[--plen] = new Dict();
     int pos=plen-offset, ai=Math.Min(pos, args.Length);
 
-    Array.Copy(args, 0, newargs, 0, ai);
+    for(int i=0; i<ai; i++) newargs[i] = args[i];
     for(; ai<pos; ai++) newargs[ai] = Defaults[ai-NumRequired];
 
     if(HasList)
@@ -51,7 +51,7 @@ public abstract class Function : IFancyCallable
       if(ai>=args.Length) tup = new Tuple();
       else
       { object[] items = new object[args.Length-ai];
-        for(int i=0; i<items.Length; i++) items[i] = args[ai+i];
+        Array.Copy(args, ai, items, 0, items.Length);
         tup = new Tuple(items);
       }
       newargs[plen-1] = tup;
@@ -63,14 +63,14 @@ public abstract class Function : IFancyCallable
   protected unsafe object[] MakeArgs(object[] positional, string[] names, object[] values)
   { object[] newargs = new object[ParamNames.Length];
     bool* done = stackalloc bool[newargs.Length];
-    Dict  dict = HasDict ? new Dict() : null;
+    Dict  dict = null;
     int pi=0, js=0, plen=newargs.Length;
 
     for(int i=0; i<newargs.Length; i++) done[i] = false;
 
     // do the positional arguments first
     if(positional!=null)
-      for(int end=Math.Min(NumRequired, positional.Length); pi<end; pi++)
+      for(int end=Math.Min(plen-(HasDict?1:0)-(HasList?1:0), positional.Length); pi<end; pi++)
       { newargs[pi] = positional[pi];
         done[pi] = true;
       }
@@ -89,12 +89,21 @@ public abstract class Function : IFancyCallable
           }
           goto next;
         }
-      if(dict!=null) dict[name] = values[i];
+      if(HasDict)
+      { if(dict==null) dict = new Dict();
+        dict[name] = values[i];
+      }
       else throw Ops.TypeError("'{0}()' got an unexpected keyword parameter '{1}'", FuncName, name);
       next:;
     }
 
-    if(HasDict) newargs[--plen] = dict;
+    if(HasDict)
+    { if(done[--plen])
+      { if(dict!=null)
+          throw Ops.TypeError("'{0}()' got duplicate values for parameter '{1}'", FuncName, names[plen-1]);
+      }
+      else newargs[plen] = (dict==null ? new Dict() : dict);
+    }
     if(HasList)
     { Tuple tup;
       if(pi==0) tup = new Tuple(positional==null ? Misc.EmptyArray : positional);
@@ -105,10 +114,9 @@ public abstract class Function : IFancyCallable
       }
       newargs[--plen] = tup;
     }
-
+    for(; pi<plen; pi++) newargs[pi] = Defaults[pi-NumRequired];
     for(pi=0; pi<NumRequired; pi++)
       if(!done[pi]) throw Ops.TypeError("No value given for parameter '{0}'", ParamNames[pi]);
-    for(; pi<plen; pi++) if(!done[pi]) newargs[pi] = Defaults[pi-NumRequired];
 
     return newargs;
   }

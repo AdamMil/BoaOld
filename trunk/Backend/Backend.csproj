@@ -219,6 +219,11 @@
                     BuildAction = "Compile"
                 />
                 <File
+                    RelPath = "Runtime\Generator.cs"
+                    SubType = "Code"
+                    BuildAction = "Compile"
+                />
+                <File
                     RelPath = "Runtime\Importer.cs"
                     SubType = "Code"
                     BuildAction = "Compile"

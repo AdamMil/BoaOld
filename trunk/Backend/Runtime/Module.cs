@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Specialized;
 using System.Reflection;
 
+// TODO: implement module documentation strings
 namespace Boa.Runtime
 {
 
