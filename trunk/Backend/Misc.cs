@@ -4,7 +4,7 @@ also called Boa. This implementation is both interpreted and compiled,
 targeting the Microsoft .NET Framework.
 
 http://www.adammil.net/
-Copyright (C) 2004 Adam Milazzo
+Copyright (C) 2004-2005 Adam Milazzo
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -45,7 +45,15 @@ public sealed class Misc
       }
     return sb.ToString();
   }
-  public static string BodyToDocString(Statement body)  { Suite suite = body as Suite;    if(suite!=null && suite.Statements[0] is ExpressionStatement) // TODO: strip uniform whitespace after second line    { ExpressionStatement es = (ExpressionStatement)suite.Statements[0];      if(es.Expression is ConstantExpression) return ((ConstantExpression)es.Expression).Value as string;    }    return null;  }
+
+  public static string BodyToDocString(Statement body)
+  { Suite suite = body as Suite;
+    if(suite!=null && suite.Statements[0] is ExpressionStatement) // TODO: strip uniform whitespace after second line
+    { ExpressionStatement es = (ExpressionStatement)suite.Statements[0];
+      if(es.Expression is ConstantExpression) return ((ConstantExpression)es.Expression).Value as string;
+    }
+    return null;
+  }
   public static Type[] MakeTypeArray(Type type, int length)
   { Type[] arr = new Type[length];
     for(int i=0; i<length; i++) arr[i] = type;
