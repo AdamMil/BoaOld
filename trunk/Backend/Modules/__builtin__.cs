@@ -567,6 +567,7 @@ of object, a help page on the object is generated.")]
   public static void help(object o)
   { object doc;
     if(o is FunctionWrapper) o = ((FunctionWrapper)o).func;
+    restart:
     if(o is Function)
     { Function f = (Function)o;
       Console.Write("def ");
@@ -602,6 +603,8 @@ of object, a help page on the object is generated.")]
     { ReflectedEvent re = (ReflectedEvent)o;
       Console.WriteLine("'{0}' is an event that takes a '{1}' object",
                         re.info.Name, TypeName(re.info.EventHandlerType));
+      o = re.info.EventHandlerType;
+      goto restart;
     }
     else if(o is ReflectedField)
     { ReflectedField rf = (ReflectedField)o;
@@ -653,7 +656,11 @@ of object, a help page on the object is generated.")]
         if(mi.ReturnType!=typeof(void)) Console.Write(" -> "+TypeName(mi.ReturnType));
         Console.WriteLine();
       }
-      else goto noHelp;
+      else
+      { o = ((ReflectedType)o).Constructor;
+        if(o!=null) goto restart;
+        else goto noHelp;
+      }
     }
     else goto noHelp;
     return;

@@ -260,7 +260,7 @@ public abstract class Statement : Node
         }
         else if(node is ImportStatement)
         { ImportStatement imp = (ImportStatement)node;
-          foreach(ImportName n in imp.Names) AddName(new Name(n.AsName==null ? n.Name : n.AsName, Scope.Local));
+          foreach(ImportName n in imp.Names) AddName(new Name(n.AsName==null ? n.SlotName : n.AsName, Scope.Local));
         }
         else if(node is ImportFromStatement)
         { ImportFromStatement imp = (ImportFromStatement)node;
@@ -958,14 +958,14 @@ public class ImportStatement : Statement
   { foreach(ImportName n in Names)
     { cg.EmitString(n.Name);
       cg.EmitCall(typeof(Importer), n.AsName==null ? "ImportTop" : "Import", new Type[] { typeof(string) });
-      cg.EmitSet(new Name(n.AsName==null ? n.Name : n.AsName, Scope.Local));
+      cg.EmitSet(new Name(n.AsName==null ? n.SlotName : n.AsName, Scope.Local));
     }
   }
 
   public override void Execute(Frame frame)
   { foreach(ImportName n in Names)
-      if(n.AsName==null) frame.Set(n.Name, Importer.ImportTop(n.Name));
-      else frame.Set(n.AsName, Importer.ImportTop(n.Name));
+      if(n.AsName==null) frame.Set(n.SlotName, Importer.ImportTop(n.Name));
+      else frame.Set(n.AsName, Importer.Import(n.Name));
   }
 
   public override void ToCode(System.Text.StringBuilder sb, int indent)

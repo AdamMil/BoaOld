@@ -33,15 +33,20 @@ public sealed class sys
 { sys() { }
   static sys()
   { modules["__builtin__"] = Importer.Import("__builtin__");
+    Assembly ass;
 
     if(Options.Interactive) path.append("");
-    else path.append(System.IO.Path.GetDirectoryName(Assembly.GetEntryAssembly().Location));
+    else
+    { ass = Assembly.GetEntryAssembly();
+      if(ass!=null) path.append(System.IO.Path.GetDirectoryName(ass.Location));
+    }
 
     string lib = Environment.GetEnvironmentVariable("BOA_LIB_PATH");
     if(lib!=null && lib!="") path.append(lib);
 
-    path.append(System.IO.Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) +
-                System.IO.Path.DirectorySeparatorChar + "lib");
+    ass = Assembly.GetExecutingAssembly();
+    if(ass!=null)
+      path.append(System.IO.Path.GetDirectoryName(ass.Location) + System.IO.Path.DirectorySeparatorChar + "lib");
   }
 
   public static string __repr__() { return "<module 'sys' (built-in)>"; }
