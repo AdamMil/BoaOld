@@ -6,11 +6,13 @@ using System.Reflection;
 namespace Boa.Runtime
 {
 
-public class Module : IHasAttributes
+public class Module : Boa.AST.Snippet, IHasAttributes
 { public const string FieldName = "__module";
 
   public Module() { __dict__ = new HybridDictionary(); }
   public Module(IDictionary dict) { __dict__ = dict; }
+
+  public override object Run(Frame frame) { throw new NotImplementedException("Run() not implemented!"); }
 
   #region IHasAttributes Members
   public List __attrs__() { return new List(__dict__.Keys); }
@@ -26,8 +28,6 @@ public class Module : IHasAttributes
 
   public readonly IDictionary __dict__;
   
-  protected internal virtual void Initialize(Frame frame) { }
-
   static ReflectedType builtins = ReflectedType.FromType(typeof(Boa.Modules.__builtin__));
 }
 

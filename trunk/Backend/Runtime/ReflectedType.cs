@@ -174,15 +174,12 @@ public class ReflectedProperty : IDataDescriptor
 
 #region ReflectedType
 public class ReflectedType : BoaType
-{ ReflectedType(Type type) : base(type)
-  { foreach(ConstructorInfo ci in type.GetConstructors()) AddConstructor(ci);
-    foreach(EventInfo ei in type.GetEvents()) AddEvent(ei);
-    foreach(FieldInfo fi in type.GetFields()) AddField(fi);
-    foreach(MethodInfo mi in type.GetMethods()) AddMethod(mi);
-    foreach(PropertyInfo pi in type.GetProperties()) AddProperty(pi);
-  }
+{ ReflectedType(Type type) : base(type) { }
 
-  public override object Call(params object[] args) { return cons.Call(args); }
+  public override object Call(params object[] args)
+  { Initialize();
+    return cons.Call(args);
+  }
 
   public override void DelAttr(object self, string name)
   { object slot = RawGetSlot(name);
@@ -212,11 +209,20 @@ public class ReflectedType : BoaType
 
   public static ReflectedType FromType(Type type)
   { ReflectedType rt = (ReflectedType)types[type];
-    if(rt==null)
-    { types[type] = rt = new ReflectedType(type);
-      rt.Initialize();
-    }
+    if(rt==null) types[type] = rt = new ReflectedType(type);
     return rt;
+  }
+
+  protected override void Initialize()
+  { if(initialized) return;
+    base.Initialize();
+    foreach(ConstructorInfo ci in type.GetConstructors()) AddConstructor(ci);
+    foreach(EventInfo ei in type.GetEvents()) AddEvent(ei);
+    foreach(FieldInfo fi in type.GetFields()) AddField(fi);
+    foreach(MethodInfo mi in type.GetMethods()) AddMethod(mi);
+    foreach(PropertyInfo pi in type.GetProperties()) AddProperty(pi);
+
+    if(!dict.Contains("next") && typeof(IEnumerator).IsAssignableFrom(type)) dict["next"] = NextMethod.Value;
   }
 
   void AddConstructor(ConstructorInfo ci)
@@ -235,11 +241,6 @@ public class ReflectedType : BoaType
   }
 
   void AddProperty(PropertyInfo pi) { dict[pi.Name] = new ReflectedProperty(pi); }
-
-  void Initialize()
-  { // add "next" method to enumerators
-    if(!dict.Contains("next") && typeof(IEnumerator).IsAssignableFrom(type)) dict["next"] = NextMethod.Value;
-  }
 
   ReflectedConstructor cons;
 

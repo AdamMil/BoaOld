@@ -9,20 +9,24 @@ namespace Boa.Runtime
 public sealed class Importer
 { Importer() { }
 
-  public static object Import(string name) { return Import(name, true); }
-
-  public static object Import(string name, bool throwOnError)
-  { object ret = sys.modules[name];
+  public static object Import(string name) { return Import(name, true, false); }
+  public static object Import(string name, bool throwOnError) { return Import(name, throwOnError, false); }
+  public static object Import(string name, bool throwOnError, bool returnTop)
+  { object ret = sys.modules[name]; // TODO: look at this... for a dotted name, will this ever be true?
     if(ret!=null) return ret;
 
     string[] names = name.Split('.');
-    object module = Load(names[0]);
-    if(module!=null) sys.modules[names[0]] = module;
+    object top = Load(names[0]), module = top;
+    if(top!=null) sys.modules[names[0]] = top;
 
     for(int i=1; i<names.Length && module!=null; i++) module = Ops.GetAttr(module, names[i]);
+    if(returnTop) module=top;
     if(throwOnError && module==null) throw Ops.ImportError("module {0} could not be loaded", name);
     return module;
   }
+
+  public static object ImportTop(string name) { return Import(name, true, true); }
+  public static object ImportTop(string name, bool throwOnError) { return Import(name, throwOnError, true); }
   
   static object Load(string name)
   { object ret = LoadBuiltin(name);
@@ -54,7 +58,7 @@ public sealed class Importer
   { Module mod = ModuleGenerator.Generate(name, filename, Parser.FromFile(filename).Parse());
     if(__path__!=null) mod.__setattr__("__path__", __path__);
     sys.modules[name] = mod;
-    mod.Initialize(new Frame(mod));
+    mod.Run(new Frame(mod));
     return mod;
   }
 
@@ -64,7 +68,7 @@ public sealed class Importer
     return LoadFromSource(name, Path.Combine(path, "__init__.boa"), __path__);
   }
 
-  static object LoadReflected(string name) { throw new NotImplementedException(); }
+  static object LoadReflected(string name) { return ReflectedPackage.GetPackage(name); }
 }
 
 } // namespace Boa.Runtime

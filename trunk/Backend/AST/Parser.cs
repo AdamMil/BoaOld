@@ -4,6 +4,7 @@ using System.IO;
 using Boa.Runtime;
 
 // TODO: improve diagnostics
+// TODO: allow nonparenthesized tuples
 
 namespace Boa.AST
 {
@@ -21,7 +22,7 @@ enum Token
   BitAnd, BitOr, BitNot, BitXor, LogAnd, LogOr, LogNot,
   
   // keywords
-  Def, Print, Return, And, Or, Not, While, If, Elif, Else, Pass, Break, Continue, Global, Import, From,
+  Def, Print, Return, And, Or, Not, While, If, Elif, Else, Pass, Break, Continue, Global, Import, From, For,
   
   // abstract
   Identifier, Literal, Assign, Compare, Call, Member, Index, Slice, Hash, List, Tuple, Suite,
@@ -42,7 +43,7 @@ public class Parser
   { stringTokens = new Hashtable();
     Token[] tokens =
     { Token.Def, Token.Print, Token.Return, Token.And, Token.Or, Token.Not, Token.While, Token.Import, Token.From,
-      Token.If,  Token.Elif, Token.Else, Token.Pass, Token.Break, Token.Continue, Token.Global,
+      Token.For, Token.If,  Token.Elif, Token.Else, Token.Pass, Token.Break, Token.Continue, Token.Global,
     };
     foreach(Token token in tokens) stringTokens.Add(Enum.GetName(typeof(Token), token).ToLower(), token);
   }
@@ -228,7 +229,8 @@ public class Parser
   Statement ParseExprStmt()
   { Expression lhs = ParseExpression();
     if(TryEat(Token.Assign))
-    { if(lhs is NameExpression || lhs is AttrExpression) return new AssignStatement(lhs, ParseExpression());
+    { if(lhs is NameExpression || lhs is AttrExpression || lhs is TupleExpression)
+        return new AssignStatement(lhs, ParseExpression());
       throw Ops.SyntaxError("can't assign to {0}", lhs.GetType());
     }
     else return new ExpressionStatement(lhs);

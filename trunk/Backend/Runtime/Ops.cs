@@ -135,6 +135,9 @@ public sealed class Ops
     return ic==null ? Invoke(func, "__call__") : ic.Call(args);
   }
   
+  public static object Call0(object func) { return Call(func); }
+  public static object Call1(object func, object a0) { return Call(func, a0); }
+
   public static object CallWithArgsSequence(object func, object seq)
   { object[] arr = seq as object[];
     if(arr!=null) return Call(func, arr);
@@ -280,8 +283,7 @@ public sealed class Ops
     for(int i=trace.FrameCount-1; i>=0; i--)
     { Type type = trace.GetFrame(i).GetMethod().DeclaringType;
       System.Reflection.FieldInfo fi = type.GetField(Module.FieldName);
-      if(fi!=null && (type.IsSubclassOf(typeof(Module)) || type.IsSubclassOf(typeof(Boa.AST.Snippet))))
-        return (Module)fi.GetValue(null);
+      if(fi!=null && type.IsSubclassOf(typeof(Boa.AST.Snippet))) return (Module)fi.GetValue(null);
     }
     if(Frames.Count>0) return ((Frame)Frames.Peek()).Module;
     throw new InvalidOperationException("No executing module");
@@ -291,7 +293,9 @@ public sealed class Ops
 
   public static void Import(Module module, string[] names, string[] asNames)
   { for(int i=0; i<names.Length; i++)
-      module.__setattr__(asNames[i]==null ? names[i] : asNames[i], Importer.Import(names[i]));
+    { string dname = asNames[i]!=null ? asNames[i] : names[i].IndexOf('.')==-1 ? names[i] : names[i].Split('.')[0];
+      module.__setattr__(dname, Importer.ImportTop(names[i]));
+    }
   }
 
   public static ImportErrorException ImportError(string format, params object[] args)
@@ -302,26 +306,15 @@ public sealed class Ops
   { if(names.Length==0) return;
     if(names[0]=="*") ImportStar(module, moduleName);
     else
-    { object imod = Importer.Import(moduleName);
-      Module mod = imod as Module;
-      if(mod!=null) for(int i=0; i<names.Length; i++)
+    { IHasAttributes mod = (IHasAttributes)Importer.Import(moduleName);
+      for(int i=0; i<names.Length; i++)
         module.__setattr__(asNames[i]==null ? names[i] : asNames[i], mod.__getattr__(names[i]));
-      else
-      { DynamicType dt = Ops.GetDynamicType(imod);
-        for(int i=0; i<names.Length; i++)
-          module.__setattr__(asNames[i]==null ? names[i] : asNames[i], dt.GetAttr(imod, names[i]));
-      }
     }
   }
 
   public static void ImportStar(Module module, string moduleName)
-  { object imod = Importer.Import(moduleName);
-    Module mod = imod as Module;
-    if(mod!=null) foreach(string name in mod.__attrs__()) module.__setattr__(name, mod.__getattr__(name));
-    else
-    { DynamicType dt = Ops.GetDynamicType(imod);
-      foreach(string name in dt.GetAttrNames(imod)) module.__setattr__(name, dt.GetAttr(imod, name));
-    }
+  { IHasAttributes mod = (IHasAttributes)Importer.Import(moduleName);
+    foreach(string name in mod.__attrs__()) module.__setattr__(name, mod.__getattr__(name));
   }
 
   public static IndexErrorException IndexError(string format, params object[] args)

@@ -265,6 +265,25 @@ public class TupleExpression : Expression
 { public TupleExpression() : this(new Expression[0]) { }
   public TupleExpression(Expression[] expressions) { Expressions=expressions; }
 
+  public override void Assign(object value, Frame frame)
+  { if(value is ISequence)
+    { ISequence seq = (ISequence)value;
+      if(seq.__len__() != Expressions.Length) throw Ops.ValueError("too many values to unpack");
+      for(int i=0; i<Expressions.Length; i++) Expressions[i].Assign(seq.__getitem__(i), frame);
+    }
+    else if(value is string)
+    { string s = (string)value;
+      if(s.Length != Expressions.Length) throw Ops.ValueError("too many values to unpack");
+      for(int i=0; i<Expressions.Length; i++) Expressions[i].Assign(new string(s[i], 1), frame);
+    }
+    else // assume it's a sequence
+    { object getitem = Ops.GetAttr(value, "__getitem__");
+      if(Ops.ToInt(Ops.Call(Ops.GetAttr(value, "__length__")))!=Expressions.Length)
+        throw Ops.ValueError("too many values to unpack");
+      for(int i=0; i<Expressions.Length; i++) Expressions[i].Assign(Ops.Call(getitem, i), frame);
+    }
+  }
+
   public override void Emit(CodeGenerator cg)
   { cg.EmitObjectArray(Expressions);
     cg.EmitNew(typeof(Tuple), new Type[] { typeof(object[]) });
