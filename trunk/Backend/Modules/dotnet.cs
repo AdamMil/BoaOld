@@ -138,7 +138,7 @@ public sealed class dotnet
   { if(bytes<0) throw Ops.ValueError("urandom(): 'bytes' must be >= 0");
     if(urng==null) urng = new System.Security.Cryptography.RNGCryptoServiceProvider();
     byte[] ret = new byte[bytes];
-    urng.GetBytes(ret);
+    lock(urng) urng.GetBytes(ret);
     return ret;
   }
 

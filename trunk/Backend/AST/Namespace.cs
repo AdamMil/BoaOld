@@ -82,7 +82,7 @@ public class FieldNamespace : Namespace
     : base(parent, cg) { this.instance=instance; Prefix=prefix; }
   
   public override Slot AllocTemp(Type type)
-  { return new FieldSlot(instance, codeGen.TypeGenerator.TypeBuilder.DefineField("temp$"+count++, type,
+  { return new FieldSlot(instance, codeGen.TypeGenerator.TypeBuilder.DefineField("temp$"+Misc.NextIndex, type,
                                                                                  FieldAttributes.Public));
   }
 
@@ -119,8 +119,6 @@ public class FieldNamespace : Namespace
   public string Prefix;
 
   Slot instance;
-  
-  static int count;
 }
 #endregion
 

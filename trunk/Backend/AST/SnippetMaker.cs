@@ -36,10 +36,10 @@ public class SnippetMaker
 
   public static void DumpAssembly()
   { Assembly.Save();
-    Assembly = new AssemblyGenerator("snippets"+assCount, "snippets"+ assCount++ +".dll");
+    Assembly = new AssemblyGenerator("snippets"+assCount, "snippets"+Misc.NextIndex+".dll");
   }
 
-  public static Snippet Generate(Statement body) { return Generate(body, "code_"+typeCount++); }
+  public static Snippet Generate(Statement body) { return Generate(body, "code_"+Misc.NextIndex); }
   public static Snippet Generate(Statement body, string typeName)
   { TypeGenerator tg = Assembly.DefineType(typeName, typeof(Snippet));
     CodeGenerator cg = tg.DefineMethod(MethodAttributes.Public|MethodAttributes.Virtual, "Run",
@@ -60,8 +60,6 @@ public class SnippetMaker
   }
 
   public static AssemblyGenerator Assembly = new AssemblyGenerator("snippets", "snippets.dll");
-
-  static int assCount, typeCount;
 }
 
 } // namespace IronPython.AST

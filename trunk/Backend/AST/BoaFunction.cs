@@ -49,11 +49,12 @@ public sealed class BoaFunction : Node
 
   public void Emit(CodeGenerator cg)
   { Initialize();
+    index = Misc.NextIndex;
     CodeGenerator impl = MakeImplMethod(cg);
     Type targetType = Inherit==null ? typeof(CallTargetN) : typeof(CallTargetFN);
     Type funcType   = Inherit==null ? typeof(CompiledFunctionN) : typeof(CompiledFunctionFN);
     Type[] consTypes = { typeof(string), typeof(string[]), typeof(object[]), typeof(bool), typeof(bool),
-                         typeof(int), typeof(ClosedVar[]), targetType };
+                        typeof(int), typeof(ClosedVar[]), targetType };
 
     cg.EmitString(Name==null ? null : Name.String);
     EmitNames(cg);
@@ -71,7 +72,6 @@ public sealed class BoaFunction : Node
       cg.EmitString(docstring);
       cg.EmitFieldSet(typeof(Function), "__doc__");
     }
-    index++;
   }
 
   public Function MakeFunction(Frame frame)
@@ -201,6 +201,8 @@ public sealed class BoaFunction : Node
     Stack locals = new Stack();
   }
   #endregion
+
+  long index;
 
   void EmitBody(CodeGenerator cg, Name[] parmNames)
   { bool interactive = Options.Interactive;
@@ -365,7 +367,6 @@ public sealed class BoaFunction : Node
   string docstring;
   int optionalStart, numOptional, numRequired;
   bool hasList, hasDict;
-  static int index;
 }
 
 } // namespace Boa.AST

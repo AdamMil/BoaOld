@@ -384,11 +384,15 @@ eval() or execfile().")]
   public static object eval(object expr, IDictionary globals, IDictionary locals)
   { Frame frame = new Frame(locals, globals);
     try
-    { Ops.Frames.Push(frame);
+    { System.Threading.Monitor.Enter(Ops.Frames);
+      Ops.Frames.Push(frame);
       if(expr is string) return Parser.FromString((string)expr).ParseExpression().Evaluate(frame);
       else throw new NotImplementedException();
     }
-    finally { Ops.Frames.Pop(); }
+    finally
+    { Ops.Frames.Pop();
+      System.Threading.Monitor.Exit(Ops.Frames);
+    }
   }
 
   [DocString(@"exec(code[, globals[, locals]])
@@ -419,11 +423,15 @@ public static void exec(object code, IDictionary globals) { exec(code, globals, 
 public static void exec(object code, IDictionary globals, IDictionary locals)
 { Frame frame = new Frame(locals, globals);
   try
-  { Ops.Frames.Push(frame);
+  { System.Threading.Monitor.Enter(Ops.Frames);
+    Ops.Frames.Push(frame);
     if(code is string) Parser.FromString((string)code).Parse().Execute(frame);
     else throw new NotImplementedException();
   }
-  finally { Ops.Frames.Pop(); }
+  finally
+  { Ops.Frames.Pop();
+    System.Threading.Monitor.Exit(Ops.Frames);
+  }
 }
 
   [DocString(@"execfile(filename[, globals[, locals]])
@@ -450,10 +458,14 @@ public static void execfile(string filename, IDictionary globals) { execfile(fil
 public static void execfile(string filename, IDictionary globals, IDictionary locals)
 { Frame frame = new Frame(locals, globals);
   try
-  { Ops.Frames.Push(frame);
+  { System.Threading.Monitor.Enter(Ops.Frames);
+    Ops.Frames.Push(frame);
     Parser.FromFile(filename).Parse().Execute(frame);
   }
-  finally { Ops.Frames.Pop(); }
+  finally
+  { Ops.Frames.Pop();
+    System.Threading.Monitor.Exit(Ops.Frames);
+  }
 }
 
   [DocString(@"filter(function, sequence) -> sequence

@@ -194,7 +194,7 @@ public sealed class _time
     if(time is Tuple) return new struct_time((Tuple)time);
     throw Ops.TypeError("invalid type used as a time: "+Ops.TypeName(time));
   }
-  
+
   static readonly string[] months = new string[] { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep",
                                                    "Oct", "Nov", "Dec" };
   static readonly string[] weekdays = new string[] { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };

@@ -26,6 +26,7 @@ using Boa.Modules;
 
 // TODO: clean up broken module out of sys.modules if import fails
 // TODO: add __builtins__ to all namespaces that don't otherwise define it
+// FIXME: make sys.modules synchronized, and remove manual synchronization from this file
 namespace Boa.Runtime
 {
 
@@ -35,12 +36,13 @@ public sealed class Importer
   public static object Import(string name) { return Import(name, true, false); }
   public static object Import(string name, bool throwOnError) { return Import(name, throwOnError, false); }
   public static object Import(string name, bool throwOnError, bool returnTop)
-  { object ret = sys.modules[name]; // TODO: look at this... for a dotted name, will this ever be true?
+  { object ret;
+    lock(sys.modules) ret = sys.modules[name]; // TODO: look at this... for a dotted name, will this ever be true?
     if(ret!=null) return ret;
 
     string[] names = name.Split('.');
     object top = Load(names[0]), module = top;
-    if(top!=null) sys.modules[names[0]] = top;
+    if(top!=null) lock(sys.modules) sys.modules[names[0]] = top;
 
     for(int i=1; i<names.Length && module!=null; i++) module = Ops.GetAttr(module, names[i]);
     if(returnTop) module=top;
@@ -80,7 +82,7 @@ public sealed class Importer
   static object LoadFromSource(string name, string filename, List __path__)
   { Module mod = ModuleGenerator.Generate(name, filename, Parser.FromFile(filename).Parse());
     if(__path__!=null) mod.__setattr__("__path__", __path__);
-    sys.modules[name] = mod;
+    lock(sys.modules) sys.modules[name] = mod;
     mod.Run(new Frame(mod));
     return mod;
   }

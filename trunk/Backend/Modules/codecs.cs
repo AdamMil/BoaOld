@@ -72,17 +72,19 @@ public sealed class codecs
   public static encoder getencoder(Encoding encoding) { return new encoder(encoding.GetEncoder()); }
 
   public static Encoding lookup(string encoding)
-  { foreach(object lf in lookups)
-    { object ret = Ops.Call(lf, encoding);
-      if(ret!=null)
-      { if(ret is Encoding) return (Encoding)ret;
-        Tuple tup = ret as Tuple;
-        if(tup==null || tup.Count!=2)
-          throw Ops.TypeError("lookup(): expected null or (encoder, decoder), but got {0}", Ops.Repr(ret));
-        // TODO: return new BoaEncoding(ret);
-        throw new NotImplementedException("BoaEncoding");
-      }
-    }
+  { if(lookups!=null)
+      lock(lookups)
+        foreach(object lf in lookups)
+        { object ret = Ops.Call(lf, encoding);
+          if(ret!=null)
+          { if(ret is Encoding) return (Encoding)ret;
+            Tuple tup = ret as Tuple;
+            if(tup==null || tup.Count!=2)
+              throw Ops.TypeError("lookup(): expected null or (encoder, decoder), but got {0}", Ops.Repr(ret));
+            // TODO: return new BoaEncoding(ret);
+            throw new NotImplementedException("BoaEncoding");
+          }
+        }
 
     try { return Encoding.GetEncoding(encoding); }
     catch(NotSupportedException) { throw Ops.LookupError("codec '{0}' not supported on this system"); }
@@ -90,7 +92,7 @@ public sealed class codecs
   
   public static void register(object function)
   { if(lookups==null) lookups = new ArrayList();
-    lookups.Add(function);
+    lock(lookups) lookups.Add(function);
   }
 
   public static readonly Encoding ascii = Encoding.ASCII;
