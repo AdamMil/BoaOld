@@ -125,8 +125,7 @@ public class PieceTable
 
   public void Delete(int pos) { Delete(pos, 1); }
   public void Delete(int pos, int length)
-  { if(pos<0 || length<0) throw new ArgumentOutOfRangeException();
-    else if(pos>=textLength) return;
+  { if(pos<0 || length<0 || pos>=textLength) throw new ArgumentOutOfRangeException();
 
     Piece piece = pieces.Head;
     int offset=0, count=0;
@@ -139,7 +138,7 @@ public class PieceTable
     if(piece==null) return;
 
     offset = pos-offset;
-    pos    = piece.Offset + offset; // convert the logical offset to the physical offset within the node
+    pos    = piece.Offset + offset; // convert logical offset to physical offset within node
     if(length==1) // special case single character deletion
     { if(pos==piece.Offset) { piece.Offset++; piece.Length--; }
       else if(pos==piece.End-1) piece.Length--;
@@ -362,9 +361,9 @@ public class PieceTable
   }
 
   void Insert(int pos, int length)
-  { if(pos<0 || length<0) throw new ArgumentOutOfRangeException();
+  { if(pos<0 || length<0 || pos>textLength) throw new ArgumentOutOfRangeException();
 
-    if(pos>=textLength || pieces.Count==0)
+    if(pos==textLength || pieces.Count==0)
     { pieces.Append(new Piece(addi, length, false));
       goto done;
     }
@@ -388,7 +387,7 @@ public class PieceTable
       else piece.Length += length;
     }
     else
-    { pos = piece.Offset + (pos-offset); // convert logical offset to physical offset
+    { pos = piece.Offset + (pos-offset); // convert logical offset to physical offset within node
       node = pieces.InsertAfter(piece, new Piece(addi, length, false));
       pieces.InsertAfter(node, new Piece(pos, piece.End-pos, piece.File));
       piece.Length = pos-piece.Offset;
