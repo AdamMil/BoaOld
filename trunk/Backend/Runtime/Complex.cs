@@ -3,86 +3,127 @@ using System;
 namespace Boa.Runtime
 {
 
-public sealed class Complex : IConvertible
-{ public Complex Add(object b);
-  public int     Compare(object b);  
-  public Complex Divide(object b);
-  public Complex FloorDivide(object b);
-  public Complex Modulus(object b);
-  public Complex Multiply(object b);
-  public Complex Negate();
-  public bool    NonZero();
-  public Complex Power(object b);
-  public Complex PowerMod(object b);
-  public Complex Subtract(object b);
+public struct Complex : IRepresentable
+{ public Complex(double real) { this.real=real; }
+  public Complex(double real, double imag) { this.real=real; this.imag=imag; }
+  public Complex(Complex c) { real=c.real; imag=c.imag; }
 
-  #region IConvertible Members
-  public ulong ToUInt64(IFormatProvider provider)
-  {
+  public Complex Conjugate { get { return new Complex(real, -imag); } }
+
+  public string __repr__() { return ToString("R"); }
+
+  public override bool Equals(object obj)
+  { Complex c = obj as Complex;
+    return c==null ? false : c.real=real && c.imag==imag;
   }
 
-  public sbyte ToSByte(IFormatProvider provider)
-  {
+  public override int GetHashCode() { return read.GetHashCode() + imag.GetHashCode()*1000003; }
+
+  public double abs() { return Math.Sqrt(real*real+imag*imag); }
+  public Complex conjugate() { return new Complex(real, -imag); }
+
+  public Complex pow(Complex power)
+  { double r, i;
+	  if(power.real==0 && power.imag==0) { r=1; i=0; }
+	  else if(real==0 && imag==0)
+	  { if(power.imag!=0 || power.real<0) throw Ops.DivideByZero("complex pow(): division by zero");
+	    r=i=0;
+	  }
+	  else
+	  { double vabs=Math.Sqrt(real*real, imag*imag), len=Math.Pow(vabs, power.real), at=Math.Atan2(imag, real),
+	           phase=at*power.real;
+		  if(power.imag!=0)
+		  { len /= Math.Exp(at*power.imag);
+			  phase += power.imag*Math.Log(vabs);
+			}
+  		r = len*Math.Cos(phase);
+	  	i = len*Math.Sin(phase);
+	  }
+	  return new Complex(r, i);
+  }
+  
+  public Complex pow(int power)
+  { if(power>100 || power<-100) return pow(new Complex(power));
+    else if(power>0) return powu(power);
+	  else return new Complex(1, 0) / powu(-power);
   }
 
-  public double ToDouble(IFormatProvider provider)
-  {
+  public Complex pow(double power)
+  { int p = (int)power;
+    return p==power ? pow(p) : pow(new Complex(power));
   }
 
-  public DateTime ToDateTime(IFormatProvider provider)
-  {
+  public override string ToString()
+  { return '(' + real.ToString() + '+' + imag.ToString() + "j)";
+  }
+  
+  public string ToString(string s)
+  { return '(' + real.ToString(s) + '+' + imag.ToString(s) + "j)";
   }
 
-  public float ToSingle(IFormatProvider provider)
-  {
-  }
+  public double real, imag;
 
-  public bool ToBoolean(IFormatProvider provider)
-  {
-  }
+  public static Complex pow(double a, Complex b) { return new Complex(a).pow(b); }
 
-  public int ToInt32(IFormatProvider provider)
-  {
-  }
+  public static Complex operator+(Complex a, Complex b) { return new Complex(a.real+b.real, a.imag+b.imag); }
+  public static Complex operator+(Complex a, double  b) { return new Complex(a.real+b, a.imag); }
+  public static Complex operator+(double  a, Complex b) { return new Complex(a+b.real, b.imag); }
 
-  public ushort ToUInt16(IFormatProvider provider)
-  {
-  }
+  public static Complex operator-(Complex a, Complex b) { return new Complex(a.real-b.real, a.imag-b.imag); }
+  public static Complex operator-(Complex a, double  b) { return new Complex(a.real-b, a.imag); }
+  public static Complex operator-(double  a, Complex b) { return new Complex(a-b.real, -b.imag); }
 
-  public short ToInt16(IFormatProvider provider)
-  {
+  public static Complex operator*(Complex a, Complex b)
+  { return new Complex(a.real*b.real - a.imag*b.imag, a.real*b.imag + a.imag*b.real);
   }
+  public static Complex operator*(Complex a, double b)  { return new Complex(a.real*b, a.imag*b); }
+  public static Complex operator*(double  a, Complex b) { return new Complex(a*b.real, a*b.imag); }
 
-  public string ToString(IFormatProvider provider)
-  {
+  public static Complex operator/(Complex a, Complex b)
+  { const double abs_breal = b.real < 0 ? -b.real : b.real;
+	  const double abs_bimag = b.imag < 0 ? -b.imag : b.imag;
+	  double real, imag;
+
+  	if(abs_breal >= abs_bimag)
+  	{ if(abs_breal == 0.0) throw Ops.DivideByZeroError("attempted complex division by zero");
+	 	  else
+	 	  { const double ratio = b.imag / b.real;
+	 		  const double denom = b.real + b.imag * ratio;
+	 		  real = (a.real + a.imag * ratio) / denom;
+	 		  imag = (a.imag - a.real * ratio) / denom;
+	 	  }
+  	}
+	  else
+	  { const double ratio = b.real / b.imag;
+		  const double denom = b.real * ratio + b.imag;
+		  real = (a.real * ratio + a.imag) / denom;
+		  imag = (a.imag * ratio - a.real) / denom;
+	  }
+	  return new Complex(real, imag);
   }
+  public static Complex operator/(Complex a, double b) { return new Complex(a.real/b, a.imag/b); }
+  public static Complex operator/(double a, Complex b) { return new Complex(a)/b; }
 
-  public byte ToByte(IFormatProvider provider)
-  {
+  public static Complex operator-(Complex a) { return new Complex(-a.real, -a.imag); }
+
+  public static Complex operator==(Complex a, Complex b) { return a.real==b.real && a.imag==b.imag; }
+  public static Complex operator==(Complex a, double b)  { return a.real==b && a.imag==0; }
+  public static Complex operator==(double a, Complex b)  { return a==b.real && b.imag==0; }
+
+  public static Complex operator!=(Complex a, Complex b) { return a.real!=b.real || a.imag!=b.imag; }
+  public static Complex operator!=(Complex a, double b)  { return a.real!=b || a.imag!=0; }
+  public static Complex operator!=(double a, Complex b)  { return a!=b.real || b.imag!=0; }
+  
+  void powu(int power)
+  { Complex r = new Complex(1, 0);
+	  int mask = 1;
+	  while(mask>0 && power>=mask)
+	  { if((power&mask)!=0) r = r*this;
+		  mask <<= 1;
+		  this *= this;
+	  }
+	  return r;
   }
-
-  public char ToChar(IFormatProvider provider)
-  {
-  }
-
-  public long ToInt64(IFormatProvider provider)
-  {
-  }
-
-  public System.TypeCode GetTypeCode() { return TypeCode.Object; }
-
-  public decimal ToDecimal(IFormatProvider provider)
-  {
-  }
-
-  public object ToType(Type conversionType, IFormatProvider provider)
-  {
-  }
-
-  public uint ToUInt32(IFormatProvider provider)
-  {
-  }
-  #endregion
 }
 
 } // namespace Boa.Runtime

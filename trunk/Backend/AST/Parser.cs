@@ -11,7 +11,8 @@ using Boa.Runtime;
 // TODO: add switch?
 // TODO: implement 'in' and 'not in'
 // FIXME: having 'and', 'or', and 'not' be low precedence operators may screw up python code in subtle ways
-
+// TODO: add <=> operator
+// TODO: add support for complex numbers: 5j == complex(0, 5)
 namespace Boa.AST
 {
 

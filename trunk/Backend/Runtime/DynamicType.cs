@@ -32,7 +32,7 @@ public abstract class DynamicType
   { throw Ops.AttributeError("'{0}' object has no attribute '{1}'", __name__, name);
   }
 
-  public object __name__;
+  public readonly object __name__;
 }
 
 public class NullType : DynamicType

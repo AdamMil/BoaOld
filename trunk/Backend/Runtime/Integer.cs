@@ -3,91 +3,94 @@ using System;
 namespace Boa.Runtime
 {
 
-public sealed class Integer
-{ public object Add(object b);
-  public object BitwiseAnd(object b);
-  public Integer BitwiseOr(object b);
-  public Integer BitwiseXor(object b);
-  public Integer BitwiseNegate();
-  public int    Compare(object b);  
-  public object Divide(object b);
-  public object FloorDivide(object b);
-  public Integer LeftShift(object b);
-  public object Modulus(object b);
-  public object Multiply(object b);
-  public Integer Negate();
-  public bool   NonZero();
-  public object Power(object b);
-  public object PowerMod(object b);
-  public object Subtract(object b);
-  public object RightShift(object b);
-
+public struct Integer : IConvertible, IRepresentable, IComparable
+{ 
   #region IConvertible Members
-  public ulong ToUInt64(IFormatProvider provider)
+  public static ulong ToUInt64(IFormatProvider provider)
   {
   }
 
-  public sbyte ToSByte(IFormatProvider provider)
+  public static sbyte ToSByte(IFormatProvider provider)
   {
   }
 
-  public double ToDouble(IFormatProvider provider)
+  public static double ToDouble(IFormatProvider provider)
   {
   }
 
-  public DateTime ToDateTime(IFormatProvider provider)
+  public static DateTime ToDateTime(IFormatProvider provider)
   {
   }
 
-  public float ToSingle(IFormatProvider provider)
+  public static float ToSingle(IFormatProvider provider)
   {
   }
 
-  public bool ToBoolean(IFormatProvider provider)
+  public static bool ToBoolean(IFormatProvider provider)
   {
   }
 
-  public int ToInt32(IFormatProvider provider)
+  public static int ToInt32(IFormatProvider provider)
   {
   }
 
-  public ushort ToUInt16(IFormatProvider provider)
+  public static ushort ToUInt16(IFormatProvider provider)
   {
   }
 
-  public short ToInt16(IFormatProvider provider)
+  public static short ToInt16(IFormatProvider provider)
   {
   }
 
-  public string ToString(IFormatProvider provider)
+  public static string ToString(IFormatProvider provider)
   {
   }
 
-  public byte ToByte(IFormatProvider provider)
+  public static byte ToByte(IFormatProvider provider)
   {
   }
 
-  public char ToChar(IFormatProvider provider)
+  public static char ToChar(IFormatProvider provider)
   {
   }
 
-  public long ToInt64(IFormatProvider provider)
+  public static long ToInt64(IFormatProvider provider)
   {
   }
 
-  public System.TypeCode GetTypeCode() { return TypeCode.Object; }
+  public static System.TypeCode GetTypeCode() { return TypeCode.Object; }
 
-  public decimal ToDecimal(IFormatProvider provider)
+  public static decimal ToDecimal(IFormatProvider provider)
   {
   }
 
-  public object ToType(Type conversionType, IFormatProvider provider)
+  public static object ToType(Type conversionType, IFormatProvider provider)
   {
   }
 
-  public uint ToUInt32(IFormatProvider provider)
+  public static uint ToUInt32(IFormatProvider provider)
   {
   }
+  #endregion
+
+  #region IRepresentable Members
+
+  public string __repr__()
+  {
+    // TODO:  Add Integer.__repr__ implementation
+    return null;
+  }
+
+  #endregion
+
+  #region IComparable Members
+
+  public int CompareTo(object obj)
+  {
+    // TODO:  Add Integer.CompareTo implementation
+    return 0;
+  }
+
   #endregion
 }
 

@@ -209,6 +209,11 @@
                     BuildAction = "Compile"
                 />
                 <File
+                    RelPath = "Runtime\ComplexOps.cs"
+                    SubType = "Code"
+                    BuildAction = "Compile"
+                />
+                <File
                     RelPath = "Runtime\Dict.cs"
                     SubType = "Code"
                     BuildAction = "Compile"
@@ -250,6 +255,11 @@
                 />
                 <File
                     RelPath = "Runtime\Integer.cs"
+                    SubType = "Code"
+                    BuildAction = "Compile"
+                />
+                <File
+                    RelPath = "Runtime\IntegerOps.cs"
                     SubType = "Code"
                     BuildAction = "Compile"
                 />
