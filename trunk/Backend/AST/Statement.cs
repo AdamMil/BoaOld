@@ -8,6 +8,8 @@ using Boa.Runtime;
 namespace Boa.AST
 {
 
+// FIXME: 'while' and 'for' don't catch StopIterationException in the compiled versions
+// FIXME: update post processing to know about 'for' loops and tuple assignment
 // TODO: using exceptions is extremely slow! stop it!
 #region Exceptions (used to aid implementation)
 public class ContinueException : Exception
@@ -16,6 +18,23 @@ public class ContinueException : Exception
 public class ReturnException : Exception
 { public ReturnException(object value) { Value=value; }
   public object Value;
+}
+#endregion
+
+#region JumpFinder
+class JumpFinder : IWalker
+{ public JumpFinder(Label start, Label end) { this.start=start; this.end=end; }
+
+  public void PostWalk(Node node) { }
+
+  public bool Walk(Node node)
+  { if(node is BreakStatement) ((BreakStatement)node).Label = end;
+    else if(node is ContinueStatement) ((ContinueStatement)node).Label = start;
+    else if(node is WhileStatement) return false;
+    return true;
+  }
+
+  Label start, end;
 }
 #endregion
 
@@ -145,7 +164,8 @@ public class Suite : Statement
 
 #region AssignStatement
 public class AssignStatement : Statement
-{ public AssignStatement(Expression lhs, Expression rhs) { LHS=lhs; RHS=rhs; }
+{ public AssignStatement(Expression lhs) { LHS=lhs; }
+  public AssignStatement(Expression lhs, Expression rhs) { LHS=lhs; RHS=rhs; }
 
   public override void Emit(CodeGenerator cg)
   { if(LHS is TupleExpression)
@@ -161,7 +181,7 @@ public class AssignStatement : Statement
         Slot lenslot = cg.AllocLocalTemp(typeof(int)), seqslot = cg.AllocLocalTemp(typeof(ISequence)),
              strslot = cg.AllocLocalTemp(typeof(string)), objslot = cg.AllocLocalTemp(typeof(object));
 
-        RHS.Emit(cg);
+        if(RHS!=null) RHS.Emit(cg);
         cg.ILG.Emit(OpCodes.Dup);
         cg.ILG.Emit(OpCodes.Isinst, typeof(ISequence)); // this does return a valid object. use it somehow?
         cg.ILG.Emit(OpCodes.Brfalse, notseq);
@@ -266,7 +286,7 @@ public class AssignStatement : Statement
       }
     }
     else
-    { RHS.Emit(cg);
+    { if(RHS!=null) RHS.Emit(cg);
       LHS.EmitSet(cg);
     }
   }
@@ -573,6 +593,67 @@ public class ImportStatement : Statement
 }
 #endregion
 
+#region ForStatement
+public class ForStatement : Statement
+{ public ForStatement(Name[] names, Expression expr, Statement body)
+  { if(names.Length==1) Names = new NameExpression(names[0]);
+    else
+    { Expression[] ne = new Expression[names.Length];
+      for(int i=0; i<names.Length; i++) ne[i] = new NameExpression(names[i]);
+      Names=new TupleExpression(ne);
+    }
+    Expression=expr; Body=body;
+  }
+
+  public override void Emit(CodeGenerator cg)
+  { AssignStatement ass = new AssignStatement(Names);
+    Label start=cg.ILG.DefineLabel(), end=cg.ILG.DefineLabel();
+
+    Walk(new JumpFinder(start, end));
+    Expression.Emit(cg);
+    cg.EmitCall(typeof(Ops), "GetEnumerator", new Type[] { typeof(object) });
+    cg.ILG.MarkLabel(start);
+    cg.ILG.Emit(OpCodes.Dup);
+    cg.EmitCall(typeof(IEnumerator), "MoveNext");
+    cg.ILG.Emit(OpCodes.Brfalse, end);
+    cg.ILG.Emit(OpCodes.Dup);
+    cg.EmitPropGet(typeof(IEnumerator), "Current");
+    ass.Emit(cg);
+    Body.Emit(cg);
+    cg.ILG.Emit(OpCodes.Br, start);
+    cg.ILG.MarkLabel(end);
+    cg.ILG.Emit(OpCodes.Pop);
+  }
+
+  public override void Execute(Frame frame)
+  { ConstantExpression ce = new ConstantExpression(null);
+    AssignStatement ass = new AssignStatement(Names, ce);
+
+    IEnumerator e = Ops.GetEnumerator(Expression.Evaluate(frame));
+    while(e.MoveNext())
+    { ce.Value = e.Current;
+      ass.Execute(frame);
+      try { Body.Execute(frame); }
+      catch(StopIterationException) { break; }
+      catch(ContinueException) { }
+    }
+  }
+  
+  public override void Walk(IWalker w)
+  { if(w.Walk(this))
+    { Names.Walk(w);
+      Expression.Walk(w);
+      Body.Walk(w);
+    }
+    w.PostWalk(this);
+  }
+
+  public Expression Names;
+  public Expression Expression;
+  public Statement  Body;
+}
+#endregion
+
 #region GlobalStatement
 public class GlobalStatement : Statement
 { public GlobalStatement(string[] names)
@@ -616,7 +697,7 @@ public class PrintStatement : Statement
   }
 
   public override void Walk(IWalker w)
-  { if(w.Walk(this)) foreach(Expression e in Expressions) e.Walk(w);
+  { if(w.Walk(this) && Expressions!=null) foreach(Expression e in Expressions) e.Walk(w);
     w.PostWalk(this);
   }
 
@@ -677,21 +758,6 @@ public class WhileStatement : Statement
 
   public Expression Test;
   public Statement  Body;
-
-  class JumpFinder : IWalker
-  { public JumpFinder(Label start, Label end) { this.start=start; this.end=end; }
-
-    public void PostWalk(Node node) { }
-
-    public bool Walk(Node node)
-    { if(node is BreakStatement) ((BreakStatement)node).Label = end;
-      else if(node is ContinueStatement) ((ContinueStatement)node).Label = start;
-      else if(node is WhileStatement) return false;
-      return true;
-    }
-
-    Label start, end;
-  }
 }
 #endregion
 

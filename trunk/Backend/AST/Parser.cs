@@ -22,7 +22,7 @@ enum Token
   BitAnd, BitOr, BitNot, BitXor, LogAnd, LogOr, LogNot,
   
   // keywords
-  Def, Print, Return, And, Or, Not, While, If, Elif, Else, Pass, Break, Continue, Global, Import, From, For,
+  Def, Print, Return, And, Or, Not, While, If, Elif, Else, Pass, Break, Continue, Global, Import, From, For, In,
   
   // abstract
   Identifier, Literal, Assign, Compare, Call, Member, Index, Slice, Hash, List, Tuple, Suite,
@@ -43,7 +43,7 @@ public class Parser
   { stringTokens = new Hashtable();
     Token[] tokens =
     { Token.Def, Token.Print, Token.Return, Token.And, Token.Or, Token.Not, Token.While, Token.Import, Token.From,
-      Token.For, Token.If,  Token.Elif, Token.Else, Token.Pass, Token.Break, Token.Continue, Token.Global,
+      Token.For, Token.If,  Token.Elif, Token.Else, Token.Pass, Token.Break, Token.Continue, Token.Global, Token.In,
     };
     foreach(Token token in tokens) stringTokens.Add(Enum.GetName(typeof(Token), token).ToLower(), token);
   }
@@ -72,11 +72,12 @@ public class Parser
     return expr;
   }
   // statement     := <stmt_line> | <compound_stmt>
-  // compount_stmt := <if_stmt> | <while_stmt> | <funcdef> | <global_stmt> | <import_stmt>
+  // compount_stmt := <if_stmt> | <while_stmt> | <for_stmt> | <funcdef> | <global_stmt> | <import_stmt>
   public Statement ParseStatement()
   { switch(token)
     { case Token.If:     return ParseIf();
       case Token.While:  return ParseWhile();
+      case Token.For:    return ParseFor();
       case Token.Def:    return ParseDef();
       case Token.Global: return ParseGlobal();
       case Token.Import: case Token.From: return ParseImport();
@@ -254,7 +255,15 @@ public class Parser
     }
   }
 
-  // global_stmt := 'global' <identifier> (',' <identifier>)* EOL
+  // for_stmt := 'for' <namelist> 'in' <expression> <suite>
+  Statement ParseFor()
+  { Eat(Token.For);
+    Name[] names = ParseNameList();
+    Eat(Token.In);
+    return new ForStatement(names, ParseExpression(), ParseSuite());
+  }
+
+  // global_stmt := 'global' <namelist> EOL
   Statement ParseGlobal()
   { Eat(Token.Global);
     ArrayList names = new ArrayList();
@@ -433,6 +442,13 @@ public class Parser
     } while(token!=Token.EOL && token!=Token.Semicolon);
     
     return new PrintStatement((Expression[])stmts.ToArray(typeof(Expression)), !comma);
+  }
+
+  // namelist := <identifier> (',' <identifier>)*
+  Name[] ParseNameList()
+  { ArrayList list = new ArrayList();
+    do list.Add(new Name(ParseIdentifier())); while(TryEat(Token.Comma));
+    return (Name[])list.ToArray(typeof(Name));
   }
 
   // param_list := (<identifier> (',' <identifier>)*)?

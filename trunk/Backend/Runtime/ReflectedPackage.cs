@@ -71,12 +71,12 @@ public class ReflectedPackage : IHasAttributes
   static void InitAssembly(Assembly a)
   { ReflectedPackage p=null;
     foreach(Type type in a.GetTypes())
-    { string ns = type.Namespace==null ? "Unnamed" : type.Namespace;
-      if(p==null || p.__name__!=ns) p = ReflectedPackage.FromNamespace(ns);
+    { if(type.Namespace==null) continue;
+      if(p==null || p.__name__!=type.Namespace) p = ReflectedPackage.FromNamespace(type.Namespace);
       p.__dict__[type.Name] = ReflectedType.FromType(type); // do this lazily?
     }
   }
-  
+
   static void Initialize()
   { if(!initialized)
     { LoadAssemblyByName("mscorlib", false);

@@ -223,6 +223,7 @@ public class ReflectedType : BoaType
     foreach(PropertyInfo pi in type.GetProperties()) AddProperty(pi);
 
     if(!dict.Contains("next") && typeof(IEnumerator).IsAssignableFrom(type)) dict["next"] = NextMethod.Value;
+    // TODO: add __repr__ to string?
   }
 
   void AddConstructor(ConstructorInfo ci)
