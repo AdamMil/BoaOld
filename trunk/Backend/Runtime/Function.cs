@@ -10,7 +10,7 @@ public abstract class Function : ICallable
 
   public abstract object Call(params object[] args);
 
-  public override string ToString() { return string.Format("<function '{0}'>", Name); }
+  public override string ToString() { return Name==null ? "<lambda>" : string.Format("<function '{0}'>", Name); }
 
   public string Name;
   public Parameter[] Parameters;

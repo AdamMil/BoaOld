@@ -1,17 +1,20 @@
 using System;
 using System.Reflection;
 using System.Reflection.Emit;
+using System.Diagnostics.SymbolStore;
 using Boa.Runtime;
 
 namespace Boa.AST
 {
 
 public class AssemblyGenerator
-{ public AssemblyGenerator(string moduleName, string outFileName)
+{ public AssemblyGenerator(string moduleName, string outFileName) : this(moduleName, outFileName, Options.Debug) { }
+  public AssemblyGenerator(string moduleName, string outFileName, bool debug)
   { AssemblyName an = new AssemblyName();
     an.Name = moduleName;
     Assembly = AppDomain.CurrentDomain.DefineDynamicAssembly(an, AssemblyBuilderAccess.RunAndSave);
-    Module   = Assembly.DefineDynamicModule(outFileName, outFileName);
+    Module   = Assembly.DefineDynamicModule(outFileName, outFileName, debug);
+    Symbols  = debug ? Module.DefineDocument(outFileName, Guid.Empty, Guid.Empty, SymDocumentType.Text) : null;
     OutFileName = outFileName;
   }
 
@@ -25,6 +28,7 @@ public class AssemblyGenerator
 
   public AssemblyBuilder Assembly;
   public ModuleBuilder   Module;
+  public ISymbolDocumentWriter Symbols;
   public string OutFileName;
 }
 
