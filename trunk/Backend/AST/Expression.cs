@@ -8,6 +8,9 @@ namespace Boa.AST
 {
 
 // TODO: add versions optimized for System.Array ?
+// TODO: implement generator expressions: http://python.org/peps/pep-0289.html
+// TODO: implement decimal: http://python.org/peps/pep-0327.html
+// TODO: implement other stuff here: http://python.org/2.4/highlights.html
 
 #region Expression
 public abstract class Expression : Node

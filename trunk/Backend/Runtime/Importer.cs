@@ -3,6 +3,7 @@ using System.IO;
 using Boa.AST;
 using Boa.Modules;
 
+// TODO: clean up broken module out of sys.modules if import fails
 namespace Boa.Runtime
 {
 
