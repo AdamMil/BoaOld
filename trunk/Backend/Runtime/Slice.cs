@@ -36,10 +36,14 @@ public class Slice : IRepresentable
 
   public override bool Equals(object obj)
   { Slice o = obj as Slice;
-    return o!=null && start.Equals(o.start) && stop.Equals(o.stop) && step.Equals(o.step);
+    return o!=null && (start==null ? o.start==null : start.Equals(o.start)) &&
+                      (stop ==null ? o.stop ==null : stop .Equals(o.stop))  &&
+                      (step ==null ? o.step ==null : step.Equals(o.step));
   }
   
-  public override int GetHashCode() { return start.GetHashCode() ^ stop.GetHashCode(); }
+  public override int GetHashCode()
+  { return (start==null ? 0 : start.GetHashCode()) ^ (stop==null ? 0 : stop.GetHashCode());
+  }
 
   public Tuple indices(int length)
   { int step  = (this.step==null ? 1 : Ops.ToInt(this.step));

@@ -33,22 +33,22 @@ public sealed class _socket
 
   #region Support classes
   public class _error : RuntimeException
-  { public _error(int code, string desc) { value = new Tuple(code, desc); }
-    public _error(object value) { this.value = value; }
+  { public _error(int code, string message) : base(message) { this.code=code; }
+    public _error(string message) : base(message) { }
 
-    public object value;
+    public int code;
   }
   
   public class _herror : _error
-  { public _herror(int code, string desc) : base(code, desc) { }
-    public _herror(object value) : base(value) { }
+  { public _herror(int code, string message) : base(code, message) { }
+    public _herror(string message) : base(message) { }
   }
   
   public class _gaierror : _error
-  { public _gaierror(int code, string desc) : base(code, desc) { }
-    public _gaierror(object value) : base(value) { }
+  { public _gaierror(int code, string message) : base(code, message) { }
+    public _gaierror(string message) : base(message) { }
   }
-  
+
   public class _timeout : _error
   { public _timeout() : base("timed out") { }
   }
@@ -84,7 +84,7 @@ public sealed class _socket
     }
     
     public void close() { socket.Close(); }
-    
+
     public void connect(Tuple address)
     { try { socket.Connect(AddressToEndpoint(address)); }
       catch(SocketException e) { throw new _error(e.ErrorCode, e.Message); }
@@ -300,7 +300,7 @@ public sealed class _socket
   { IPHostEntry he = Resolve(host);
     List list = new List(he.AddressList.Length);
     foreach(IPAddress addr in he.AddressList)
-      list.Add(new Tuple(family, socktype, proto, he.HostName, new Tuple(addr.ToString(), port)));
+      list.Add(new Tuple((int)addr.AddressFamily, socktype, proto, he.HostName, new Tuple(addr.ToString(), port)));
     return list;
   }
 

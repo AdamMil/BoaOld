@@ -728,7 +728,9 @@ public sealed class Ops
         if(a is ICollection) return ((ICollection)a).Count>0;
         if(a is ISequence) return ((ISequence)a).__len__()>0;
         object ret;
-        return TryInvoke(a, "__nonzero__", out ret) ? IsTrue(ret) : Ops.ToInt(Invoke(a, "__len__"))>0;
+        if(TryInvoke(a, "__nonzero__", out ret)) return IsTrue(ret);
+        if(TryInvoke(a, "__len__", out ret)) return Ops.ToInt(ret)>0;
+        return true;
       case TypeCode.SByte:  return (sbyte)a!=0;
       case TypeCode.Single: return (float)a!=0;
       case TypeCode.String: return ((string)a).Length>0;

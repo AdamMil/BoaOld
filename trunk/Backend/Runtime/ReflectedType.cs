@@ -115,6 +115,29 @@ public class NextMethod : IDescriptor, ICallable
 }
 #endregion
 
+#region StringContains
+public class StringContains : IDescriptor, ICallable
+{ public StringContains() { }
+  StringContains(string instance) { this.instance=instance; }
+
+  public object __get__(object instance) { return instance==null ? this : new StringContains((string)instance); }
+
+  public object Call(params object[] args)
+  { if(args.Length!=1) throw Ops.WrongNumArgs("__getitem__", args.Length, 1);
+    if(instance==null) throw Ops.MethodCalledWithoutInstance("string.__contains__()");
+    string s = args[0] as string;
+    if(s!=null) return Ops.FromBool((s.Length==1 ? instance.IndexOf(s[0]) : instance.IndexOf(s)) != -1);
+    if(args[0] is char) return Ops.FromBool(instance.IndexOf((char)args[0])!=-1);
+    throw Ops.TypeError("string.__contains__() expected a string or character argument, but got "+
+                        Ops.TypeName(args[0]));
+  }
+
+  public override string ToString() { return "<method '__contains__' on 'System.String'>"; }
+
+  string instance;
+}
+#endregion
+
 #region StringGetItem
 public class StringGetItem : IDescriptor, ICallable
 { public StringGetItem() { }
@@ -130,6 +153,25 @@ public class StringGetItem : IDescriptor, ICallable
   }
 
   public override string ToString() { return "<method '__getitem__' on 'System.String'>"; }
+
+  string instance;
+}
+#endregion
+
+#region StringJoin
+public class StringJoin : IDescriptor, ICallable
+{ public StringJoin() { }
+  StringJoin(string instance) { this.instance=instance; }
+
+  public object __get__(object instance) { return instance==null ? this : new StringJoin((string)instance); }
+
+  public object Call(params object[] args)
+  { if(args.Length!=1) throw Ops.WrongNumArgs("__getitem__", args.Length, 1);
+    if(instance==null) throw Ops.MethodCalledWithoutInstance("string.join()");
+    return Boa.Modules.@string.join(args[0], instance);
+  }
+
+  public override string ToString() { return "<method 'join' on 'System.String'>"; }
 
   string instance;
 }
@@ -152,6 +194,7 @@ public class StringRepr : IDescriptor, ICallable
   string instance;
 }
 #endregion
+
 }
 #endregion
 
@@ -416,8 +459,11 @@ public abstract class ReflectedMethodBase : ReflectedMember, IFancyCallable
       }
     }
 
-    return sigs[bestMatch].IsConstructor ? ((ConstructorInfo)sigs[bestMatch]).Invoke(args)
-                                         : sigs[bestMatch].Invoke(instance, args);
+    try
+    { return sigs[bestMatch].IsConstructor ? ((ConstructorInfo)sigs[bestMatch]).Invoke(args)
+                                           : sigs[bestMatch].Invoke(instance, args);
+    }
+    catch(TargetInvocationException e) { throw e.InnerException; }
   }
 
   bool TryMatch(ParameterInfo[] parms, object[] args, Type[] types, int lastRP, bool paramArray,
@@ -610,8 +656,6 @@ public class ReflectedType : BoaType
     return rt;
   }
 
-  public string __doc__;
-
   internal Type Type { get { return type; } }
 
   protected override void Initialize()
@@ -643,15 +687,17 @@ public class ReflectedType : BoaType
     else if(type==typeof(string)) // strings
     { dict["__repr__"] = new SpecialAttr.StringRepr();
       dict["__getitem__"] = new SpecialAttr.StringGetItem();
+      dict["__contains__"] = new SpecialAttr.StringContains();
+      dict["join"]  = new SpecialAttr.StringJoin();
       dict["lower"] = dict["ToLower"];
       dict["upper"] = dict["ToUpper"];
     }
 
     if(!dict.Contains("__doc__")) // add doc strings
     { object[] docs = type.GetCustomAttributes(typeof(DocStringAttribute), false);
-      if(docs.Length!=0) __doc__ = ((DocStringAttribute)docs[0]).Docs;
+      if(docs.Length!=0) dict["__doc__"] = ((DocStringAttribute)docs[0]).Docs;
     }
-    
+
     foreach(MemberInfo m in type.GetDefaultMembers()) // add handler for default property
       if(m.MemberType==MemberTypes.Property)
       { ReflectedProperty prop = dict[m.Name] as ReflectedProperty;

@@ -38,7 +38,6 @@ public sealed class ModuleGenerator
     { AssemblyGenerator ag = new AssemblyGenerator(name, Path.GetFileNameWithoutExtension(filename)+".dll");
       TypeGenerator tg = ag.DefineType(name, typeof(Boa.Runtime.Module));
 
-      ConstructorBuilder cons = tg.TypeBuilder.DefineDefaultConstructor(MethodAttributes.Public);
       CodeGenerator icg = tg.DefineMethod(MethodAttributes.Virtual|MethodAttributes.Public|MethodAttributes.HideBySig,
                                           "Run", typeof(void), new Type[] { typeof(Boa.Runtime.Frame) });
       FrameNamespace ns = new FrameNamespace(tg, icg);

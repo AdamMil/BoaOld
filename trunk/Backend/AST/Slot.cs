@@ -42,13 +42,12 @@ public abstract class Slot
 
 #region ArgSlot
 public class ArgSlot : Slot
-{ public ArgSlot(MethodBuilder methodBuilder, int index, string name)
-    : this(methodBuilder, index, name, typeof(object)) { }
-  public ArgSlot(MethodBuilder methodBuilder, int index, string name, Type type)
-    : this(methodBuilder, methodBuilder.DefineParameter(index+1, ParameterAttributes.None, name), type) { }
-  public ArgSlot(MethodBuilder methodBuilder, ParameterBuilder parameterBuilder, Type type)
+{ public ArgSlot(MethodBuilder mb, int index, string name) : this(mb, index, name, typeof(object)) { }
+  public ArgSlot(MethodBuilder mb, int index, string name, Type type)
+    : this(mb, mb.DefineParameter(index+1, ParameterAttributes.None, name), type) { }
+  public ArgSlot(MethodBase mb, ParameterBuilder parameterBuilder, Type type)
   { builder   = parameterBuilder;
-    isStatic  = methodBuilder.IsStatic;
+    isStatic  = mb.IsStatic;
     this.type = type;
   }
 
