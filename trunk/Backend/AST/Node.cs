@@ -75,6 +75,7 @@ public struct ImportName
 public struct ListCompFor
 { public ListCompFor(Name[] names, Expression list, Expression test)
   { List=list; Test=test;
+
     for(int i=0; i<names.Length; i++) names[i].Scope = Scope.Private;
     if(names.Length==1) Names = new NameExpression(names[0]);
     else

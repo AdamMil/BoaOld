@@ -10,9 +10,10 @@ namespace Boa.AST
 
 #region Namespace
 public abstract class Namespace
-{ public Namespace(Namespace parent)
-  { Parent = parent;
-    Global = parent==null || parent.Parent==null ? parent : parent.Parent;
+{ public Namespace(Namespace parent, CodeGenerator cg)
+  { Parent  = parent;
+    Global  = parent==null || parent.Parent==null ? parent : parent.Parent;
+    codeGen = cg;
   }
 
   public virtual Slot AllocTemp(Type type) { throw new NotImplementedException(); }
@@ -24,7 +25,7 @@ public abstract class Namespace
 
   public Slot GetSlotForGet(Name name)
   { Slot s = (Slot)slots[name.String];
-    return s==null ? GetGlobalSlot(name) : s;
+    return s!=null ? s : name.Scope==Scope.Private ? GetSlot(name) : GetGlobalSlot(name);
   }
   public Slot GetSlotForSet(Name name) { return GetSlot(name); }
   
@@ -34,13 +35,20 @@ public abstract class Namespace
 
   public Namespace Parent, Global;
   
+  protected string GetKey(Name name) { return name.Scope==Scope.Private ? "private$"+name.String : name.String; }
+
   protected abstract Slot MakeSlot(Name name);
+
   protected HybridDictionary slots = new HybridDictionary();
+  protected CodeGenerator codeGen;
 
   Slot GetSlot(Name name)
-  { Slot ret = (Slot)slots[name.String];
-    if(ret!=null) return ret;
-    slots[name.String] = ret = MakeSlot(name);
+  { string key = GetKey(name);
+    Slot ret = (Slot)slots[key];
+    if(ret==null)
+    { ret = name.Scope==Scope.Private ? new LocalSlot(codeGen.ILG.DeclareLocal(typeof(object))) : MakeSlot(name);
+      slots[key] = ret;
+    }
     return ret;
   }
 }
@@ -48,15 +56,13 @@ public abstract class Namespace
 
 #region FieldNamespace
 public class FieldNamespace : Namespace
-{ public FieldNamespace(Namespace parent, string prefix, CodeGenerator cg) : base(parent)
-  { this.cg=cg; Prefix=prefix;
-  }
+{ public FieldNamespace(Namespace parent, string prefix, CodeGenerator cg) : base(parent, cg) { Prefix=prefix; }
   public FieldNamespace(Namespace parent, string prefix, CodeGenerator cg, Slot instance)
-    : base(parent) { this.cg=cg; this.instance=instance; Prefix=prefix; }
+    : base(parent, cg) { this.instance=instance; Prefix=prefix; }
   
   public override Slot AllocTemp(Type type)
-  { return new FieldSlot(instance, cg.TypeGenerator.TypeBuilder.DefineField("temp$"+count++, type,
-                                                                            FieldAttributes.Public));
+  { return new FieldSlot(instance, codeGen.TypeGenerator.TypeBuilder.DefineField("temp$"+count++, type,
+                                                                                 FieldAttributes.Public));
   }
 
   public override void DeleteSlot(Name name)
@@ -67,8 +73,8 @@ public class FieldNamespace : Namespace
       par.DeleteSlot(name);
     }
     else
-    { cg.ILG.Emit(OpCodes.Ldnull);
-      GetSlotForSet(name).EmitSet(cg);
+    { codeGen.ILG.Emit(OpCodes.Ldnull);
+      GetSlotForSet(name).EmitSet(codeGen);
     }
   }
 
@@ -80,8 +86,8 @@ public class FieldNamespace : Namespace
       return par.GetGlobalSlot(name);
     }
     else
-    { return new FieldSlot(instance, cg.TypeGenerator.TypeBuilder.DefineField(Prefix+name.String, typeof(object),
-                                                                              FieldAttributes.Public));
+    { return new FieldSlot(instance, codeGen.TypeGenerator.TypeBuilder.DefineField(Prefix+name.String, typeof(object),
+                                                                                   FieldAttributes.Public));
     }
   }
 
@@ -91,7 +97,6 @@ public class FieldNamespace : Namespace
 
   public string Prefix;
 
-  CodeGenerator cg;
   Slot instance;
   
   static int count;
@@ -100,9 +105,8 @@ public class FieldNamespace : Namespace
 
 #region FrameNamespace
 public class FrameNamespace : Namespace
-{ public FrameNamespace(TypeGenerator tg, CodeGenerator cg) : base(null)
-  { codeGen = cg;
-    Slot field = new StaticSlot(tg.TypeBuilder.DefineField("__frame", typeof(Frame),
+{ public FrameNamespace(TypeGenerator tg, CodeGenerator cg) : base(null, cg)
+  { Slot field = new StaticSlot(tg.TypeBuilder.DefineField("__frame", typeof(Frame),
                                                            FieldAttributes.Public|FieldAttributes.Static));
     FrameSlot = new FrameObjectSlot(cg, new ArgSlot(cg.MethodBuilder, 0, "frame"), field);
   }
@@ -114,20 +118,21 @@ public class FrameNamespace : Namespace
   }
 
   public override void SetArgs(Name[] names, int offset, MethodBuilder mb)
-  { foreach(Name name in names) slots[name.String] = MakeSlot(name);
+  { foreach(Name name in names) slots[GetKey(name)] = MakeSlot(name);
   }
 
   public FrameObjectSlot FrameSlot;
 
-  protected override Slot MakeSlot(Name name) { return new NamedFrameSlot(FrameSlot, name.String); }
-
-  CodeGenerator codeGen;
+  protected override Slot MakeSlot(Name name)
+  { if(name.Scope==Scope.Private) throw new NotImplementedException();
+    return new NamedFrameSlot(FrameSlot, name.String);
+  }
 }
 #endregion
 
 #region LocalNamespace
 public class LocalNamespace : Namespace
-{ public LocalNamespace(Namespace parent, CodeGenerator cg) : base(parent) { codeGen=cg; }
+{ public LocalNamespace(Namespace parent, CodeGenerator cg) : base(parent, cg) { }
 
   public override void DeleteSlot(Name name)
   { if(name.Scope==Scope.Global) // TODO: handle Free variables here?
@@ -145,6 +150,7 @@ public class LocalNamespace : Namespace
   public override void SetArgs(Name[] names, int offset, MethodBuilder mb)
   { for(int i=0; i<names.Length; i++) slots[names[i].String] = new ArgSlot(mb, i+offset, names[i].String);
   }
+
   public void SetArgs(Name[] names, CodeGenerator cg, Slot objArray)
   { if(names.Length==0) return;
     objArray.EmitGet(cg);
@@ -174,12 +180,9 @@ public class LocalNamespace : Namespace
         return par.GetGlobalSlot(name);
       }
       case Scope.Local: return new LocalSlot(codeGen.ILG.DeclareLocal(typeof(object)), name.String);
-      case Scope.Private: return new LocalSlot(codeGen.ILG.DeclareLocal(typeof(object)));
       default: throw new Exception("unhandled scope type");
     }
   }
-
-  CodeGenerator codeGen;
 }
 #endregion
 

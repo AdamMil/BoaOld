@@ -97,6 +97,11 @@ public class AttrExpression : Expression
     sb.Append('.');
     sb.Append(Attribute);
   }
+  
+  public override void Walk(IWalker w)
+  { if(w.Walk(this)) Object.Walk(w);
+    w.PostWalk(this);
+  }
 
   public Expression Object;
   public string Attribute;
@@ -345,8 +350,8 @@ public class CallExpression : Expression
 
   public override void Walk(IWalker w)
   { if(w.Walk(this))
-    { for(int i=0; i<Arguments.Length; i++) if(Arguments[i].Expression!=null) Arguments[i].Expression.Walk(w);
-      Target.Walk(w);
+    { Target.Walk(w);
+      for(int i=0; i<Arguments.Length; i++) if(Arguments[i].Expression!=null) Arguments[i].Expression.Walk(w);
     }
     w.PostWalk(this);
   }
@@ -725,7 +730,21 @@ public class ListCompExpression : ListGenExpression
 
 #region ListGenExpression
 public abstract class ListGenExpression : Expression
-{ public ListGenExpression(Expression item, ListCompFor[] fors) { Item=item; Fors=fors; }
+{ public ListGenExpression(Expression item, ListCompFor[] fors)
+  { Item=item; Fors=fors;
+
+    Name[] names = NameFinder.Find(item);
+    foreach(Name itemname in names)
+      foreach(ListCompFor f in fors)
+      { NameExpression n = f.Names as NameExpression;
+        if(n==null)
+        { TupleExpression te = (TupleExpression)f.Names;
+          foreach(NameExpression ne in te.Expressions)
+            if(ne.Name.String==itemname.String) { itemname.Scope=Scope.Private; break; }
+        }
+        else if(n.Name.String==itemname.String) itemname.Scope=Scope.Private;
+      }
+  }
 
   public override void ToCode(System.Text.StringBuilder sb, int indent)
   { sb.Append('[');
