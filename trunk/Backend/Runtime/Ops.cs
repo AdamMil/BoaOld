@@ -106,22 +106,26 @@ public sealed class Ops
   public static object Add(object a, object b)
   { if(a is int && b is int) return (int)a+(int)b;
     if(a is double && b is double) return (double)a+(double)b;
-    throw TypeError("unsupported operand type(s) for +: '{0}' and '{1}'", a.GetType(), b.GetType());
+    throw TypeError("unsupported operand type(s) for +: '{0}' and '{1}'",
+                    GetDynamicType(a).__name__, GetDynamicType(b).__name__);
   }
 
   public static object BitwiseAnd(object a, object b)
   { if(a is int && b is int) return (int)a & (int)b;
-    throw TypeError("unsupported operand type(s) for &: '{0}' and '{1}'", a.GetType(), b.GetType());
+    throw TypeError("unsupported operand type(s) for &: '{0}' and '{1}'",
+                    GetDynamicType(a).__name__, GetDynamicType(b).__name__);
   }
 
   public static object BitwiseOr(object a, object b)
   { if(a is int && b is int) return (int)a | (int)b;
-    throw TypeError("unsupported operand type(s) for |: '{0}' and '{1}'", a.GetType(), b.GetType());
+    throw TypeError("unsupported operand type(s) for |: '{0}' and '{1}'",
+                    GetDynamicType(a).__name__, GetDynamicType(b).__name__);
   }
 
   public static object BitwiseXor(object a, object b)
   { if(a is int && b is int) return (int)a ^ (int)b;
-    throw TypeError("unsupported operand type(s) for ^: '{0}' and '{1}'", a.GetType(), b.GetType());
+    throw TypeError("unsupported operand type(s) for ^: '{0}' and '{1}'",
+                    GetDynamicType(a).__name__, GetDynamicType(b).__name__);
   }
 
   // TODO: check relative performance of "is" and GetTypeCode()
@@ -190,7 +194,7 @@ public sealed class Ops
   public static object Divide(object a, object b)
   { if(a is int && b is int) return (int)a/(int)b;
     if(a is double && b is double) return (double)a/(double)b;
-    throw TypeError("unsupported operand type(s) for /: '{0}' and '{1}'", a.GetType(), b.GetType());
+    throw TypeError("unsupported operand type(s) for /: '{0}' and '{1}'", GetDynamicType(a).__name__, GetDynamicType(b).__name__);
   }
 
   public static EOFErrorException EOFError(string format, params object[] args)
@@ -211,14 +215,18 @@ public sealed class Ops
   public static object FloorDivide(object a, object b)
   { if(a is int && b is int) return (int)Math.Floor((double)a/(int)b);
     if(a is double && b is double) return Math.Floor((double)a/(double)b);
-    throw TypeError("unsupported operand type(s) for //: '{0}' and '{1}'", a.GetType(), b.GetType());
+    throw TypeError("unsupported operand type(s) for //: '{0}' and '{1}'", GetDynamicType(a).__name__, GetDynamicType(b).__name__);
   }
 
   public static object FromBool(bool value) { return value ? TRUE : FALSE; }
 
   public static object GetAttr(object o, string name)
   { IHasAttributes iha = o as IHasAttributes;
-    if(iha!=null) return iha.__getattr__(name);
+    if(iha!=null)
+    { object ret = iha.__getattr__(name);
+      if(ret==Ops.Missing) throw AttributeError("object has no attribute '{0}'", name);
+      return ret;
+    }
     return GetDynamicType(o).GetAttr(o, name);
   }
 
@@ -343,7 +351,7 @@ public sealed class Ops
 
   public static object LeftShift(object a, object b)
   { if(a is int && b is int) return (int)a<<(int)b;
-    throw TypeError("unsupported operand type(s) for <<: '{0}' and '{1}'", a.GetType(), b.GetType());
+    throw TypeError("unsupported operand type(s) for <<: '{0}' and '{1}'", GetDynamicType(a).__name__, GetDynamicType(b).__name__);
   }
 
   public static object Less(object a, object b) { return FromBool(Compare(a,b)<0); }
@@ -355,13 +363,13 @@ public sealed class Ops
   public static object Modulus(object a, object b)
   { if(a is int && b is int) return (int)a%(int)b;
     if(a is double && b is double) { return Math.IEEERemainder((double)a, (double)b); }
-    throw TypeError("unsupported operand type(s) for %: '{0}' and '{1}'", a.GetType(), b.GetType());
+    throw TypeError("unsupported operand type(s) for %: '{0}' and '{1}'", GetDynamicType(a).__name__, GetDynamicType(b).__name__);
   }
 
   public static object Multiply(object a, object b)
   { if(a is int && b is int) return (int)a*(int)b;
     if(a is double && b is double) return (double)a*(double)b;
-    throw TypeError("unsupported operand type(s) for *: '{0}' and '{1}'", a.GetType(), b.GetType());
+    throw TypeError("unsupported operand type(s) for *: '{0}' and '{1}'", GetDynamicType(a).__name__, GetDynamicType(b).__name__);
   }
 
   public static object More(object a, object b) { return FromBool(Compare(a,b)>0); }
@@ -396,7 +404,7 @@ public sealed class Ops
   public static string Repr(object o)
   { if(o==null) return "null";
 
-    string s = o as string; // optimization
+    string s = o as string;
     if(s!=null) return StringOps.Quote(s);
     
     IRepresentable ir = o as IRepresentable;
@@ -412,7 +420,7 @@ public sealed class Ops
 
   public static object RightShift(object a, object b)
   { if(a is int && b is int) return (int)a>>(int)b;
-    throw TypeError("unsupported operand type(s) for >>: '{0}' and '{1}'", a.GetType(), b.GetType());
+    throw TypeError("unsupported operand type(s) for >>: '{0}' and '{1}'", GetDynamicType(a).__name__, GetDynamicType(b).__name__);
   }
 
   public static RuntimeException RuntimeError(string format, params object[] args)
@@ -441,7 +449,7 @@ public sealed class Ops
   public static object Subtract(object a, object b)
   { if(a is int && b is int) return (int)a-(int)b;
     if(a is double && b is double) return (double)a-(double)b;
-    throw TypeError("unsupported operand type(s) for -: '{0}' and '{1}'", a.GetType(), b.GetType());
+    throw TypeError("unsupported operand type(s) for -: '{0}' and '{1}'", GetDynamicType(a).__name__, GetDynamicType(b).__name__);
   }
 
   public static SyntaxErrorException SyntaxError(string format, params object[] args)

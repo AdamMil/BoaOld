@@ -25,7 +25,7 @@ public class Text
       { Statement stmt=null;
         Console.Write(sys.ps1);
         string source = Console.ReadLine();
-        if(source=="quit" || source=="exit") break;
+        if(source==null) break;
 
         try { stmt = Parser.FromString(source).Parse(); }
         catch(SyntaxErrorException e)
@@ -50,6 +50,7 @@ public class Text
       }
       catch(Exception e)
       { if(e is SystemExitException) throw;
+        if(e.InnerException is SystemExitException) throw e.InnerException;
         Console.Error.WriteLine();
         Console.Error.WriteLine(e);
       }

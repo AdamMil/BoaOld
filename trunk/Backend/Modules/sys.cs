@@ -68,7 +68,7 @@ public sealed class sys
 
   static object display(params object[] values) // TODO: optimize this and use CallTarget1 or something
   { if(values[0]!=null)
-    { Console.WriteLine(values[0]);
+    { Console.WriteLine(Ops.Str(values[0]));
       __builtin__._ = values[0];
     }
     return null;

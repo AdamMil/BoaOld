@@ -421,6 +421,8 @@ public sealed class __builtin__
   }
 
   public static object _;
+  public static object exit = "Use Ctrl-Z plus Return (eg EOF) to exit.";
+  public static object quit = "Use Ctrl-Z plus Return (eg EOF) to exit.";
 
   // TODO: figure out how to handle these types that collide with the functions
   // (perhaps by modifying ReflectedType.cons)

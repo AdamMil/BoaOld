@@ -16,6 +16,7 @@ public abstract class BoaType : DynamicType, IDynamicObject, ICallable, IHasAttr
   { this.type=type;
 
     if(type==typeof(object)) __name__ = "object";
+    else if(type==typeof(string)) __name__ = "string";
     else
     { BoaTypeAttribute attr = (BoaTypeAttribute)Attribute.GetCustomAttribute(type, typeof(BoaTypeAttribute), false);
       __name__ = attr==null ? type.FullName : attr.Name;
@@ -63,7 +64,6 @@ public abstract class BoaType : DynamicType, IDynamicObject, ICallable, IHasAttr
   { value = __getattr__(name);
     return value!=Ops.Missing;
   }
-
 
   internal object LookupSlot(string name) { return RawGetSlot(name); }
 
