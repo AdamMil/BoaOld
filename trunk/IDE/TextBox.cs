@@ -4,337 +4,234 @@ using System.Text.RegularExpressions;
 using System.Windows.Forms;
 using Boa.AST;
 using Boa.Runtime;
+using ICSharpCode.TextEditor;
+using ICSharpCode.TextEditor.Gui.CompletionWindow;
 
 namespace Boa.IDE
 {
 
 #region BoaBox
-public class BoaBox : RichTextBox
-{ public BoaBox() { AcceptsTab=true; DetectUrls=false; WordWrap=false; }
-
-  public void PerformSyntaxHighlighting()
-  { if((DateTime.Now-lastUserChange).TotalSeconds < 5) return;
-
-    if(!redoHighlight) return;
-    redoHighlight=false;
-
-    bool old=myChange; myChange=true;
-    int start=Math.Max(SelectionStart, 0), len=Math.Max(SelectionLength, 0);
-
-    for(Match m=highlightre.Match(Text); m.Success; m=m.NextMatch())
-    { Highlight type;
-      string value = m.Value;
-      char c = value[0];
-      if(char.IsLetter(c) || c=='_') type=Highlight.Identifier;
-      else if(char.IsDigit(c)) type=Highlight.Number;
-      else if(c=='#' || value.StartsWith("/*")) type = Highlight.Comment;
-      else type = Highlight.Operator;
-
-      Color newColor = HighlightColor(Classify(value, type));
-      SelectionStart  = m.Index;
-      SelectionLength = m.Length;
-      if(SelectionColor!=newColor) SelectionColor = newColor;
-    }
-
-    SelectionLength = 0;
-    SelectionColor  = Color.Black;
-    SelectionStart  = start;
-    SelectionLength = len;
+public class BoaBox : TextEditorControl
+{ public BoaBox()
+  { AllowDrop = ConvertTabsToSpaces = true;
+    EnableFolding = ShowEOLMarkers = ShowInvalidLines = ShowLineNumbers = ShowSpaces = ShowTabs = ShowVRuler = false;
+    TabIndent = 2;
     
-    myChange=old;
+    ActiveTextAreaControl.TextArea.DoProcessDialogKey += new DialogKeyProcessor(TextArea_DialogKey);
+    ActiveTextAreaControl.TextArea.KeyEventHandler += new ICSharpCode.TextEditor.KeyEventHandler(TextArea_KeyEventHandler);
+
+    Document.HighlightingStrategy =
+      ICSharpCode.TextEditor.Document.HighlightingStrategyFactory.CreateHighlightingStrategy("Boa");
   }
 
-  protected AutoCompleteBox AcBox { get { return EditForm.AcBox; } }
-
-  protected bool AtEndOfLine
-  { get { return GetLineFromCharIndex(SelectionStart) != GetLineFromCharIndex(SelectionStart+1); }
+  public void AppendLine(string format, params object[] args) { AppendLine(string.Format(format, args)); }
+  public void AppendLine(string text)
+  { int end = Document.TextLength;
+    if(Document.GetCharAt(end-1) != '\n') Document.Insert(end++, "\n");
+    ActiveTextAreaControl.TextArea.Document.Insert(end, text+"\n");
   }
 
+  public void InsertLine(string format, params object[] args) { InsertLine(string.Format(format, args)); }
+  public void InsertLine(string text)
+  { Caret caret = ActiveTextAreaControl.Caret;
+    int line = caret.Line+1;
+    if(line==Document.TotalNumberOfLines) Document.Insert(Document.TextLength, "\n");
+    caret.Position = new Point(0, line);
+    ActiveTextAreaControl.TextArea.Document.Insert(caret.Offset, text+"\n");
+  }
+
+  protected AutoCompleteBox AcBox { get { return EditForm.acbox; } }
   protected Frame BoaFrame { get { return EditForm.boaFrame; } }
+  protected EditForm EditForm { get { return (EditForm)ParentForm; } }
 
-  protected EditForm EditForm
-  { get
-    { Control ctl = Parent;
-      while(!(ctl is EditForm)) ctl = ctl.Parent;
-      return (EditForm)ctl;
-    }
-  }
+  #region Event handlers
+  bool TextArea_DialogKey(Keys key)
+  { bool alt=(key&Keys.Alt)!=0, control=(key&Keys.Control)!=0, shift=(key&Keys.Shift)!=0;
+    Keys code=key&Keys.KeyCode;
 
-  protected internal void AppendLine(string format, params object[] args) { AppendLine(string.Format(format, args)); }
-  protected internal void AppendLine(string line)
-  { line += "\n";
-    string text = Text + (Text.EndsWith("\n") ? line : "\n"+line);
-    SetText(text, text.Length);
-  }
-
-  protected void InsertText(string text)
-  { int start=SelectionStart, end=start+SelectionLength;
-    SetText(Text=Text.Substring(0, start) + text + Text.Substring(end, TextLength-end), start+text.Length);
-  }
-
-  protected void MoveToNextLine()
-  { int line = GetLineFromCharIndex(SelectionStart), len=0;
-    string[] lines = Lines;
-    if(line==lines.Length-1) { Text += "\n"; SelectionStart=TextLength; }
-    else
-    { for(int i=0; i<=line; i++) len += lines[i].Length+1;
-      SelectionStart = Math.Min(len, TextLength);
-    }
-    SelectionLength = 0;
-  }
-
-  #region Event overrides
-  protected override void OnKeyDown(KeyEventArgs e)
-  { if(e.Handled) goto done;
-    else if(e.KeyCode==Keys.Return && e.Alt && !e.Control && !e.Shift) // Alt-enter
-    { string code = SelectedText;
-      bool nextline;
-      if(code=="")
-      { string[] lines = Lines;
-        if(lines.Length==0) goto done;
-        code = lines[GetLineFromCharIndex(SelectionStart)].Trim();
-        nextline = true;
-        if(code=="") goto move;
-      }
-      else nextline = false;
-      EditForm.Run(code, true);
-
-      move:
-      if(nextline) MoveToNextLine();
-      else
-      { SelectionStart  = SelectionStart+SelectionLength;
-        SelectionLength = 0;
-      }
-    }
-    else if(e.KeyData==Keys.OemPeriod)
+    if(key==Keys.OemPeriod)
     { if(!AcBox.Visible)
-      { AcBox.Tag = this;
-        PopulateBox();
-
-        if(AcBox.Items.Count!=0)
-        { Point cpt = GetPositionFromCharIndex(SelectionStart);
-          int y = cpt.Y, xoff=0, yoff=0;
-          Control ctl = this;
-          while(ctl != AcBox.Parent) { xoff += ctl.Left; yoff += ctl.Top; ctl=ctl.Parent; }
-
-          cpt.X += xoff+2;
-          cpt.Y += yoff+(int)Math.Ceiling(Font.GetHeight())+2;
-
-          if(cpt.Y+AcBox.Height > Parent.ClientSize.Height)
-          { y = yoff+y-AcBox.Height+2;
-            if(y>=0) cpt.Y=y;
-          }
-
-          AcBox.Location = cpt;
-          AcBox.BringToFront();
-          AcBox.Show();
-        }
+      { PopulateMembers();
+        if(AcBox.Items.Count!=0) ShowCompletionBox();
       }
       else
       { if(AcBox.SelectedIndex!=-1) SelectItem();
-        PopulateBox();
+        PopulateMembers();
         if(AcBox.Items.Count==0) AcBox.Hide();
       }
       typed = "";
+      return false;
     }
-    else if(e.KeyCode==Keys.Back)
+    else if(code==Keys.Back)
     { if(typed.Length!=0) typed = typed.Substring(0, typed.Length-1);
-      int curPos = SelectionStart;
-      if(curPos>0 && Text[curPos-1]=='.') AcBox.Hide();
+      int curPos = ActiveTextAreaControl.Caret.Offset;
+      if(curPos>0 && Document.GetCharAt(curPos-1)=='.') AcBox.Hide();
+      return false;
     }
-    else if(!AcBox.Visible) goto done;
-    else if(e.KeyCode==Keys.Up)
+    else if(!AcBox.Visible)
+    { if(code==Keys.Return && alt && !control && !shift) // Alt-enter
+      { TextAreaControl txt = ActiveTextAreaControl;
+        Caret caret = txt.Caret;
+        string source = txt.SelectionManager.SelectedText;
+        bool nextline;
+        if(source=="")
+        { source = Document.GetText(Document.GetLineSegmentForOffset(caret.Offset)).Trim();
+          nextline = true;
+          if(source=="") goto move;
+        }
+        else nextline = false;
+        EditForm.Run(source, true);
+
+        move:
+        int line = 1+(nextline ? caret.Line : txt.SelectionManager.GetSelectionAt(caret.Offset).EndPosition.Y);
+        if(line==Document.TotalNumberOfLines) Document.Insert(Document.TextLength, "\n");
+        caret.Position = new Point(0, line);
+
+        return true;
+      }
+      else if(code==Keys.Space && control && !shift && !alt)
+      { string text = PopulatePartial();
+        if(AcBox.Items.Count==1) { typed=text; AcBox.SelectedIndex=0; SelectItem(); }
+        else if(AcBox.Items.Count!=0) ShowCompletionBox();
+        typed = "";
+        return true;
+      }
+      else if(code==Keys.OemCloseBrackets && control && !shift && !alt)
+      { int index=ActiveTextAreaControl.Caret.Offset;
+        if(index!=Document.TextLength)
+        { char c = Document.GetCharAt(index), other;
+          if(c==')' || c==']' || c=='}')
+          { other = c==')' ? '(' : c==']' ? '[' : '{';
+            index = Document.FormattingStrategy.SearchBracketBackward(Document, index-1, other, c);
+          }
+          else if(c=='(' || c=='[' || c=='{')
+          { other = c=='(' ? ')' : c=='[' ? ']' : '}';
+            index = Document.FormattingStrategy.SearchBracketForward(Document, index+1, c, other);
+          }
+          if(index != -1) ActiveTextAreaControl.Caret.Position = Document.OffsetToPosition(index);
+        }
+        return true;
+      }
+      return false;
+    }
+    else if((char)code=='\t' || (char)code=='\r' || (char)code=='\n') return TextArea_KeyEventHandler((char)code);
+    else if(code==Keys.Up)
     { if(AcBox.SelectedIndex>0) AcBox.SelectedIndex--;
-      e.Handled = true;
     }
-    else if(e.KeyCode==Keys.Down)
+    else if(code==Keys.Down)
     { if(AcBox.SelectedIndex<AcBox.Items.Count-1) AcBox.SelectedIndex++;
-      e.Handled = true;
     }
-    else if(e.KeyCode==Keys.PageUp)
+    else if(code==Keys.PageUp)
     { int items = AcBox.ClientSize.Height / AcBox.GetItemHeight(0);
       if(AcBox.SelectedIndex>0) AcBox.SelectedIndex = Math.Max(0, AcBox.SelectedIndex-items);
     }
-    else if(e.KeyCode==Keys.PageDown)
+    else if(code==Keys.PageDown)
     { int items = AcBox.ClientSize.Height / AcBox.GetItemHeight(0);
       if(AcBox.SelectedIndex!=AcBox.Items.Count-1)
         AcBox.SelectedIndex = Math.Min(AcBox.Items.Count-1, AcBox.SelectedIndex+items);
     }
-    else if(e.KeyCode==Keys.Home)
+    else if(code==Keys.Home)
     { AcBox.SelectedIndex=0;
-      e.Handled = true;
     }
-    else if(e.KeyCode==Keys.End)
+    else if(code==Keys.End)
     { AcBox.SelectedIndex = AcBox.Items.Count-1;
-      e.Handled = true;
     }
-
-    done: base.OnKeyDown(e);
+    else return false;
+    
+    return true;
   }
 
-  protected override void OnKeyPress(KeyPressEventArgs e)
-  { if(e.Handled) goto done;
-
-    if(!AcBox.Visible || e.KeyChar=='.' || e.KeyChar=='\b') goto done;
-    else if(e.KeyChar<127 && !char.IsLetterOrDigit(e.KeyChar) && e.KeyChar!='_')
-    { if(e.KeyChar=='(' || e.KeyChar=='[' || e.KeyChar=='\n' || e.KeyChar=='\r' || e.KeyChar=='\t' || e.KeyChar==' ')
+  bool TextArea_KeyEventHandler(char ch)
+  { if(!AcBox.Visible || ch=='.' || ch=='\b') return false;
+    else if(ch<127 && !char.IsLetterOrDigit(ch) && ch!='_')
+    { bool handled=false;
+      if(ch=='(' || ch=='[' || ch=='\n' || ch=='\r' || ch=='\t' || ch==' ')
       { if(AcBox.SelectedIndex!=-1) SelectItem();
-        if((int)e.KeyChar<32) e.Handled = true;
+        if((int)ch<32) handled=true;
       }
       AcBox.Hide();
       typed = "";
+      return handled;
     }
-    else if(e.KeyChar>32 && e.KeyChar<127)
-    { typed += e.KeyChar;
+    else if(ch>32 && ch<127)
+    { typed += ch;
       int index = AcBox.FindString(typed);
       if(index!=ListBox.NoMatches) AcBox.SelectedIndex = index;
     }
-
-    done: base.OnKeyPress(e);
-  }
-
-  protected override void OnMouseDown(MouseEventArgs e)
-  { AcBox.Hide();
-    base.OnMouseDown(e);
-  }
-
-  protected override void OnTextChanged(EventArgs e)
-  { base.OnTextChanged(e);
-    if(myChange) return;
-
-    Modified = true;
-    lastUserChange = DateTime.Now;
-
-    int pos=SelectionStart, end;
-    if(pos<=0) { redoHighlight=true; return; }
-
-    char c = Text[--pos];
-    if(char.IsLetterOrDigit(c)) return;
-
-    string text=Text;
-
-    while(pos>=0 && char.IsWhiteSpace(text[pos])) pos--;
-    if(pos<0) return;
-    end=pos+1;
-
-    Highlight type;
-    if(char.IsLetter(c=text[pos]) || c=='_')
-    { while(--pos>=0 && (char.IsLetter(c=text[pos]) || c=='_'));
-      type = Highlight.Identifier;
-    }
-    else if(char.IsNumber(text[pos])) // TODO: improve number recognition
-    { while(--pos>=0 && (char.IsDigit(c=text[pos]) || c=='.'));
-      type = Highlight.Number;
-    }
-    else if(char.IsPunctuation(c=text[pos]) || char.IsSymbol(c)) // TODO: improve symbol recognition
-    { while(--pos>=0 && (char.IsPunctuation(c=text[pos]) || char.IsSymbol(c)));
-      type = Highlight.Operator;
-    }
-    else return;
-
-    pos++;
-    string word = end<=0 ? "" : text.Substring(pos, end-pos);
-    if(word=="") return;
-
-    Color newColor = HighlightColor(Classify(word, type));
-
-    int start=SelectionStart, len=SelectionLength;
-    SelectionStart  = pos;
-    SelectionLength = end-pos;
-    if(SelectionColor!=newColor) SelectionColor = newColor;
-
-    SelectionStart  = start;
-    SelectionLength = 0;
-    SelectionColor  = Color.Black;
-    SelectionLength = len;
+    return false;
   }
   #endregion
 
-  enum Highlight
-  { Identifier, Keyword, CallKeyword, DeclareKeyword, Operator, Punctuation, Number, Comment
-  };
-
-  Highlight Classify(string word, Highlight type)
-  { if(type==Highlight.Identifier)
-      switch(word)
-      { case "while": case "return": case "from": case "for": case "if": case "elif": case "else": case "break":
-        case "continue": case "in": case "try": case "except": case "finally": case "is":
-        case "not": case "and": case "or":
-          type=Highlight.Keyword; break;
-
-        case "import": case "pass": case "global": case "raise": case "assert": case "del": case "yield":
-        case "exec":
-          type=Highlight.CallKeyword; break;
-
-        case "def": case "lambda": case "class":
-          type=Highlight.DeclareKeyword; break;
-      }
-    else if(type==Highlight.Operator)
-      switch(word[0])
-      { case '(': case ')': case '[': case ']': case '{': case '}': case ':': case ',':
-          type=Highlight.Punctuation; break;
-      }
-    return type;
-  }
-
-  Color HighlightColor(Highlight type)
-  { switch(type)
-    { case Highlight.Operator: return Color.OrangeRed;
-      case Highlight.CallKeyword: case Highlight.Keyword: return Color.Blue;
-      case Highlight.Number: return Color.DarkRed;
-      case Highlight.Comment: return Color.Green;
-      case Highlight.DeclareKeyword: return Color.DarkCyan;
-      default: return Color.Black;
-    }
-  }
-
-  void PopulateBox()
-  { AcBox.Items.Clear();
-
-    string word = PreviousIdentifier();
-    if(word=="") return;
-
-    string[] bits = word.Split('.');
-    
+  object GetObject(string ident, bool ignoreLast)
+  { if(ident==null || ident=="") return null;
+    string[] bits = ident.Split('.');
     try
     { object obj=BoaFrame.Module;
-      for(int i=0; i<bits.Length; i++) if(!Ops.GetAttr(obj, bits[i], out obj) || obj==null) return;
-      foreach(string s in Modules.__builtin__.dir(obj)) AcBox.Items.Add(s);
+      for(int i=0,len=bits.Length-(ignoreLast ? 1 : 0); i<len; i++)
+        if(!Ops.GetAttr(obj, bits[i], out obj) || obj==null) return null;
+      return obj;
     }
-    catch { }
+    catch { return null; }
   }
 
-  string PreviousIdentifier()
-  { string text=Text;
-    int pos=SelectionStart, end=pos;
+  void PopulateMembers()
+  { AutoCompleteBox acbox = AcBox;
+    acbox.Items.Clear();
+    object obj = GetObject(PreviousIdentifier(true), false);
+    if(obj!=null) foreach(string s in Modules.__builtin__.dir(obj)) acbox.Items.Add(s);
+  }
+
+  string PopulatePartial()
+  { AutoCompleteBox acbox = AcBox;
+    acbox.Items.Clear();
+    string ident = PreviousIdentifier(false);
+    object obj = GetObject(ident, true);
+    if(obj!=null)
+    { int index=ident.LastIndexOf('.');
+      if(index!=-1) ident = ident.Substring(index+1);
+      foreach(string s in Modules.__builtin__.dir(obj)) if(s.StartsWith(ident)) acbox.Items.Add(s);
+    }
+    return ident;
+  }
+
+  string PreviousIdentifier(bool trimEnd)
+  { int pos=ActiveTextAreaControl.Caret.Offset, end=pos;
     char c;
-    while(--pos>=0 && (char.IsLetterOrDigit(c=text[pos]) || c=='.' || c=='_'));
-    string word = end<=0 ? "" : text.Substring(pos+1, end-pos-1);
-    word.TrimEnd('.');
+    while(--pos>=0 && (char.IsLetterOrDigit(c=Document.GetCharAt(pos)) || c=='.' || c=='_'));
+    string word = end<=0 ? "" : Document.GetText(pos+1, end-pos-1);
+    if(trimEnd) word = word.TrimEnd('.');
     return word;
   }
 
   internal void SelectItem()
-  { int start=SelectionStart, prefix=start-typed.Length, suffix=Math.Min(start+typed.Length, TextLength);
-    string item = AcBox.GetItemText(AcBox.SelectedItem);
-    SetText(Text.Substring(0, prefix) + item + Text.Substring(suffix, TextLength-suffix), prefix+item.Length);
+  { string item = AcBox.GetItemText(AcBox.SelectedItem);
+    Caret caret = ActiveTextAreaControl.Caret;
+    if(typed.Length==0) Document.Insert(caret.Offset, item);
+    else Document.Replace(caret.Offset-typed.Length, typed.Length, item);
+    caret.Column += item.Length-typed.Length;
   }
-  
-  void SetText(string text, int newCaretPos)
-  { bool old=myChange; myChange=true;
-    Text = text;
-    SelectAll();
-    SelectionColor  = Color.Black;
-    SelectionLength = 0;
-    SelectionStart  = newCaretPos;
+
+  void ShowCompletionBox()
+  { AcBox.Tag = this;
+    Point cpt = ActiveTextAreaControl.Caret.ScreenPosition;
+    int y = cpt.Y, xoff=0, yoff=0;
+    Control ctl=this, form=ParentForm;
+    while(ctl != form) { xoff += ctl.Left; yoff += ctl.Top; ctl=ctl.Parent; }
+
+    cpt.X += xoff+2;
+    cpt.Y += yoff+(int)Math.Ceiling(Font.GetHeight())+2;
+
+    if(cpt.Y+AcBox.Height > Parent.ClientSize.Height)
+    { y = yoff+y-AcBox.Height+2;
+      if(y>=0) cpt.Y=y;
+    }
+
+    AcBox.Location = cpt;
+    AcBox.BringToFront();
+    AcBox.Show();
   }
 
   string typed="";
-  DateTime lastUserChange;
-  bool redoHighlight=true, myChange;
-  
-  static Regex highlightre = new Regex(@"/\*.*?\*/|#.*?(?:\n|$)|\w+|\d+(?:\.\d+)?|<>|(?:&&|\|\||[~^&*-=+<>/?|])=?",
-                                       RegexOptions.Compiled|RegexOptions.Singleline);
 }
 #endregion
 
@@ -342,17 +239,21 @@ public class ImmediateBox : BoaBox
 { public ImmediateBox()
   { displayhook = Ops.GenerateFunction("display", new Parameter[] { new Parameter("value") },
                                        new CallTargetN(display));
+    invoke = new StringDelegate(InsertLine);
   }
 
-  object display(params object[] values) // TODO: optimize this and use CallTarget1 or something
+  delegate void StringDelegate(string text);
+
+  object display(params object[] values)
   { if(values[0]!=null)
-    { AppendLine("Result: "+Ops.Repr(values[0]));
+    { Invoke(invoke, new object[] { "Result: "+Ops.Repr(values[0]) });
       Modules.__builtin__._ = values[0];
     }
     return null;
   }
 
   internal object displayhook;
+  StringDelegate invoke;
 }
 
 }

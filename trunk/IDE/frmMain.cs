@@ -77,6 +77,7 @@ namespace Boa.IDE
       this.menuCascade = new System.Windows.Forms.MenuItem();
       this.menuHorz = new System.Windows.Forms.MenuItem();
       this.menuVert = new System.Windows.Forms.MenuItem();
+      this.SuspendLayout();
       // 
       // menuBar
       // 
@@ -291,6 +292,7 @@ namespace Boa.IDE
       this.Name = "MainForm";
       this.Text = "Boa IDE";
       this.WindowState = System.Windows.Forms.FormWindowState.Maximized;
+      this.ResumeLayout(false);
 
     }
 		#endregion
@@ -360,40 +362,46 @@ namespace Boa.IDE
     { Form form = ActiveMdiChild;
       Control ctl = form==null ? null : form.ActiveControl;
       TextBoxBase text = ctl as TextBoxBase;
-      RichTextBox rich = ctl as RichTextBox;
+      BoaBox rich = ctl as BoaBox;
 
-      menuRedo.Enabled = rich!=null && rich.CanRedo;
-      menuUndo.Enabled = text!=null && text.CanUndo;
+      menuRedo.Enabled = rich!=null && rich.Document.UndoStack.CanRedo;
+      menuUndo.Enabled = rich!=null && rich.Document.UndoStack.CanUndo || text!=null && text.CanUndo;
       menuGotoLine.Enabled = menuFind.Enabled = text!=null;
+      
+      menuFindNext.Enabled = false;
     }
 
     void menuUndo_Click(object sender, System.EventArgs e)
     { Form form = ActiveMdiChild;
-      TextBoxBase ctl = form==null ? null : form.ActiveControl as TextBoxBase;
-      if(ctl!=null) ctl.Undo();
+      Control ctl = form==null ? null : form.ActiveControl;
+      if(ctl is BoaBox) ((BoaBox)ctl).Undo();
+      else if(ctl is TextBoxBase) ((TextBoxBase)ctl).Undo();
     }
 
     void menuRedo_Click(object sender, System.EventArgs e)
     { Form form = ActiveMdiChild;
-      RichTextBox ctl = form==null ? null : form.ActiveControl as RichTextBox;
+      BoaBox ctl = form==null ? null : form.ActiveControl as BoaBox;
       if(ctl!=null) ctl.Redo();
     }
 
     void menuGotoLine_Click(object sender, System.EventArgs e)
     { Form form = ActiveMdiChild;
-      TextBoxBase box = form==null ? null : form.ActiveControl as TextBoxBase;
-      if(box!=null)
+      Control ctl = form==null ? null : form.ActiveControl;
+      if(ctl!=null)
       { GotoLineForm gl = new GotoLineForm();
         if(gl.ShowDialog()==DialogResult.OK)
         { int line = gl.Line;
           if(line<0) return;
 
-          string[] lines = App.GetRawLines(box);
-          int pos=0;
-          line = Math.Max(1, Math.Min(line, lines.Length))-1;
-          for(int i=0; i<line; i++) pos += lines[i].Length;
-          box.SelectionStart  = pos;
-          box.SelectionLength = 0;
+          if(ctl is TextBoxBase)
+          { TextBoxBase box = (TextBoxBase)ctl;
+            string[] lines = App.GetRawLines(box);
+            int pos=0;
+            line = Math.Max(1, Math.Min(line, lines.Length))-1;
+            for(int i=0; i<line; i++) pos += lines[i].Length;
+            box.SelectionStart  = pos;
+            box.SelectionLength = 0;
+          }
         }
       }
     }
