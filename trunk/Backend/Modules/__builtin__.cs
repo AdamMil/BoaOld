@@ -235,7 +235,7 @@ floating point numbers the result is (q, a % b), where q is usually
 math.floor(a / b) but may be 1 less than that. In any case q * b + a % b
 is very close to a, if a % b is non-zero it has the same sign as b, and
 0 <= abs(a % b) < abs(b).")]
-  public static Tuple divmod(object a, object b) { return new Tuple(Ops.Divide(a, b), Ops.Modulus(a, b)); }
+  public static Tuple divmod(object a, object b) { return Ops.DivMod(a, b); }
 
   [DocString(@"enumerate(object) -> iter
 
@@ -377,9 +377,9 @@ Note that filter(function, list) is equivalent to
       else { ret=new List(); e=Ops.GetEnumerator(seq); }
 
       if(function==null)
-      { while(e.MoveNext()) if(Ops.IsTrue(e.Current)) ret.append(Ops.ToBoa(e.Current));
+      { while(e.MoveNext()) if(Ops.IsTrue(e.Current)) ret.append(e.Current);
       }
-      else while(e.MoveNext()) if(Ops.IsTrue(Ops.Call(function, e.Current))) ret.append(Ops.ToBoa(e.Current));
+      else while(e.MoveNext()) if(Ops.IsTrue(Ops.Call(function, e.Current))) ret.append(e.Current);
       return seq is Tuple ? ret.ToTuple() : (object)ret;
     }
   }
@@ -654,8 +654,8 @@ arguments may be any kind of sequence; the result is always a list.")]
     if(col!=null) { ret = new List(col.Count); e = col.GetEnumerator(); }
     else { ret = new List(); e = Ops.GetEnumerator(seq); }
 
-    if(function==null) while(e.MoveNext()) ret.append(Ops.ToBoa(e.Current));
-    else while(e.MoveNext()) ret.append(Ops.ToBoa(Ops.Call(function, e.Current)));
+    if(function==null) while(e.MoveNext()) ret.append(e.Current);
+    else while(e.MoveNext()) ret.append(Ops.Call(function, e.Current));
     return ret;
   }
 

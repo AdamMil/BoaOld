@@ -44,6 +44,7 @@ public class Dict : HybridDictionary, IComparable, IMapping, ICloneable, IRepres
     else return false;
   }
   
+  public override int GetHashCode() { throw Ops.TypeError("dict objects are unhashable"); }
   public override string ToString() { return __repr__(); }
 
   #region IComparable Members

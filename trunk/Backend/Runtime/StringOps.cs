@@ -234,6 +234,13 @@ public sealed class StringOps
     return sb.ToString();
   }
   
+  public static string Multiply(string str, object times)
+  { int times = Ops.ToInt(times);
+    StringBuilder sb = new StringBuilder(str.Length*times);
+    while(times-->0) sb.Append(str);
+    return sb.ToString();
+  }
+
   public static string PrintF(string format, object args) { return new StringFormatter(format, args).Format(); }
 
   public static string Slice(string s, Slice slice)

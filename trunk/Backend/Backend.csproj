@@ -204,6 +204,11 @@
                     BuildAction = "Compile"
                 />
                 <File
+                    RelPath = "Runtime\Complex.cs"
+                    SubType = "Code"
+                    BuildAction = "Compile"
+                />
+                <File
                     RelPath = "Runtime\Dict.cs"
                     SubType = "Code"
                     BuildAction = "Compile"
@@ -215,6 +220,11 @@
                 />
                 <File
                     RelPath = "Runtime\Exceptions.cs"
+                    SubType = "Code"
+                    BuildAction = "Compile"
+                />
+                <File
+                    RelPath = "Runtime\FloatOps.cs"
                     SubType = "Code"
                     BuildAction = "Compile"
                 />
@@ -239,12 +249,27 @@
                     BuildAction = "Compile"
                 />
                 <File
+                    RelPath = "Runtime\Integer.cs"
+                    SubType = "Code"
+                    BuildAction = "Compile"
+                />
+                <File
                     RelPath = "Runtime\Interfaces.cs"
                     SubType = "Code"
                     BuildAction = "Compile"
                 />
                 <File
+                    RelPath = "Runtime\IntOps.cs"
+                    SubType = "Code"
+                    BuildAction = "Compile"
+                />
+                <File
                     RelPath = "Runtime\List.cs"
+                    SubType = "Code"
+                    BuildAction = "Compile"
+                />
+                <File
+                    RelPath = "Runtime\LongOps.cs"
                     SubType = "Code"
                     BuildAction = "Compile"
                 />

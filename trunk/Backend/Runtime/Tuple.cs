@@ -74,18 +74,21 @@ public class Tuple : ISequence, ICollection, IComparable, IRepresentable
 
   public override bool Equals(object o) { return CompareTo(o)==0; }
 
-  public override int GetHashCode() // TODO: improve hashing
-  { int ret = 0, inc = Math.Max(items.Length/10, 1); // limit to 10 items (bad idea?)
-    for(int i=0; i<items.Length; i+=inc) ret ^= items[i].GetHashCode();
-    return ret;
-  }
+  public override int GetHashCode()
+  { if(hashCode!=null) return (int)hashCode;
 
+    int hash=0;
+    for(int i=0; i<items.Length; i++) hash ^= items[i].GetHashCode();
+    hashCode = hash;
+    return hash;
+  }
 
   public override string ToString() { return __repr__(); }
 
   public static readonly Tuple Empty = new Tuple();
   
   internal object[] items;
+  object hashCode;
 }
 
 } // namespace Boa.Runtime

@@ -2,7 +2,9 @@ using System;
 using System.Collections;
 
 // TODO: investigate python's changes to the division operator
-
+// TODO: should we allow integer operations on chars?
+// TODO: implement all of http://docs.python.org/ref/specialnames.html
+// TODO: double check all mathematical operations
 namespace Boa.Runtime
 {
 
@@ -11,10 +13,11 @@ namespace Boa.Runtime
   Failure=8, Success=1
 }
 
+// TODO: make heavy use of regions in here
 public sealed class Ops
 { Ops() { }
 
-  public static readonly object Missing = "<missing>"; // relies on .NET interning strings
+  public static readonly object Missing = "<missing>";
   public static readonly DefaultBoaComparer DefaultComparer = new DefaultBoaComparer();
 
   #region ISeqEnumerator
@@ -117,35 +120,149 @@ public sealed class Ops
   }
 
   public static object Add(object a, object b)
-  { if(a is int && b is int) return (int)a+(int)b;
-    if(a is double && b is double) return (double)a+(double)b;
-    if(a is string && b is string) return (string)a+(string)b;
-    throw TypeError("unsupported operand type(s) for +: '{0}' and '{1}'",
+  { switch(Convert.GetTypeCode(a))
+    { case TypeCode.Boolean: return IntOps.Add((bool)a ? 1 : 0, b);
+      case TypeCode.Byte:    return IntOps.Add((int)(byte)a, b);
+      case TypeCode.Char:
+        if(b is string) return (char)a+(string)b;
+        break;
+      case TypeCode.Double:  return FloatOps.Add((double)a, b);
+      case TypeCode.Int16: return IntOps.Add((int)(short)a, b);
+      case TypeCode.Int32: return IntOps.Add((int)a, b);
+      case TypeCode.Int64: return LongOps.Add((long)a, b);
+      case TypeCode.Object:
+        if(a is Integer) return ((Integer)a).Add(b);
+        if(a is Complex) return ((Complex)a).Add(b);
+        if(a is ICollection || a is ISequence) return ArrayOps.Concat((Array)a, b);
+        object ret;
+        if(TryInvoke(a, "__add__", out ret, b)) return ret;
+        return Invoke(b, "__radd__", a);
+      case TypeCode.SByte: return IntOps.Add((int)(sbyte)a, b);
+      case TypeCode.Single: return FloatOps.Add((float)a, b);
+      case TypeCode.String: return StringOps.Concat((string)a, b);
+      case TypeCode.UInt16: return IntOps.Add((int)(short)a, b);
+      case TypeCode.UInt32: 
+      { uint v = (uint)a;
+        return v<=int.MaxValue ? IntOps.Add((int)v, b) : LongOps.Add((long)v, b);
+      }
+      case TypeCode.UInt64:
+      { ulong v = (ulong)a;
+        return v<=long.MaxValue ? LongOps.Add((long)v, b) : new Integer(v).Add(b);
+      }
+    }
+    throw TypeError("unsupported operand types for +: '{0}' and '{1}'",
                     GetDynamicType(a).__name__, GetDynamicType(b).__name__);
   }
 
   public static object BitwiseAnd(object a, object b)
-  { if(a is int && b is int) return (int)a & (int)b;
-    throw TypeError("unsupported operand type(s) for &: '{0}' and '{1}'",
+  { switch(Convert.GetTypeCode(a))
+    { case TypeCode.Boolean:
+        if(b is bool) return FromBool((bool)a && (bool)b);
+        return IntOps.BitwiseAnd((bool)a ? 1 : 0, b);
+      case TypeCode.Byte:  return IntOps.BitwiseAnd((int)(byte)a, b);
+      case TypeCode.Int16: return IntOps.BitwiseAnd((int)(short)a, b);
+      case TypeCode.Int32: return IntOps.BitwiseAnd((int)a, b);
+      case TypeCode.Int64: return LongOps.BitwiseAnd((long)a, b);
+      case TypeCode.Object:
+        if(a is Integer) return ((Integer)a).BitwiseAnd(b);
+        object ret;
+        if(TryInvoke(a, "__and__", out ret, b)) return ret;
+        return Invoke(a, "__rand__", b);
+      case TypeCode.SByte: return IntOps.BitwiseAnd((int)(sbyte)a, b);
+      case TypeCode.UInt16: return IntOps.BitwiseAnd((int)(short)a, b);
+      case TypeCode.UInt32:
+      { uint v = (uint)a;
+        return v<=int.MaxValue ? IntOps.BitwiseAnd((int)v, b) : LongOps.BitwiseAnd((long)v, b);
+      }
+      case TypeCode.UInt64:
+      { ulong v = (ulong)a;
+        return v<=long.MaxValue ? LongOps.BitwiseAnd((long)v, b) : new Integer(v).BitwiseAnd(b);
+      }
+    }
+    throw TypeError("unsupported operand types for &: '{0}' and '{1}'",
                     GetDynamicType(a).__name__, GetDynamicType(b).__name__);
   }
 
   public static object BitwiseOr(object a, object b)
-  { if(a is int && b is int) return (int)a | (int)b;
-    throw TypeError("unsupported operand type(s) for |: '{0}' and '{1}'",
+  { switch(Convert.GetTypeCode(a))
+    { case TypeCode.Boolean:
+        if(b is bool) return FromBool((bool)a || (bool)b);
+        return IntOps.BitwiseOr((bool)a ? 1 : 0, b);
+      case TypeCode.Byte:  return IntOps.BitwiseOr((int)(byte)a, b);
+      case TypeCode.Int16: return IntOps.BitwiseOr((int)(short)a, b);
+      case TypeCode.Int32: return IntOps.BitwiseOr((int)a, b);
+      case TypeCode.Int64: return LongOps.BitwiseOr((long)a, b);
+      case TypeCode.Object:
+        if(a is Integer) return ((Integer)a).BitwiseOr(b);
+        object ret;
+        if(TryInvoke(a, "__or___", out ret, b)) return ret;
+        return Invoke(a, "__ror___", b);
+      case TypeCode.SByte: return IntOps.BitwiseOr((int)(sbyte)a, b);
+      case TypeCode.UInt16: return IntOps.BitwiseOr((int)(short)a, b);
+      case TypeCode.UInt32:
+      { uint v = (uint)a;
+        return v<=int.MaxValue ? IntOps.BitwiseOr((int)v, b) : LongOps.BitwiseOr((long)v, b);
+      }
+      case TypeCode.UInt64:
+      { ulong v = (ulong)a;
+        return v<=long.MaxValue ? LongOps.BitwiseOr((long)v, b) : new Integer(v).BitwiseOr(b);
+      }
+    }
+    throw TypeError("unsupported operand types for |: '{0}' and '{1}'",
                     GetDynamicType(a).__name__, GetDynamicType(b).__name__);
   }
 
   public static object BitwiseXor(object a, object b)
-  { if(a is int && b is int) return (int)a ^ (int)b;
-    throw TypeError("unsupported operand type(s) for ^: '{0}' and '{1}'",
+  { switch(Convert.GetTypeCode(a))
+    { case TypeCode.Boolean:
+        if(b is bool) return FromBool((bool)a != (bool)b);
+        return IntOps.BitwiseXor((bool)a ? 1 : 0, b);
+      case TypeCode.Byte:  return IntOps.BitwiseXor((int)(byte)a, b);
+      case TypeCode.Int16: return IntOps.BitwiseXor((int)(short)a, b);
+      case TypeCode.Int32: return IntOps.BitwiseXor((int)a, b);
+      case TypeCode.Int64: return LongOps.BitwiseXor((long)a, b);
+      case TypeCode.Object:
+        if(a is Integer) return ((Integer)a).BitwiseXor(b);
+        object ret;
+        if(TryInvoke(a, "__xor__", out ret, b)) return ret;
+        return Invoke(a, "__rxor__", b);
+      case TypeCode.SByte: return IntOps.BitwiseXor((int)(sbyte)a, b);
+      case TypeCode.UInt16: return IntOps.BitwiseXor((int)(short)a, b);
+      case TypeCode.UInt32:
+      { uint v = (uint)a;
+        return v<=int.MaxValue ? IntOps.BitwiseXor((int)v, b) : LongOps.BitwiseXor((long)v, b);
+      }
+      case TypeCode.UInt64:
+      { ulong v = (ulong)a;
+        return v<=long.MaxValue ? LongOps.BitwiseXor((long)v, b) : new Integer(v).BitwiseXor(b);
+      }
+    }
+    throw TypeError("unsupported operand types for ^: '{0}' and '{1}'",
                     GetDynamicType(a).__name__, GetDynamicType(b).__name__);
   }
 
-  // TODO: check relative performance of "is" and GetTypeCode()
-  public static object BitwiseNegate(object o)
-  { if(o is int) return ~(int)o;
-    throw TypeError("unsupported operand type for ~: '{0}'", o.GetType());
+  public static object BitwiseNegate(object a)
+  { switch(Convert.GetTypeCode(a))
+    { case TypeCode.Boolean: return (bool)a ? -2 : -1;
+      case TypeCode.Byte:  return ~(int)(byte)a;
+      case TypeCode.Int16: return ~(int)(short)a;
+      case TypeCode.Int32: return ~(int)a;
+      case TypeCode.Int64: return ~(long)a;
+      case TypeCode.Object:
+        if(a is Integer) return ((Integer)a).BitwiseNegate();
+        return Invoke(a, "__invert__");
+      case TypeCode.SByte: return ~(int)(sbyte)a;
+      case TypeCode.UInt16: return ~(int)(short)a;
+      case TypeCode.UInt32:
+      { uint v = (uint)a;
+        return v<=int.MaxValue ? ~(int)v : ~(long)v;
+      }
+      case TypeCode.UInt64:
+      { ulong v = (ulong)a;
+        return v<=long.MaxValue ? ~(long)v : new Integer(v).BitwiseNegate();
+      }
+    }
+    throw TypeError("unsupported operand type for ~: '{0}'", GetDynamicType(a).__name__);
   }
 
   public static object Call(object func, params object[] args)
@@ -297,15 +414,39 @@ public sealed class Ops
 
   public static int Compare(object a, object b)
   { if(a==b) return 0;
-
-    if(a is double && b is int) return ((double)a).CompareTo((double)(int)b);
-    if(a is int && b is double) return -((double)b).CompareTo((double)(int)a);
-
-    IComparable c = a as IComparable;
-    if(c!=null)
-      try { return c.CompareTo(b); }
-      catch(ArgumentException) { }
-    throw TypeError("can't compare {0} to {1}", GetDynamicType(a).__name__, GetDynamicType(b).__name__);
+    switch(Convert.GetTypeCode(a))
+    { case TypeCode.Boolean:
+        if(b is bool) return (bool)a ? (bool)b ? 0 : 1 : (bool)b ? -1 : 0;
+        return IntOps.Compare((bool)a ? 1 : 0, b);
+      case TypeCode.Byte: return IntOps.Compare((int)(byte)a, b);
+      case TypeCode.Char: return IntOps.Compare((int)(char)a, b);
+      case TypeCode.Double: return FloatOps.Compare((double)a, b);
+      case TypeCode.Int16: return IntOps.Compare((int)(short)a, b);
+      case TypeCode.Int32: return IntOps.Compare((int)a, b);
+      case TypeCode.Int64: return LongOps.Compare((long)a, b);
+      case TypeCode.Object:
+        if(a is Integer) return ((Integer)a).Compare(b);
+        if(a is Complex) return ((Complex)a).Compare(b);
+        if(a is ICollection || a is ISequence) return ArrayOps.Compare((Array)a, b);
+        return Invoke(a, "__cmp__", b);
+      case TypeCode.SByte: return IntOps.Compare((int)(sbyte)a, b);
+      case TypeCode.Single: return FloatOps.Compare((float)a, b);
+      case TypeCode.String:
+      { string sa=(string)a, sb = b as string;
+        if(sb!=null) return a<b ? -1 : a>b ? 1 : 0;
+        break;
+      }
+      case TypeCode.UInt16: return IntOps.Compare((int)(short)a, b);
+      case TypeCode.UInt32: 
+      { uint v = (uint)a;
+        return v<=int.MaxValue ? IntOps.Compare((int)v, b) : LongOps.Compare((long)v, b);
+      }
+      case TypeCode.UInt64:
+      { ulong v = (ulong)a;
+        return v<=long.MaxValue ? LongOps.Compare((long)v, b) : new Integer(v).Compare(b);
+      }
+    }
+    throw TypeError("can't compare '{0}' to '{1}'", GetDynamicType(a).__name__, GetDynamicType(b).__name__);
   }
 
   public static object ConvertTo(object o, Type type)
@@ -325,7 +466,10 @@ public sealed class Ops
     else if(to==from) return Conversion.Identity;
     else if(to.IsAssignableFrom(from)) return Conversion.Reference;
 
-    if(from.IsPrimitive && to.IsPrimitive) // TODO: check whether it's faster to use IndexOf() or our own loop
+    // TODO: check whether it's faster to use IndexOf() or our own loop
+    // TODO: check whether it's possible to speed up this big block of checks up somehow
+    // TODO: add support for Integer and Complex
+    if(from.IsPrimitive && to.IsPrimitive)
     { if(from==typeof(int))    return IsIn(typeConv[4], to)   ? Conversion.Unsafe : Conversion.Safe;
       if(to  ==typeof(bool))   return IsIn(typeConv[9], from) ? Conversion.None : Conversion.Safe;
       if(from==typeof(double)) return Conversion.None;
@@ -368,10 +512,33 @@ public sealed class Ops
   }
 
   public static object Divide(object a, object b)
-  { if(a is int && b is int) return (int)a/(int)b;
-    if(a is double && b is double) return (double)a/(double)b;
-    if(a is double && b is int) return (double)a/(int)b;
-    throw TypeError("unsupported operand type(s) for /: '{0}' and '{1}'", GetDynamicType(a).__name__, GetDynamicType(b).__name__);
+  { switch(Convert.GetTypeCode(a))
+    { case TypeCode.Boolean: return IntOps.Divide((bool)a ? 1 : 0, b);
+      case TypeCode.Byte:    return IntOps.Divide((int)(byte)a, b);
+      case TypeCode.Double:  return FloatOps.Divide((double)a, b);
+      case TypeCode.Int16: return IntOps.Divide((int)(short)a, b);
+      case TypeCode.Int32: return IntOps.Divide((int)a, b);
+      case TypeCode.Int64: return LongOps.Divide((long)a, b);
+      case TypeCode.Object:
+        if(a is Integer) return ((Integer)a).Divide(b);
+        if(a is Complex) return ((Complex)a).Divide(b);
+        object ret;
+        if(TryInvoke(a, "__div__", out ret, b)) return ret;
+        return Invoke(a, "__rdiv__", b);
+      case TypeCode.SByte: return IntOps.Divide((int)(sbyte)a, b);
+      case TypeCode.Single: return FloatOps.Divide((float)a, b);
+      case TypeCode.UInt16: return IntOps.Divide((int)(short)a, b);
+      case TypeCode.UInt32: 
+      { uint v = (uint)a;
+        return v<=int.MaxValue ? IntOps.Divide((int)v, b) : LongOps.Divide((long)v, b);
+      }
+      case TypeCode.UInt64:
+      { ulong v = (ulong)a;
+        return v<=long.MaxValue ? LongOps.Divide((long)v, b) : new Integer(v).Divide(b);
+      }
+    }
+    throw TypeError("unsupported operand types for /: '{0}' and '{1}'",
+                    GetDynamicType(a).__name__, GetDynamicType(b).__name__);
   }
 
   public static EOFErrorException EOFError(string format, params object[] args)
@@ -399,9 +566,33 @@ public sealed class Ops
   }
 
   public static object FloorDivide(object a, object b)
-  { if(a is int && b is int) return (int)Math.Floor((double)a/(int)b);
-    if(a is double && b is double) return Math.Floor((double)a/(double)b);
-    throw TypeError("unsupported operand type(s) for //: '{0}' and '{1}'", GetDynamicType(a).__name__, GetDynamicType(b).__name__);
+  { switch(Convert.GetTypeCode(a))
+    { case TypeCode.Boolean: return IntOps.FloorDivide((bool)a ? 1 : 0, b);
+      case TypeCode.Byte:    return IntOps.FloorDivide((int)(byte)a, b);
+      case TypeCode.Double:  return FloatOps.FloorDivide((double)a, b);
+      case TypeCode.Int16: return IntOps.FloorDivide((int)(short)a, b);
+      case TypeCode.Int32: return IntOps.FloorDivide((int)a, b);
+      case TypeCode.Int64: return LongOps.FloorDivide((long)a, b);
+      case TypeCode.Object:
+        if(a is Integer) return ((Integer)a).FloorDivide(b);
+        if(a is Complex) return ((Complex)a).Divide(b);
+        object ret;
+        if(TryInvoke(a, "__floordiv__", out ret, b)) return ret;
+        return Invoke(a, "__rfloordiv__", b)
+      case TypeCode.SByte: return IntOps.FloorDivide((int)(sbyte)a, b);
+      case TypeCode.Single: return FloatOps.FloorDivide((float)a, b);
+      case TypeCode.UInt16: return IntOps.FloorDivide((int)(short)a, b);
+      case TypeCode.UInt32: 
+      { uint v = (uint)a;
+        return v<=int.MaxValue ? IntOps.FloorDivide((int)v, b) : LongOps.FloorDivide((long)v, b);
+      }
+      case TypeCode.UInt64:
+      { ulong v = (ulong)a;
+        return v<=long.MaxValue ? LongOps.FloorDivide((long)v, b) : new Integer(v).FloorDivide(b);
+      }
+    }
+    throw TypeError("unsupported operand types for /: '{0}' and '{1}'",
+                    GetDynamicType(a).__name__, GetDynamicType(b).__name__);
   }
 
   // TODO: check whether we can eliminate this (ie, "true is true" still works)
@@ -552,14 +743,29 @@ public sealed class Ops
   }
 
   public static bool IsTrue(object o)
-  { if(o==null) return false;
-    switch(Convert.GetTypeCode(o))
-    { case TypeCode.Boolean: return (bool)o;
-      case TypeCode.Int32: return ((int)o) != 0;
-      case TypeCode.String: return ((string)o).Length != 0;
+  { if(o is bool) return (bool)o;
+    switch(Convert.GetTypeCode(a))
+    { case TypeCode.Boolean: return (bool)a;
+      case TypeCode.Byte:    return (byte)a!=0;
+      case TypeCode.Char:    return (char)c!=0;
+      case TypeCode.Double:  return (double)a!=0;
+      case TypeCode.Empty: return false;
+      case TypeCode.Int16: return (short)a!=0;
+      case TypeCode.Int32: return (int)a!=0;
+      case TypeCode.Int64: return (long)a!=0;
+      case TypeCode.Object:
+        if(a is Integer) return ((Integer)a).NonZero();
+        if(a is Complex) return ((Complex)a).NonZero();
+        if(a is ICollection) return ((ICollection)a).Count>0;
+        if(a is ISequence) return ((ISequence)a).__len__()>0;
+        return Invoke(a, "__nonzero__");
+      case TypeCode.SByte: return (sbyte)a!=0;
+      case TypeCode.Single: return (float)a!=0;
+      case TypeCode.String: return ((string)a).Length>0;
+      case TypeCode.UInt16: return (short)a!=0;
+      case TypeCode.UInt32: return (uint)a!=0;
+      case TypeCode.UInt64: return (ulong)a!=0;
     }
-    if(o is System.Collections.ICollection) return ((System.Collections.ICollection)o).Count != 0;
-    if(TryInvoke(o, "__nonzero__", out o)) return IsTrue(o);
     return true;
   }
 
@@ -568,8 +774,27 @@ public sealed class Ops
   }
 
   public static object LeftShift(object a, object b)
-  { if(a is int && b is int) return (int)a<<(int)b;
-    throw TypeError("unsupported operand type(s) for <<: '{0}' and '{1}'", GetDynamicType(a).__name__, GetDynamicType(b).__name__);
+  { switch(Convert.GetTypeCode(a))
+    { case TypeCode.Boolean: return IntOps.LeftShift((bool)a ? 1 : 0, b);
+      case TypeCode.Byte:  return IntOps.LeftShift((int)(byte)a, b);
+      case TypeCode.Int16: return IntOps.LeftShift((int)(short)a, b);
+      case TypeCode.Int32: return IntOps.LeftShift((int)a, b);
+      case TypeCode.Int64: return LongOps.LeftShift((long)a, b);
+      case TypeCode.Object:
+        if(a is Integer) return ((Integer)a).LeftShift(b);
+        object ret;
+        if(TryInvoke(a, "__lshift__", out ret, b)) return ret;
+        return Invoke(a, "__rlshift__", b);
+      case TypeCode.SByte: return IntOps.LeftShift((int)(sbyte)a, b);
+      case TypeCode.UInt16: return IntOps.LeftShift((int)(short)a, b);
+      case TypeCode.UInt32: return LongOps.LeftShift((long)(uint)v, b);
+      case TypeCode.UInt64:
+      { ulong v = (ulong)a;
+        return v<=long.MaxValue ? LongOps.LeftShift((long)v, b) : new Integer(v).LeftShift(b);
+      }
+    }
+    throw TypeError("unsupported operand types for <<: '{0}' and '{1}'",
+                    GetDynamicType(a).__name__, GetDynamicType(b).__name__);
   }
 
   public static object Less(object a, object b) { return FromBool(Compare(a,b)<0); }
@@ -587,26 +812,67 @@ public sealed class Ops
   }
 
   public static object Modulus(object a, object b)
-  { if(a is int && b is int) return (int)a%(int)b;
-    if(a is double && b is double) { return Math.IEEERemainder((double)a, (double)b); }
-    if(a is string) return StringOps.PrintF((string)a, b);
-    throw TypeError("unsupported operand type(s) for %: '{0}' and '{1}'", GetDynamicType(a).__name__, GetDynamicType(b).__name__);
+  { switch(Convert.GetTypeCode(a))
+    { case TypeCode.Boolean: return IntOps.Modulus((bool)a ? 1 : 0, b);
+      case TypeCode.Byte:    return IntOps.Modulus((int)(byte)a, b);
+      case TypeCode.Double:  return FloatOps.Modulus((double)a, b);
+      case TypeCode.Int16: return IntOps.Modulus((int)(short)a, b);
+      case TypeCode.Int32: return IntOps.Modulus((int)a, b);
+      case TypeCode.Int64: return LongOps.Modulus((long)a, b);
+      case TypeCode.Object:
+        if(a is Integer) return ((Integer)a).Modulus(b);
+        if(a is Complex) return ((Complex)a).Modulus(b);
+        object ret;
+        if(TryInvoke(a, "__mod__", out ret, b)) return ret;
+        return Invoke(a, "__rmod__", b);
+      case TypeCode.SByte: return IntOps.Modulus((int)(sbyte)a, b);
+      case TypeCode.Single: return FloatOps.Modulus((float)a, b);
+      case TypeCode.String: return StringOps.PrintF((string)a, b);
+      case TypeCode.UInt16: return IntOps.Modulus((int)(short)a, b);
+      case TypeCode.UInt32: 
+      { uint v = (uint)a;
+        return v<=int.MaxValue ? IntOps.Modulus((int)v, b) : LongOps.Modulus((long)v, b);
+      }
+      case TypeCode.UInt64:
+      { ulong v = (ulong)a;
+        return v<=long.MaxValue ? LongOps.Modulus((long)v, b) : new Integer(v).Modulus(b);
+      }
+    }
+    throw TypeError("unsupported operand types for %: '{0}' and '{1}'",
+                    GetDynamicType(a).__name__, GetDynamicType(b).__name__);
   }
 
   public static object Multiply(object a, object b)
-  { if(a is int && b is int) return (int)a*(int)b;
-    if(a is double && b is double) return (double)a*(double)b;
-    if(a is string && b is int)
-    { int count = (int)b;
-      if(count==1) return a;
-      if(count==0) return string.Empty;
-      string s = (string)a;
-      System.Text.StringBuilder sb = new System.Text.StringBuilder(s.Length*count);
-      if(s.Length==1) sb.Append(s[0], count);
-      else while(count-->0) sb.Append(s);
-      return sb.ToString();
+  { switch(Convert.GetTypeCode(a))
+    { case TypeCode.Boolean: return IntOps.Multiply((bool)a ? 1 : 0, b);
+      case TypeCode.Byte:    return IntOps.Multiply((int)(byte)a, b);
+      case TypeCode.Char:    return IntOps.Multiply((int)(char)a, b);
+      case TypeCode.Double:  return FloatOps.Multiply((double)a, b);
+      case TypeCode.Int16: return IntOps.Multiply((int)(short)a, b);
+      case TypeCode.Int32: return IntOps.Multiply((int)a, b);
+      case TypeCode.Int64: return LongOps.Multiply((long)a, b);
+      case TypeCode.Object:
+        if(a is Integer) return ((Integer)a).Multiply(b);
+        if(a is Complex) return ((Complex)a).Multiply(b);
+        if(a is ICollection || a is ISequence) return ArrayOps.Multiply((Array)a, b);
+        object ret;
+        if(TryInvoke(a, "__mul__", out ret, b)) return ret;
+        return Invoke(a, "__rmul__", b);
+      case TypeCode.SByte: return IntOps.Multiply((int)(sbyte)a, b);
+      case TypeCode.Single: return FloatOps.Multiply((float)a, b);
+      case TypeCode.String: return StringOps.Multiply((string)a, b);
+      case TypeCode.UInt16: return IntOps.Multiply((int)(short)a, b);
+      case TypeCode.UInt32: 
+      { uint v = (uint)a;
+        return v<=int.MaxValue ? IntOps.Multiply((int)v, b) : LongOps.Multiply((long)v, b);
+      }
+      case TypeCode.UInt64:
+      { ulong v = (ulong)a;
+        return v<=long.MaxValue ? LongOps.Multiply((long)v, b) : new Integer(v).Multiply(b);
+      }
     }
-    throw TypeError("unsupported operand type(s) for *: '{0}' and '{1}'", GetDynamicType(a).__name__, GetDynamicType(b).__name__);
+    throw TypeError("unsupported operand types for *: '{0}' and '{1}'",
+                    GetDynamicType(a).__name__, GetDynamicType(b).__name__);
   }
 
   public static object More(object a, object b) { return FromBool(Compare(a,b)>0); }
@@ -616,10 +882,29 @@ public sealed class Ops
   { return new NameErrorException(string.Format(format, args));
   }
 
-  public static object Negate(object o)
-  { if(o is int) return -(int)o;
-    if(o is double) return -(double)o;
-    throw TypeError("unsupported operand type for -: '{0}'", o.GetType());
+  public static object Negate(object a)
+  { switch(Convert.GetTypeCode(a))
+    { case TypeCode.Boolean: return (bool)a ? -1 : 0;
+      case TypeCode.Byte:  return -(int)(byte)a;
+      case TypeCode.Int16: return -(int)(short)a;
+      case TypeCode.Int32: return -(int)a;
+      case TypeCode.Int64: return -(long)a;
+      case TypeCode.Object:
+        if(a is Integer) return ((Integer)a).Negate();
+        if(a is Complex) return ((Complex)a).Negate();
+        return Invoke(a, "__neg__");
+      case TypeCode.SByte: return -(int)(sbyte)a;
+      case TypeCode.UInt16: return -(int)(short)a;
+      case TypeCode.UInt32:
+      { uint v = (uint)a;
+        return v<=int.MaxValue ? -(int)v : -(long)v;
+      }
+      case TypeCode.UInt64:
+      { ulong v = (ulong)a;
+        return v<=long.MaxValue ? -(long)v : new Integer(v).Negate();
+      }
+    }
+    throw TypeError("unsupported operand type for unary -: '{0}'", GetDynamicType(a).__name__);
   }
 
   public static object NotEqual(object a, object b) { return a==b ? FALSE : FromBool(Compare(a,b)!=0); }
@@ -632,38 +917,88 @@ public sealed class Ops
   { return new OSErrorException(string.Format(format, args));
   }
 
-  public static object Power(object value, object power)
-  { if(value is int && power is int) return (int)Math.Pow((int)value, (int)power);
-    if(value is double && power is double) return Math.Pow((double)value, (double)power);
-    throw TypeError("unsupported operand type(s) for **: '{0}' and '{1}'", value.GetType(), power.GetType());
+  public static object Power(object a, object b)
+  { switch(Convert.GetTypeCode(a))
+    { case TypeCode.Boolean: return IntOps.Power((bool)a ? 1 : 0, b);
+      case TypeCode.Byte:    return IntOps.Power((int)(byte)a, b);
+      case TypeCode.Double:  return FloatOps.Power((double)a, b);
+      case TypeCode.Int16: return IntOps.Power((int)(short)a, b);
+      case TypeCode.Int32: return IntOps.Power((int)a, b);
+      case TypeCode.Int64: return LongOps.Power((long)a, b);
+      case TypeCode.Object:
+        if(a is Integer) return ((Integer)a).Power(b);
+        if(a is Complex) return ((Complex)a).Power(b);
+        object ret;
+        if(TryInvoke(a, "__pow__", out ret, b)) return ret;
+        return Invoke(a, "__rpow__", b);
+      case TypeCode.SByte: return IntOps.Power((int)(sbyte)a, b);
+      case TypeCode.Single: return FloatOps.Power((float)a, b);
+      case TypeCode.UInt16: return IntOps.Power((int)(short)a, b);
+      case TypeCode.UInt32: 
+      { uint v = (uint)a;
+        return v<=int.MaxValue ? IntOps.Power((int)v, b) : LongOps.Power((long)v, b);
+      }
+      case TypeCode.UInt64:
+      { ulong v = (ulong)a;
+        return v<=long.MaxValue ? LongOps.Power((long)v, b) : new Integer(v).Power(b);
+      }
+    }
+    throw TypeError("unsupported operand types for **: '{0}' and '{1}'",
+                    GetDynamicType(a).__name__, GetDynamicType(b).__name__);
   }
-  public static object PowerMod(object value, object power, object mod) { return Modulus(Power(value, power), mod); }
+
+  public static object PowerMod(object a, object b, object c)
+  { if(Convert.GetTypeCode(a)==TypeCode.Object && !(a is Integer || a is Complex)) return Invoke(a, "__pow__", b, c);
+    return Modulus(Power(a, b), c);
+  }
 
   public static void Print(object o) { Console.Write(Str(o)); }
   public static void PrintNewline() { Console.WriteLine(); }
 
+  // TODO: handle char somehow
   public static string Repr(object o)
-  { if(o==null) return "null";
-
-    string s = o as string;
-    if(s!=null) return StringOps.Escape(s);
-
-    IRepresentable ir = o as IRepresentable;
-    if(ir!=null) return ir.__repr__();
-
-    if(o is bool) return (bool)o ? "true" : "false";
-    if(o is double) return ((double)o).ToString("R");
-    if(o is long) return ((long)o).ToString() + "L";
-
-    Array a = o as Array;
-    if(a!=null) return ArrayOps.Repr(a);
-
+  { switch(Convert.GetTypeCode(o))
+    { case TypeCode.Boolean: return (bool)o ? "true" : "false";
+      case TypeCode.Byte: case TypeCode.Int16: case TypeCode.Int32: case TypeCode.SByte: case TypeCode.UInt16:
+        return o.ToString();
+      case TypeCode.UInt32:
+      { string ret = o.ToString();
+        if((uint)o>int.MaxValue) ret += 'L';
+        return ret;
+      }
+      case TypeCode.Int64: case TypeCode.UInt64: return o.ToString()+'L';
+      case TypeCode.Single: case TypeCode.Double: return o.ToString("R");
+      case TypeCode.Object:
+        if(o is IRepresentable) return ((IRepresentable)o).__repr__();
+        if(o is Array) return ArrayOps.Repr((Array)o);
+      case TypeCode.Empty: return "null";
+      case TypeCode.String: return StringOps.Escape((string)o);
+    }
     return GetDynamicType(o).Repr(o);
   }
 
   public static object RightShift(object a, object b)
-  { if(a is int && b is int) return (int)a>>(int)b;
-    throw TypeError("unsupported operand type(s) for >>: '{0}' and '{1}'", GetDynamicType(a).__name__, GetDynamicType(b).__name__);
+  { switch(Convert.GetTypeCode(a))
+    { case TypeCode.Boolean: return IntOps.RightShift((bool)a ? 1 : 0, b);
+      case TypeCode.Byte:  return IntOps.RightShift((int)(byte)a, b);
+      case TypeCode.Int16: return IntOps.RightShift((int)(short)a, b);
+      case TypeCode.Int32: return IntOps.RightShift((int)a, b);
+      case TypeCode.Int64: return LongOps.RightShift((long)a, b);
+      case TypeCode.Object:
+        if(a is Integer) return ((Integer)a).RightShift(b);
+        object ret;
+        if(TryInvoke(a, "__rshift__", out ret, b)) return ret;
+        return Invoke(a, "__rrshift__", b);
+      case TypeCode.SByte: return IntOps.RightShift((int)(sbyte)a, b);
+      case TypeCode.UInt16: return IntOps.RightShift((int)(short)a, b);
+      case TypeCode.UInt32: return LongOps.RightShift((long)(uint)v, b);
+      case TypeCode.UInt64:
+      { ulong v = (ulong)a;
+        return v<=long.MaxValue ? LongOps.RightShift((long)v, b) : new Integer(v).RightShift(b);
+      }
+    }
+    throw TypeError("unsupported operand types for >>: '{0}' and '{1}'",
+                    GetDynamicType(a).__name__, GetDynamicType(b).__name__);
   }
 
   public static RuntimeException RuntimeError(string format, params object[] args)
@@ -707,17 +1042,44 @@ public sealed class Ops
   }
 
   public static string Str(object o)
-  { if(o is string) return (string)o;
-    if(o is bool) return (bool)o ? "true" : "false";
-    object ret;
-    if(TryInvoke(o, "__str__", out ret)) return Ops.ToString(ret);
+  { if(Convert.GetTypeCode(o)==TypeCode.Object)
+    { string ret;
+      if(TryInvoke(o, "__str__", out ret)) return Ops.ToString(ret);
+    }
     return o.ToString();
   }
 
   public static object Subtract(object a, object b)
-  { if(a is int && b is int) return (int)a-(int)b;
-    if(a is double && b is double) return (double)a-(double)b;
-    throw TypeError("unsupported operand type(s) for -: '{0}' and '{1}'", GetDynamicType(a).__name__, GetDynamicType(b).__name__);
+  { switch(Convert.GetTypeCode(a))
+    { case TypeCode.Boolean: return IntOps.Subtract((bool)a ? 1 : 0, b);
+      case TypeCode.Byte:    return IntOps.Subtract((int)(byte)a, b);
+      case TypeCode.Char:
+        if(b is char) return (char)a-(char)b;
+        break;
+      case TypeCode.Double:  return FloatOps.Subtract((double)a, b);
+      case TypeCode.Int16: return IntOps.Subtract((int)(short)a, b);
+      case TypeCode.Int32: return IntOps.Subtract((int)a, b);
+      case TypeCode.Int64: return LongOps.Subtract((long)a, b);
+      case TypeCode.Object:
+        if(a is Integer) return ((Integer)a).Subtract(b);
+        if(a is Complex) return ((Complex)a).Subtract(b);
+        object ret;
+        if(TryInvoke(a, "__sub__", out ret, b)) return ret;
+        return Invoke(b, "__rsub__", a);
+      case TypeCode.SByte: return IntOps.Subtract((int)(sbyte)a, b);
+      case TypeCode.Single: return FloatOps.Subtract((float)a, b);
+      case TypeCode.UInt16: return IntOps.Subtract((int)(short)a, b);
+      case TypeCode.UInt32: 
+      { uint v = (uint)a;
+        return v<=int.MaxValue ? IntOps.Subtract((int)v, b) : LongOps.Subtract((long)v, b);
+      }
+      case TypeCode.UInt64:
+      { ulong v = (ulong)a;
+        return v<=long.MaxValue ? LongOps.Subtract((long)v, b) : new Integer(v).Subtract(b);
+      }
+    }
+    throw TypeError("unsupported operand types for -: '{0}' and '{1}'",
+                    GetDynamicType(a).__name__, GetDynamicType(b).__name__);
   }
 
   public static SyntaxErrorException SyntaxError(string format, params object[] args)
@@ -730,45 +1092,46 @@ public sealed class Ops
     return e;
   }
 
-  public static object ToBoa(object o) { return o is char ? new string((char)o, 1) : o; }
-
   public static double ToFloat(object o)
   { if(o is double) return (double)o;
     try { return Convert.ToDouble(o); }
     catch(OverflowException) { throw ValueError("too big for float"); }
-    catch(InvalidCastException) { throw TypeError("expected float, found {0}", GetDynamicType(o).__name__); }
+    catch(InvalidCastException) { throw TypeError("expected float, but got {0}", GetDynamicType(o).__name__); }
   }
 
   public static int ToInt(object o)
   { if(o is int) return (int)o;
     try { return Convert.ToInt32(o); }
     catch(OverflowException) { throw ValueError("too big for int"); } // TODO: allow conversion to long integer?
-    catch(InvalidCastException) { throw TypeError("expected int, found {0}", GetDynamicType(o).__name__); }
+    catch(InvalidCastException) { throw TypeError("expected int, but got {0}", GetDynamicType(o).__name__); }
   }
+
   public static uint ToUInt(object o)
   { if(o is int) return (uint)(int)o;
     if(o is uint) return (uint)o;
     if(o is long)
     { long lv = (long)o;
-      if(lv>uint.MaxValue || lv<uint.MinValue) throw ValueError("too big for uint");
+      if(lv<0 || lv>uint.MaxValue) throw ValueError("too big for uint");
       return (uint)lv;
     }
-    try { return (uint)Convert.ToInt32(o); }
+    try { return Convert.ToUInt32(o); }
     catch(OverflowException) { throw ValueError("too big for uint"); } // TODO: allow conversion to long integer?
-    catch(InvalidCastException) { throw TypeError("expected uint, found {0}", GetDynamicType(o).__name__); }
+    catch(InvalidCastException) { throw TypeError("expected uint, but got {0}", GetDynamicType(o).__name__); }
   }
+
   public static long ToLong(object o)
   { if(o is long) return (long)o;
     try { return Convert.ToInt64(o); }
     catch(OverflowException) { throw ValueError("too big for long"); } // TODO: allow conversion to long integer?
-    catch(InvalidCastException) { throw TypeError("expected long, found {0}", GetDynamicType(o).__name__); }
+    catch(InvalidCastException) { throw TypeError("expected long, but got {0}", GetDynamicType(o).__name__); }
   }
+
   public static ulong ToULong(object o)
   { if(o is long) return (ulong)(long)o;
     if(o is ulong) return (ulong)o;
-    try { return (ulong)Convert.ToInt64(o); }
+    try { return Convert.ToUInt64(o); }
     catch(OverflowException) { throw ValueError("too big for ulong"); } // TODO: allow conversion to long integer?
-    catch(InvalidCastException) { throw TypeError("expected ulong, found {0}", GetDynamicType(o).__name__); }
+    catch(InvalidCastException) { throw TypeError("expected ulong, but got {0}", GetDynamicType(o).__name__); }
   }
 
   public static string ToString(object o)
