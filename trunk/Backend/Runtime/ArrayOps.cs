@@ -8,6 +8,38 @@ namespace Boa.Runtime
 public sealed class ArrayOps
 { ArrayOps() { }
 
+  public static int Compare(object a, object b)
+  { Array aa, ab, ret=null;
+    if(a is Tuple)
+    { Tuple ta = (Tuple)a, tb = b as Tuple;
+      if(tb==null) goto badTypes;
+      aa = ta.items;
+      ab = tb.items;
+    }
+    else if(a is Array)
+    { if(a.GetType()!=b.GetType()) goto badTypes;
+      aa  = (Array)a;
+      ab  = (Array)b;
+      ret = Array.CreateInstance(aa.GetType().GetElementType(), aa.Length+ab.Length);
+    }
+    else
+    { aa = ToArray(a);
+      ab = ToArray(b);
+    }
+    if(ret==null) ret = new object[aa.Length+ab.Length];
+    IList A=aa, B=ab;
+    int len = Math.Min(aa.Length, ab.Length);
+    for(int i=0; i<len; i++)
+    { int c = Ops.Compare(A[i], B[i]);
+      if(c!=0) return c;
+    }
+    return aa.Length==ab.Length ? 0 : aa.Length<ab.Length ? -1 : 1;
+
+    badTypes:
+    throw Ops.TypeError("invalid operand types for sequence comparison: '{0}' and '{1}'",
+                        Ops.TypeName(a), Ops.TypeName(b));
+  }
+
   public static int Compare(object[] arr1, int len1, object[] arr2, int len2)
   { int len = Math.Min(len1, len2);
     for(int i=0; i<len; i++)
@@ -60,13 +92,14 @@ public sealed class ArrayOps
         break;
       }
       case TypeCode.Object:
-        if(b is Integer) bv = ((Integer)b).ToInt32();
+      { if(b is Integer) bv = ((Integer)b).ToInt32();
         IConvertible ic = b as IConvertible;
         if(ic==null) return Ops.Invoke(b, "__rmul__", a);
         bv = ic.ToInt32(NumberFormatInfo.InvariantInfo);
         break;
-      case TypeCode.SByte: bv = (sbyte)b;
-      case TypeCode.UInt16: bv = (ushort)b;
+      }
+      case TypeCode.SByte: bv = (sbyte)b; break;
+      case TypeCode.UInt16: bv = (ushort)b; break;
       case TypeCode.UInt32:
       { uint ui = (uint)b;
         if(ui>int.MaxValue) throw Ops.OverflowError("long int too large to convert to int");

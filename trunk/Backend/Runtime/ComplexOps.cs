@@ -6,7 +6,7 @@ namespace Boa.Runtime
 public sealed class ComplexOps
 { ComplexOps() { }
 
-  public static Complex Add(Complex a, object b)
+  public static object Add(Complex a, object b)
   { if(b is Complex) return a + (Complex)b;
     switch(Convert.GetTypeCode(b))
     { case TypeCode.Boolean: return (bool)b ? a+1 : a;
@@ -34,7 +34,7 @@ public sealed class ComplexOps
   { throw Ops.TypeError("cannot compare complex numbers except for equality/inequality");
   }
 
-  public static Complex Divide(Complex a, object b)
+  public static object Divide(Complex a, object b)
   { if(b is Complex) return a / (Complex)b;
     switch(Convert.GetTypeCode(b))
     { case TypeCode.Boolean: return a / ((bool)b ? 1 : 0);
@@ -59,7 +59,7 @@ public sealed class ComplexOps
     throw Ops.TypeError("invalid operand types for /: '{0}' and '{1}'", Ops.TypeName(a), Ops.TypeName(b));
   }
 
-  public static Complex Multiply(Complex a, object b)
+  public static object Multiply(Complex a, object b)
   { if(b is Complex) return a * (Complex)b;
     switch(Convert.GetTypeCode(b))
     { case TypeCode.Boolean: return (bool)b ? a : new Complex(0);
@@ -85,14 +85,14 @@ public sealed class ComplexOps
 
   public static bool NonZero(Complex a) { return a.real!=0 && a.imag!=0; }
 
-  public static Complex Power(Complex a, object b)
+  public static object Power(Complex a, object b)
   { if(b is Complex) return a.Pow((Complex)b);
 
     switch(Convert.GetTypeCode(b))
     { case TypeCode.Boolean: return a.Pow((bool)b ? 1 : 0);
       case TypeCode.Byte: return a.Pow((byte)b);
       case TypeCode.Decimal:
-        return a.Pow(((IConvertible)b).ToDouble(System.Globalization.NumberFormatInfo.InvariantInfo);
+        return a.Pow(((IConvertible)b).ToDouble(System.Globalization.NumberFormatInfo.InvariantInfo));
       case TypeCode.Double: return a.Pow((double)b);
       case TypeCode.Int16: return a.Pow((short)b);
       case TypeCode.Int32: return a.Pow((int)b);
@@ -110,11 +110,11 @@ public sealed class ComplexOps
     throw Ops.TypeError("invalid operand types for **: '{0}' and '{1}'", Ops.TypeName(a), Ops.TypeName(b));
   }
   
-  public static Complex PowerMod(Complex a, object b, object c)
+  public static object PowerMod(Complex a, object b, object c)
   { throw Ops.TypeError("complex modulus not supported");
   }
 
-  public static Complex Subtract(Complex a, object b)
+  public static object Subtract(Complex a, object b)
   { if(b is Complex) return a - (Complex)b;
     switch(Convert.GetTypeCode(b))
     { case TypeCode.Boolean: return (bool)b ? a-1 : a;

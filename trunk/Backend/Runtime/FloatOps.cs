@@ -16,7 +16,7 @@ public sealed class FloatOps
       case TypeCode.Int32: return a + (int)b;
       case TypeCode.Int64: return a + (long)b;
       case TypeCode.Object:
-        if(b is Integer) return a + ((Integer)b).ToDouble(null);
+        if(b is Integer) return a + ((Integer)b).ToDouble();
         if(b is Complex) return a + (Complex)b;
         IConvertible ic = b as IConvertible;
         return ic!=null ? a + ic.ToDouble(System.Globalization.NumberFormatInfo.InvariantInfo)
@@ -42,7 +42,7 @@ public sealed class FloatOps
       case TypeCode.Int32: bv=(int)b; break;
       case TypeCode.Int64: bv=(long)b; break;
       case TypeCode.Object:
-        if(b is Integer) bv = ((Integer)b).ToDouble(null);
+        if(b is Integer) bv = ((Integer)b).ToDouble();
         IConvertible ic = b as IConvertible;
         if(ic==null) return -Ops.ToInt(Ops.Invoke(b, "__cmp__", a));
         bv = ic.ToDouble(System.Globalization.NumberFormatInfo.InvariantInfo);
@@ -70,7 +70,7 @@ public sealed class FloatOps
       case TypeCode.Int32: bv=(int)b; break;
       case TypeCode.Int64: bv=(long)b; break;
       case TypeCode.Object:
-        if(b is Integer) bv = ((Integer)b).ToDouble(null);
+        if(b is Integer) bv = ((Integer)b).ToDouble();
         IConvertible ic = b as IConvertible;
         if(ic==null)
         { object ret;
@@ -109,7 +109,7 @@ public sealed class FloatOps
       case TypeCode.Int32: return a * (int)b;
       case TypeCode.Int64: return a * (long)b;
       case TypeCode.Object:
-        if(b is Integer) return a * ((Integer)b).ToDouble(null);
+        if(b is Integer) return a * ((Integer)b).ToDouble();
         if(b is Complex) return a * (Complex)b;
         IConvertible ic = b as IConvertible;
         return ic!=null ? a * ic.ToDouble(System.Globalization.NumberFormatInfo.InvariantInfo)
@@ -135,7 +135,7 @@ public sealed class FloatOps
       case TypeCode.Int32: bv=(int)b; break;
       case TypeCode.Int64: bv=(long)b; break;
       case TypeCode.Object:
-        if(b is Integer) bv = ((Integer)b).ToDouble(null);
+        if(b is Integer) bv = ((Integer)b).ToDouble();
         IConvertible ic = b as IConvertible;
         if(ic==null) return Ops.Invoke(b, "__rpow__", a);
         bv = ic.ToDouble(System.Globalization.NumberFormatInfo.InvariantInfo);
@@ -162,7 +162,7 @@ public sealed class FloatOps
       case TypeCode.Int32: return a - (int)b;
       case TypeCode.Int64: return a - (long)b;
       case TypeCode.Object:
-        if(b is Integer) return a - ((Integer)b).ToDouble(null);
+        if(b is Integer) return a - ((Integer)b).ToDouble();
         if(b is Complex) return a - (Complex)b;
         IConvertible ic = b as IConvertible;
         return ic!=null ? a - ic.ToDouble(System.Globalization.NumberFormatInfo.InvariantInfo)
