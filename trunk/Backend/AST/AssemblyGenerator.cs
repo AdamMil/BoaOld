@@ -32,7 +32,7 @@ public class AssemblyGenerator
 { public AssemblyGenerator(string moduleName, string outFileName) : this(moduleName, outFileName, Options.Debug) { }
   public AssemblyGenerator(string moduleName, string outFileName, bool debug)
   { AssemblyName an = new AssemblyName();
-    an.Name = moduleName;
+    an.Name  = moduleName;
     Assembly = AppDomain.CurrentDomain
                  .DefineDynamicAssembly(an, AssemblyBuilderAccess.RunAndSave, null, null, null, null, null, true);
     Module   = Assembly.DefineDynamicModule(outFileName, outFileName, debug);
