@@ -37,12 +37,14 @@ public sealed class _md5
 
   public const int digest_size = 16;
 
-  public byte[] hash(string str) { return Encoding.ASCII.GetBytes(str); }
-  public byte[] hash(byte[] bytes)
+  public byte[] digest(string str) { return Encoding.ASCII.GetBytes(str); }
+  public byte[] digest(byte[] bytes)
   { MD5CryptoServiceProvider hash = new MD5CryptoServiceProvider();
     hash.Initialize();
     return hash.ComputeHash(bytes);
   }
+  public string hexdigest(string str) { return Misc.ArrayToHex(digest(str)); }
+  public string hexdigest(byte[] bytes) { return Misc.ArrayToHex(digest(bytes)); }
 
   public static md5 @new() { return new md5(); }
   public static md5 @new(byte[] bytes) { return new md5(bytes); }
@@ -66,18 +68,7 @@ public sealed class _md5
       return hash;
     }
 
-    public string hexdigest()
-    { const string hex = "0123456789abcdef";
-      StringBuilder sb = new StringBuilder(32);
-
-      byte[] hash = digest();
-      for(int i=0; i<hash.Length; i++)
-      { byte b = hash[i];
-        sb.Append(hex[b>>4]);
-        sb.Append(hex[b&0xF]);
-      }
-      return sb.ToString();
-    }
+    public string hexdigest() { return Misc.ArrayToHex(digest()); }
 
     public void update(string str) { update(Encoding.ASCII.GetBytes(str)); }
     public void update(byte[] bytes) { Update(bytes, (uint)bytes.Length); }
