@@ -8,6 +8,7 @@ using Boa.Runtime;
 // TODO: docstrings on fields and simple properties don't work because evaluating the attribute retrieves the value
 // TODO: implement reversed(): http://python.org/peps/pep-0322.html
 // TODO: add help() for functions created in boa
+// TODO: make range() and xrange() work on arbitrary integers, not only int32s
 namespace Boa.Modules
 {
 
@@ -597,7 +598,7 @@ be checked. In any other case, a TypeError exception is raised.")]
     return false;
   }
 
-  [DocString(@"enumerator(object[, sentinel]) -> iter
+  [DocString(@"iter(object[, sentinel]) -> iter
 
 Return an iterator object. The first argument is interpreted very differently
 depending on the presence of the second argument. Without a second argument,

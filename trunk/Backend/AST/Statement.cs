@@ -23,6 +23,7 @@ variables, the compiler will raise a SyntaxError unless the exec explicitly spec
 namespace for the exec. (In other words, "exec obj"would be illegal, but "exec obj in ns" would be legal.) 
 */
 // TODO: make sure all enumerators can handle the underlying collection being changed, if possible
+// TODO: implement 'break' and 'continue' inside 'finally' blocks
 
 // TODO: using exceptions is very slow
 #region Exceptions (used to aid implementation)
@@ -39,7 +40,6 @@ public class ReturnException : Exception
 #endregion
 
 #region Walkers
-// TODO: implement 'break' and 'continue' inside 'finally' blocks
 #region JumpFinder
 class JumpFinder : IWalker
 { public JumpFinder(Label start, Label end) { this.start=start; this.end=end; }
@@ -68,6 +68,25 @@ class JumpFinder : IWalker
 
   Label start, end;
   int inTry;
+}
+#endregion
+
+#region NameFinder
+public class NameFinder : IWalker
+{ public static Name[] Find(Node n)
+  { NameFinder nf = new NameFinder();
+    n.Walk(nf);
+    return (Name[])nf.names.ToArray(typeof(Name));
+  }
+  
+  public void PostWalk(Node n) { }
+
+  public bool Walk(Node n)
+  { if(n is NameExpression) names.Add(((NameExpression)n).Name);
+    return true;
+  }
+
+  ArrayList names = new ArrayList();
 }
 #endregion
 
