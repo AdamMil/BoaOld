@@ -136,24 +136,35 @@ public sealed class binascii
       byte a, b, c, d;
 
       while(p<e)
-      { do a=cp[(byte)*p++]; while(a==255 && p<e); if(p==e) break;
-        do b=cp[(byte)*p++]; while(b==255 && p<e); if(p==e) break;
-        do c=cp[(byte)*p++]; while(c==255 && p<e); if(p==e) c=d=64;
-        do d=cp[(byte)*p++]; while(d==255 && p<e); if(p==e) d=64;
-        if(c==64)
+      { do
+        { a=cp[(byte)*p++]; 
+          if(p==e) goto breakout;
+        } while(a==255);
+        
+        do
+        { b=cp[(byte)*p++]; 
+          if(p==e) goto breakout;
+        } while(b==255);
+
+        do c=cp[(byte)*p++]; while(c==255 && p<e);
+        if(p==e || c==64)
         { *o++ = (byte)((a<<2) | ((b>>4)&3));
           break;
         }
-        if(d==64)
+
+        do d=cp[(byte)*p++]; while(d==255 && p<e);
+        if(p==e || d==64)
         { *o++ = (byte)((a<<2) | ((b>>4)&3));
           *o++ = (byte)((b<<4) | ((c>>2)&0xF));
           break;
         }
+
         *o++ = (byte)((a<<2) | ((b>>4)&3));
         *o++ = (byte)((b<<4) | ((c>>2)&0xF));
         *o++ = (byte)((c<<6) | d);
       }
-      
+
+      breakout:
       int len = (int)(o-op);
       if(len==output.Length) return output;
       byte[] narr = new byte[len];
