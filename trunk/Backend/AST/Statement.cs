@@ -265,7 +265,8 @@ public abstract class Statement : Node
         }
         else if(node is ImportFromStatement)
         { ImportFromStatement imp = (ImportFromStatement)node;
-          if(imp.Names[0].Name=="*") ; // FIXME: handle this case
+          if(imp.Names[0].Name=="*") // TODO: perhaps this should be disallowed within other contexts as well
+            Ops.SyntaxError(node, "'from ... import *' is disallowed within function definitions");
           foreach(ImportName n in imp.Names) AddName(new Name(n.AsName==null ? n.Name : n.AsName, Scope.Local));
         }
         else if(node is NameExpression)

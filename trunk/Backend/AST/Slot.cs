@@ -63,42 +63,6 @@ public class ArgSlot : Slot
 }
 #endregion
 
-#region ClosedSlot
-public class ClosedSlot : Slot
-{ public ClosedSlot(Slot slot) { Storage=slot; }
-  public ClosedSlot(CodeGenerator cg, string name)
-  { Storage = new LocalSlot(cg.ILG.DeclareLocal(typeof(ClosedVar)), name);
-    cg.EmitString(name);
-    cg.EmitNew(typeof(ClosedVar), new Type[] { typeof(string) });
-    Storage.EmitSet(cg);
-  }
-
-  public override Type Type { get { return typeof(ClosedVar); } }
-
-  public override void EmitGet(CodeGenerator cg)
-  { Storage.EmitGet(cg);
-    cg.EmitFieldGet(typeof(ClosedVar), "Value");
-  }
-  public override void EmitGetAddr(CodeGenerator cg)
-  { Storage.EmitGet(cg);
-    cg.EmitFieldGetAddr(typeof(ClosedVar), "Value");
-  }
-  public override void EmitSet(CodeGenerator cg)
-  { Slot temp = cg.AllocLocalTemp(typeof(object));
-    temp.EmitSet(cg);
-    EmitSet(cg, temp);
-    cg.FreeLocalTemp(temp);
-  }
-  public override void EmitSet(CodeGenerator cg, Slot val)
-  { Storage.EmitGet(cg);
-    val.EmitGet(cg);
-    cg.EmitFieldSet(typeof(ClosedVar), "Value");
-  }
-
-  public Slot Storage;
-}
-#endregion
-
 #region FieldSlot
 public class FieldSlot : Slot
 { public FieldSlot(FieldInfo fi) { Info=fi; }
@@ -110,7 +74,7 @@ public class FieldSlot : Slot
   { if(Instance!=null) Instance.EmitGet(cg);
     cg.EmitFieldGet(Info);
   }
-  
+
   public override void EmitGetAddr(CodeGenerator cg)
   { if(Instance!=null) Instance.EmitGet(cg);
     cg.EmitFieldGetAddr(Info);

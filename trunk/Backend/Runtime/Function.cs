@@ -153,54 +153,34 @@ public abstract class Function : IFancyCallable
 
 #region Compiled functions
 public delegate object CallTargetN(params object[] args);
-public delegate object CallTargetFN(CompiledFunction func, params object[] args);
 
 public abstract class CompiledFunction : Function
-{ public CompiledFunction(string name, string[] names, object[] defaults, bool list, bool dict, int required,
-                          ClosedVar[] closed)
-    : base(name, names, defaults, list, dict, required) { Closed=closed; }
+{ public CompiledFunction(string name, string[] names, object[] defaults, bool list, bool dict, int required)
+    : base(name, names, defaults, list, dict, required) { }
 
-  public ClosedVar[] Closed;
+  public override object Call(params object[] args) { return DoCall(FixArgs(args)); }
+
+  public override object Call(object[] positional, string[] names, object[] values)
+  { return DoCall(MakeArgs(positional, names, values));
+  }
+
+  protected abstract object DoCall(object[] args);
 }
 
 public sealed class CompiledFunctionN : CompiledFunction
 { public CompiledFunctionN(string name, string[] names, object[] defaults, bool list, bool dict, int required,
-                           ClosedVar[] closed, CallTargetN target)
-    : base(name, names, defaults, list, dict, required, closed) { Target=target; }
-
-  public override object Call(params object[] args) { return Target(FixArgs(args)); }
-
-  public override object Call(object[] positional, string[] names, object[] values)
-  { return Target(MakeArgs(positional, names, values));
-  }
+                           CallTargetN target)
+    : base(name, names, defaults, list, dict, required) { Target=target; }
 
   public override Function MakeMarked(FunctionType type)
-  { Function f = new CompiledFunctionN(Name, ParamNames, Defaults, HasList, HasDict, NumRequired, Closed, Target);
+  { Function f = new CompiledFunctionN(Name, ParamNames, Defaults, HasList, HasDict, NumRequired, Target);
     f.Type = type;
     return f;
   }
+
+  protected override object DoCall(object[] args) { return Target(args); }
 
   CallTargetN Target;
-}
-
-public sealed class CompiledFunctionFN : CompiledFunction
-{ public CompiledFunctionFN(string name, string[] names, object[] defaults, bool list, bool dict, int required,
-                            ClosedVar[] closed, CallTargetFN target)
-    : base(name, names, defaults, list, dict, required, closed) { Target=target; }
-
-  public override object Call(params object[] args) { return Target(this, FixArgs(args)); }
-
-  public override object Call(object[] positional, string[] names, object[] values)
-  { return Target(this, MakeArgs(positional, names, values));
-  }
-
-  public override Function MakeMarked(FunctionType type)
-  { Function f = new CompiledFunctionFN(Name, ParamNames, Defaults, HasList, HasDict, NumRequired, Closed, Target);
-    f.Type = type;
-    return f;
-  }
-
-  CallTargetFN Target;
 }
 #endregion
 

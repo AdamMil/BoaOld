@@ -582,9 +582,7 @@ public sealed class Ops
   { string[] names = new string[parms.Length];
     for(int i=0; i<parms.Length; i++) names[i] = parms[i].Name.String;
     if(target is CallTargetN)
-      return new CompiledFunctionN(name, names, null, false, false, names.Length, null, (CallTargetN)target);
-    else if(target is CallTargetFN)
-      return new CompiledFunctionFN(name, names, null, false, false, names.Length, null, (CallTargetFN)target);
+      return new CompiledFunctionN(name, names, null, false, false, names.Length, (CallTargetN)target);
     else throw new ArgumentException("Unhandled target type: " + target.GetType().FullName);
   }
 

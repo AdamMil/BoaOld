@@ -153,6 +153,10 @@ public class FrameNamespace : Namespace
 public class LocalNamespace : Namespace
 { public LocalNamespace(Namespace parent, CodeGenerator cg) : base(parent, cg) { }
 
+  public void AddClosedVars(Name[] names, Slot[] slots)
+  { for(int i=0; i<names.Length; i++) this.slots[names[i].String] = slots[i];
+  }
+
   public override void DeleteSlot(Name name)
   { if(name.Scope==Scope.Global) // TODO: handle Free variables here?
     { Namespace par = Parent;
@@ -185,6 +189,7 @@ public class LocalNamespace : Namespace
 
   public void SetArgs(Name[] names, CodeGenerator cg, Slot objArray)
   { if(names.Length==0) return;
+    // TODO: this should be optimized out by not using object[] param arrays everywhere
     objArray.EmitGet(cg);
     for(int i=0; i<names.Length; i++)
     { if(i!=names.Length-1) cg.ILG.Emit(OpCodes.Dup);
@@ -196,16 +201,9 @@ public class LocalNamespace : Namespace
     }
   }
 
-  public void UnpackClosedVar(Name name, CodeGenerator cg)
-  { Slot slot = new LocalSlot(codeGen.ILG.DeclareLocal(typeof(ClosedVar)), name.String);
-    slot.EmitSet(cg);
-    slots[name.String] = new ClosedSlot(slot);
-  }
-
   protected override Slot MakeSlot(Name name)
   { switch(name.Scope)
-    { case Scope.Closed: return new ClosedSlot(codeGen, name.String);
-      case Scope.Free: case Scope.Global:
+    { case Scope.Free: case Scope.Global:
       { Namespace par = Parent;
         while(par!=null && !(par is FrameNamespace)) par = par.Parent;
         if(par==null) throw new InvalidOperationException("There is no FrameNamespace in the hierachy");

@@ -43,8 +43,7 @@ public class SnippetMaker
   public static Snippet Generate(Statement body) { return Generate(body, "code_"+Misc.NextIndex); }
   public static Snippet Generate(Statement body, string typeName)
   { TypeGenerator tg = Assembly.DefineType(TypeAttributes.Public|TypeAttributes.Sealed, typeName, typeof(Snippet));
-    CodeGenerator cg = tg.DefineMethod(MethodAttributes.Public|MethodAttributes.Virtual, "Run",
-                                       typeof(void), new Type[] { typeof(Frame) });
+    CodeGenerator cg = tg.DefineMethodOverride(typeof(Snippet).GetMethod("Run"), true);
     FrameNamespace fns = new FrameNamespace(tg, cg);
     cg.Namespace = fns;
 

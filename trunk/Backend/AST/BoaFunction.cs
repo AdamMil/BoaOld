@@ -51,10 +51,6 @@ public sealed class BoaFunction : Node
   { Initialize();
     index = Misc.NextIndex;
     CodeGenerator impl = MakeImplMethod(cg);
-    Type targetType = Inherit==null ? typeof(CallTargetN) : typeof(CallTargetFN);
-    Type funcType   = Inherit==null ? typeof(CompiledFunctionN) : typeof(CompiledFunctionFN);
-    Type[] consTypes = { typeof(string), typeof(string[]), typeof(object[]), typeof(bool), typeof(bool),
-                        typeof(int), typeof(ClosedVar[]), targetType };
 
     cg.EmitString(Name==null ? null : Name.String);
     EmitNames(cg);
@@ -62,11 +58,25 @@ public sealed class BoaFunction : Node
     cg.EmitBool(hasList);
     cg.EmitBool(hasDict);
     cg.EmitInt(numRequired);
-    EmitClosedGet(cg);
-    cg.ILG.Emit(OpCodes.Ldnull); // create delegate
-    cg.ILG.Emit(OpCodes.Ldftn, (MethodInfo)impl.MethodBase);
-    cg.EmitNew((ConstructorInfo)targetType.GetMember(".ctor")[0]);
-    cg.EmitNew(funcType, consTypes);
+    if(Inherit==null)
+    { cg.ILG.Emit(OpCodes.Ldnull); // create delegate
+      cg.ILG.Emit(OpCodes.Ldftn, (MethodInfo)impl.MethodBase);
+      cg.EmitNew((ConstructorInfo)typeof(CallTargetN).GetMember(".ctor")[0]);
+      cg.EmitNew(typeof(CompiledFunctionN),
+                 new Type[] { typeof(string), typeof(string[]), typeof(object[]), typeof(bool), typeof(bool),
+                              typeof(int), typeof(CallTargetN) });
+    }
+    else
+    { Type type = impl.TypeGenerator.TypeBuilder;
+      cg.EmitNew(type, new Type[] { typeof(string), typeof(string[]), typeof(object[]), typeof(bool), typeof(bool),
+                                    typeof(int) });
+      for(int i=0; i<Inherit.Length; i++)
+      { cg.ILG.Emit(OpCodes.Dup);
+        cg.Namespace.GetSlotForGet(Inherit[i]).EmitGet(cg);
+        cg.EmitFieldSet(((FieldSlot)impl.Namespace.GetSlotForSet(Inherit[i])).Info);
+      }
+    }
+
     if(docstring!=null)
     { cg.ILG.Emit(OpCodes.Dup);
       cg.EmitString(docstring);
@@ -215,8 +225,7 @@ public sealed class BoaFunction : Node
       else
       { TypeGenerator tg = cg.TypeGenerator.DefineNestedType(TypeAttributes.Sealed, FuncName+index,
                                                              typeof(Generator));
-        CodeGenerator ncg = tg.DefineMethod(MethodAttributes.Virtual|MethodAttributes.Family, 
-                                            "InnerNext", typeof(bool), new Type[] { Misc.TypeOfObjectRef });
+        CodeGenerator ncg = tg.DefineMethodOverride(typeof(Generator), "InnerNext");
         ncg.IsGenerator = true;
         ncg.Namespace   = new FieldNamespace(cg.Namespace, "_", ncg, new ThisSlot(tg.TypeBuilder));
         ncg.Namespace.SetArgs(parmNames, 0, ncg.MethodBase);
@@ -250,31 +259,6 @@ public sealed class BoaFunction : Node
     finally { Options.Interactive = interactive; }
   }
 
-  void EmitClosedGet(CodeGenerator cg)
-  { if(Inherit==null) cg.ILG.Emit(OpCodes.Ldnull);
-    else
-    { cg.EmitNewArray(typeof(ClosedVar), Inherit.Length);
-      ConstructorInfo ci = typeof(ClosedVar).GetConstructor(new Type[] { typeof(string) });
-      FieldInfo fi = typeof(ClosedVar).GetField("Value");
-
-      for(int i=0; i<Inherit.Length; i++)
-      { cg.ILG.Emit(OpCodes.Dup);
-        cg.EmitInt(i);
-        Slot slot = cg.Namespace.GetLocalSlot(Inherit[i]);
-        ClosedSlot cs = slot as ClosedSlot;
-        if(cs!=null) cs.Storage.EmitGet(cg);
-        else
-        { cg.EmitString(Inherit[i].String);
-          cg.EmitNew(ci);
-          cg.ILG.Emit(OpCodes.Dup);
-          slot.EmitGet(cg);
-          cg.EmitFieldSet(fi);
-        }
-        cg.ILG.Emit(OpCodes.Stelem_Ref);
-      }
-    }
-  }
-  
   void EmitDefaults(CodeGenerator cg)
   { if(numOptional==0) { cg.ILG.Emit(OpCodes.Ldnull); return; }
     if(defaultSlot!=null) { defaultSlot.EmitGet(cg); return; }
@@ -339,27 +323,52 @@ public sealed class BoaFunction : Node
   { Name[] names = new Name[Parameters.Length]; 
     for(int i=0; i<Parameters.Length; i++) names[i] = Parameters[i].Name;
 
-    Type[] parmTypes = Inherit==null ? new Type[] { typeof(object[]) }
-                                     : new Type[] { typeof(CompiledFunction), typeof(object[]) };
-    CodeGenerator icg = cg.TypeGenerator.DefineMethod(FuncName + "$f" + index, typeof(object), parmTypes);
+    CodeGenerator icg;
+    Slot[] closedSlots=null;
+    if(Inherit==null || Inherit.Length==0)
+      icg = cg.TypeGenerator.DefineMethod(FuncName + "$f" + index, typeof(object), new Type[] { typeof(object[]) });
+    else
+    { closedSlots = new Slot[Inherit.Length];
+      TypeGenerator tg = SnippetMaker.Assembly.DefineType(TypeAttributes.Public|TypeAttributes.Sealed,
+                                                          FuncName+"$cf"+index, typeof(CompiledFunction));
+      for(int i=0; i<Inherit.Length; i++) closedSlots[i] = tg.DefineField(Inherit[i].String+"$cv", typeof(object));
+
+      // make the constructor and the MakeMarked function
+      { CodeGenerator ccg = tg.DefineChainedConstructor(typeof(CompiledFunction).GetConstructors()[0]);
+        ccg.EmitReturn();
+        ccg.Finish();
+
+        icg = tg.DefineMethodOverride(typeof(Function).GetMethod("MakeMarked"), true);
+        icg.EmitThis();
+        icg.EmitFieldGet(typeof(Function), "Name");
+        icg.EmitThis();
+        icg.EmitFieldGet(typeof(Function), "ParamNames");
+        icg.EmitThis();
+        icg.EmitFieldGet(typeof(Function), "Defaults");
+        icg.EmitThis();
+        icg.EmitFieldGet(typeof(Function), "HasList");
+        icg.EmitThis();
+        icg.EmitFieldGet(typeof(Function), "HasDict");
+        icg.EmitThis();
+        icg.EmitFieldGet(typeof(Function), "NumRequired");
+        icg.EmitNew((ConstructorInfo)ccg.MethodBase);
+        icg.ILG.Emit(OpCodes.Dup);
+        icg.EmitArgGet(0);
+        icg.EmitFieldSet(typeof(Function), "Type");
+        icg.EmitReturn();
+        icg.Finish();
+      }
+
+      icg = tg.DefineMethodOverride(typeof(CompiledFunction), "DoCall", true);
+    }
+
     LocalNamespace ns = new LocalNamespace(cg.Namespace, icg);
     icg.Namespace = ns;
-    //icg.SetArgs(names, 1);
-    ns.SetArgs(names, icg,
-               new ArgSlot((MethodBuilder)icg.MethodBase, Inherit==null ? 0 : 1, "$names", typeof(object[])));
-
-    if(Inherit!=null && Inherit.Length>0)
-    { icg.EmitArgGet(0);
-      icg.EmitFieldGet(typeof(CompiledFunction), "Closed");
-      for(int i=0; i<Inherit.Length; i++)
-      { if(i!=Inherit.Length-1) icg.ILG.Emit(OpCodes.Dup);
-        icg.EmitInt(i);
-        icg.ILG.Emit(OpCodes.Ldelem_Ref);
-        ns.UnpackClosedVar(Inherit[i], icg);
-      }
-    }
+    ns.SetArgs(names, icg, new ArgSlot((MethodBuilder)icg.MethodBase, 0, "$names", typeof(object[])));
+    if(Inherit!=null) ns.AddClosedVars(Inherit, closedSlots);
     EmitBody(icg, names);
     icg.Finish();
+    if(Inherit!=null) icg.TypeGenerator.FinishType();
     return icg;
   }
 
