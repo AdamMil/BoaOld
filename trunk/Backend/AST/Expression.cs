@@ -1072,25 +1072,35 @@ public class TupleExpression : Expression
   public override void Assign(object value, Frame frame)
   { if(value is ISequence)
     { ISequence seq = (ISequence)value;
-      if(seq.__len__() != Expressions.Length) throw Ops.ValueError("wrong number of values to unpack");
+      if(seq.__len__() != Expressions.Length) goto badlen;
       for(int i=0; i<Expressions.Length; i++) Expressions[i].Assign(seq.__getitem__(i), frame);
     }
     else if(value is string)
     { string s = (string)value;
-      if(s.Length != Expressions.Length) throw Ops.ValueError("wrong number of values to unpack");
+      if(s.Length != Expressions.Length) goto badlen;
       for(int i=0; i<Expressions.Length; i++) Expressions[i].Assign(new string(s[i], 1), frame);
     }
     else if(value is IList)
     { IList ls = (IList)value;
-      if(ls.Count != Expressions.Length) throw Ops.ValueError("wrong number of values to unpack");
+      if(ls.Count != Expressions.Length) goto badlen;
       for(int i=0; i<Expressions.Length; i++) Expressions[i].Assign(ls[i], frame);
+    }
+    else if(value is ICollection)
+    { ICollection col = (ICollection)value;
+      if(col.Count != Expressions.Length) goto badlen;
+      IEnumerator e = col.GetEnumerator();
+      for(int i=0; i<Expressions.Length; i++)
+      { e.MoveNext();
+        Expressions[i].Assign(e.Current, frame);
+      }
     }
     else // assume it's a sequence
     { object getitem = Ops.GetAttr(value, "__getitem__");
-      if(Ops.ToInt(Ops.Call(Ops.GetAttr(value, "__len__")))!=Expressions.Length)
-        throw Ops.ValueError("too many values to unpack");
+      if(Ops.ToInt(Ops.Call(Ops.GetAttr(value, "__len__")))!=Expressions.Length) goto badlen;
       for(int i=0; i<Expressions.Length; i++) Expressions[i].Assign(Ops.Call(getitem, i), frame);
     }
+    return;
+    badlen: throw Ops.ValueError("wrong number of values to unpack");
   }
 
   public override void Emit(CodeGenerator cg)
