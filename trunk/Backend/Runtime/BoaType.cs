@@ -58,6 +58,7 @@ public abstract class BoaType : DynamicType, IDynamicObject, ICallable, IHasAttr
   }
   #endregion
 
+  // TODO: should this include virtual slots like __dict__ ?
   public override List GetAttrNames(object self) { return __attrs__(); }
   public override bool GetAttr(object self, string name, out object value)
   { value = __getattr__(name);

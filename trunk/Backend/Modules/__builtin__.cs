@@ -66,6 +66,12 @@ public sealed class __builtin__
   
   #region XRange
   [BoaType("xrange")]
+  [DocString(@"xrange([start,] stop[, step])
+This function is very similar to range(), but returns an 'xrange object'
+instead of a list. This is an opaque sequence type which yields the same
+values as the corresponding list, without actually storing them all
+simultaneously. xrange() is useful when when working with very large
+sequences or when many of a range's elements are never used.")]
   public class XRange : IEnumerable, ISequence, IRepresentable
   { public XRange(int stop) : this(0, stop, 1) { }
     public XRange(int start, int stop) : this(start, stop, 1) { }
@@ -145,20 +151,71 @@ public sealed class __builtin__
   public static string __repr__() { return __str__(); }
   public static string __str__() { return "<module '__builtin__' (built-in)>"; }
 
+  [DocString(@"abs(object)
+
+Return the absolute value of a number. The argument may be a plain or long
+integer or a floating point number. If the argument is a complex number, its
+magnitude is returned.")]
   public static object abs(object o)
   { if(o is int) return Math.Abs((int)o);
     if(o is double) return Math.Abs((double)o);
     return Ops.Invoke(o, "__abs__");
   }
 
-  public static object apply(object func, object args) { return Ops.CallWithArgsSequence(func, args); }
+  [DocString(@"bool([x])
+
+Convert a value to a Boolean, using the standard truth testing procedure.
+If x is false or omitted, this returns false; otherwise it returns true.")]
+  public static object @bool() { return Ops.FALSE; }
   public static object @bool(object o) { return Ops.FromBool(Ops.IsTrue(o)); }
+
+  [DocString(@"callable(object)
+
+Return true if the object argument appears callable, false if not. If this
+returns true, it is still possible that a call fails, but if it is false,
+calling object will never succeed. Note that classes are callable (calling
+a class returns a new instance); class instances are callable if they have
+a __call__()  method.")]
   public static object callable(object o) { return o is ICallable ? Ops.TRUE : hasattr(o, "__call__"); }
+
+  
+  [DocString(@"chr(i)
+
+Return a string of one character whose ASCII code is the integer passed.
+For example, chr(97) returns the string 'a'. This is the inverse of ord().")]
   public static string chr(int value) { return new string((char)value, 1); }
+
+  [DocString(@"cmp(x, y)
+
+Compare the two objects x and y and return an integer according to the
+outcome. The return value is negative if x<y, zero if x==y and strictly
+positive if x>y.")]
   public static int cmp(object a, object b) { return Ops.Compare(a, b); }
+
+  // TODO: compile(string, filename, kind[, flags[, dont_inherit]])
+
+  [DocString(@"delattr(object, name)
+
+This is a relative of setattr(). The arguments are an object and a string.
+The string must be the name of one of the object's attributes. The function
+deletes the named attribute, provided the object allows it. For example,
+delattr(x, 'foobar') is equivalent to del x.foobar.")]
   public static void delattr(object o, string name) { Ops.DelAttr(o, name); }
 
   // FIXME: dir() without args should return local variables, not module variables (but this is complicated)
+  [DocString(@"dir([object])
+
+Without arguments, return the list of names in the current local symbol
+table. With an argument, attempts to return a list of valid attributes
+for that object. This information is gleaned from the object's __dict__
+attribute, if defined, and from the class or type object. The list is
+not necessarily complete. If the object is a module object, the list
+contains the names of the module's attributes. If the object is a type or
+class object, the list contains the names of its attributes, and recursively
+of the attributes of its bases. Otherwise, the list contains the object's
+attributes' names, the names of its class's attributes, and recursively of
+the attributes of its class's base classes. The resulting list is sorted
+alphabetically.")]
   public static List dir() { return dir(Ops.GetExecutingModule()); }
   public static List dir(object o)
   { List list = Ops.GetAttrNames(o);
@@ -166,21 +223,81 @@ public sealed class __builtin__
     return list;
   }
 
+  // FIXME: make this conform to the docstring
+  [DocString(@"divmod(a, b)
+
+Take two (non complex) numbers as arguments and return a pair of numbers
+consisting of their quotient and remainder when using long division. With
+mixed operand types, the rules for binary arithmetic operators apply. For
+plain and long integers, the result is the same as (a / b, a % b). For
+floating point numbers the result is (q, a % b), where q is usually
+math.floor(a / b) but may be 1 less than that. In any case q * b + a % b
+is very close to a, if a % b is non-zero it has the same sign as b, and
+0 <= abs(a % b) < abs(b).")]
   public static Tuple divmod(object a, object b) { return new Tuple(Ops.Divide(a, b), Ops.Modulus(a, b)); }
+
+  [DocString(@"enumerate(object)
+
+Return an enumerator object. The argument must be a sequence, an iterator,
+or some other object which supports iteration. The next() method of the
+iterator returned by enumerate() returns a tuple containing a count (from
+zero) and the corresponding value obtained from iterating over iterable.
+enumerate() is useful for obtaining an indexed series:
+(0, seq[0]), (1, seq[1]), (2, seq[2])")]
   public static IEnumerator enumerate(object o) { return new EnumerateEnumerator(Ops.GetEnumerator(o)); }
 
-  public static object eval(string expr)
+  [DocString(@"eval(expression[, globals[, locals]])
+
+The arguments are a string and two optional dictionaries. The expression
+argument is parsed and evaluated as a Boa expression using the globals and
+locals dictionaries as global and local name space. If the locals dictionary
+is omitted it defaults to the globals dictionary. If both dictionaries are
+omitted, the expression is executed in the environment where eval is called.
+The return value is the result of the evaluated expression. Syntax errors
+are reported as exceptions. Example:
+
+  >>> x = 1
+  >>> print eval('x+1')
+  2
+
+This function can also be used to execute arbitrary code objects (such as
+those created by compile()). In this case pass a code object instead of a
+string.
+
+Hints: dynamic execution of statements is supported by the exec statement.
+Execution of statements from a file is supported by the execfile() function.
+The globals() and locals() functions returns the current global and local
+dictionary, respectively, which may be useful to pass around for use by
+eval() or execfile().")]
+  public static object eval(object expr)
   { IDictionary dict = (IDictionary)globals();
     return eval(expr, dict, dict);
   }
-  public static object eval(string expr, IDictionary globals) { return eval(expr, globals, globals); }
-  public static object eval(string expr, IDictionary globals, IDictionary locals)
+  public static object eval(object expr, IDictionary globals) { return eval(expr, globals, globals); }
+  public static object eval(object expr, IDictionary globals, IDictionary locals)
   { Frame frame = new Frame(locals, globals);
-    Ops.Frames.Push(frame);
-    try { return Parser.FromString(expr).ParseExpression().Evaluate(frame); }
+    try
+    { Ops.Frames.Push(frame);
+      if(expr is string) return Parser.FromString((string)expr).ParseExpression().Evaluate(frame);
+      else throw new NotImplementedException();
+    }
     finally { Ops.Frames.Pop(); }
   }
 
+  // TODO: execfile(filename[, globals[, locals]])
+
+  [DocString(@"filter(function, sequence)
+
+Construct a list from those elements of list for which function returns true.
+list may be either a sequence, a container which supports iteration, or an
+iterator, If list  is a string or a tuple, the result also has that type;
+otherwise it is always a list. If function is null, the identity function is
+assumed, that is, all elements of list that are false (zero or empty) are
+removed.
+
+Note that filter(function, list) is equivalent to
+[item for item in list if function(item)] if function is not null and
+[item for item in list if item] if function is null.")]
   public static object filter(object function, object seq)
   { if(seq is string)
     { if(function==null) return seq;
@@ -206,29 +323,79 @@ public sealed class __builtin__
     }
   }
 
+  [DocString(@"float([value])
+
+Convert a string or a number to floating point. If the argument is a string,
+it must contain a possibly signed decimal or floating point number, possibly
+embedded in whitespace. Otherwise, the argument may be a plain or long
+integer or a floating point number, and a floating point number with the same
+value (within Boa's floating point precision) is returned. If no argument is
+given, returns 0.")]
+  public static double @float() { return 0.0; }
   public static double @float(string s) { return double.Parse(s); }
   public static double @float(object o) { return Ops.ToFloat(o); }
 
+  [DocString(@"getattr(object, name[, default])
+
+Return the value of the named attribute of an object. The name must be a
+string. If the string is the name of one of the object's attributes, the
+result is the value of that attribute. For example, getattr(x, 'foobar') is
+equivalent to x.foobar. If the named attribute does not exist, default is
+returned if provided, otherwise AttributeError is raised.")]
   public static object getattr(object o, string name) { return Ops.GetAttr(o, name); }
   public static object getattr(object o, string name, object defaultValue)
   { object ret;
     return Ops.GetAttr(o, name, out ret) ? ret : defaultValue;
   }
 
-  public static object globals() { return Ops.GetExecutingModule().__dict__; }
-  public static object hasattr(object o, string name) { object dummy; return Ops.GetAttr(o, name, out dummy); }
+  [DocString(@"globals()
 
-  // FIXME: python says: Numeric values that compare equal have the same hash value (even if they are of
-  //                     different types, as is the case for 1 and 1.0).
+Return a dictionary representing the current global symbol table. This is
+always the dictionary of the current module (inside a function or method,
+this is the module where it is defined, not the module from which it is
+called).")]
+  public static object globals() { return Ops.GetExecutingModule().__dict__; }
+
+  [DocString(@"hasattr(object, name)
+
+The arguments are an object and a string. The result is true if the string
+is the name of one of the object's attributes, false if not.")]
+  public static object hasattr(object o, string name)
+  { object dummy;
+    return Ops.FromBool(Ops.GetAttr(o, name, out dummy));
+  }
+
+  // FIXME: python says: Numeric values that compare equal have the same hash value (even if they are of different types, as is the case for 1 and 1.0).
+  [DocString(@"hash(object)
+
+Return the hash value of the object (if it has one). Hash values are
+integers. They are used to quickly compare dictionary keys during a
+dictionary lookup.")]
   public static int hash(object o) { return o.GetHashCode(); }
 
-  public static void help() { }
+  [DocString(@"help([object])
+
+Invoke the built-in help system (intended for interactive use). If no
+argument is given, the interactive help system starts on the interpreter
+console. If the argument is a string, then the string is looked up as the
+name of a module, function, class, method, keyword, or documentation topic,
+and a help page is printed on the console. If the argument is any other kind
+of object, a help page on the object is generated.")]
+  public static void help() { throw new NotImplementedException(); }
   public static void help(object o)
   { object doc;
     if(Ops.GetAttr(o, "__doc__", out doc)) Console.WriteLine(doc);
     else Console.WriteLine("No help available for {0}.", Ops.GetDynamicType(o).__name__);
   }
 
+  [DocString(@"hex(number)
+
+Convert an integer number (of any size) to a hexadecimal string. The result
+is a valid Boa expression. Note: this always yields an unsigned literal.
+For example, on a 32-bit machine, hex(-1) yields '0xffffffff'. When
+evaluated on a machine with the same word size, this literal is evaluated
+as -1; at a different word size, it may turn up as a large positive number
+or raise an OverflowError exception.")]
   public static object hex(object o)
   { if(o is int) return "0x" + ((int)o).ToString("x");
     if(o is long) return "0x" + ((int)o).ToString("x") + "L";
@@ -237,14 +404,33 @@ public sealed class __builtin__
 
   public static int id(object o) { throw new NotImplementedException(); }
 
+  [DocString(@"input([prompt])
+
+If the prompt argument is present, it is written to standard output without
+a trailing newline. The function then reads a line from input, converts it
+to a string (stripping a trailing newline), and returns that. When EOF is
+read, EOFError is raised.")]
   public static string input() { return input(null); }
   public static string input(string prompt)
   { if(prompt!=null) Console.Write(prompt);
     string line = Console.ReadLine();
-    if(line==null) throw Ops.EOFError("raw_input() reached EOF");
+    if(line==null) throw Ops.EOFError("input() reached EOF");
     return line;
   }
 
+  [DocString(@"int([value[, radix])
+
+Convert a string or number to a plain integer. If the argument is a string,
+it must contain a possibly signed decimal number representable as a Boa
+integer, possibly embedded in whitespace. The radix parameter gives the base
+for the conversion, or zero. If radix is zero, the proper radix is guessed
+based on the contents of string; the interpretation is the same as for
+integer literals. If radix is specified and x is not a string, TypeError is
+raised. Otherwise, the argument may be a plain or long integer or a floating
+point number. Conversion of floating point numbers to integers truncates
+(towards zero). If the argument is outside the integer range a long object
+will be returned instead. If no arguments are given, returns 0.")]
+  public static int @int() { return 0; }
   public static int @int(string s) { return int.Parse(s); }
   public static int @int(object o) { return Ops.ToInt(o); }
   public static int @int(string s, int radix)
@@ -258,20 +444,60 @@ public sealed class __builtin__
     return Convert.ToInt32(s, radix);
   }
 
+  [DocString(@"intern(string)
+
+Enters the given string into the 'interned' string table. Interned strings
+that compare equal will be shared. That is, they will be the same object.")]
   public static string intern(string s) { return string.Intern(s); }
+
+  [DocString(@"isinstance(object, type)
+
+Return true if the object argument is an instance of the type argument,
+or of a (direct or indirect) subclass thereof. Also return true if type
+is a type object and object is an object of that type. If object is not a
+class instance or an object of the given type, the function always returns
+false. If type is neither a class object nor a type object, it may be
+a tuple of class or type objects, or may recursively contain other such
+tuples (other sequence types are not accepted). If type is not a class,
+type, or tuple of classes, types, and such tuples, a TypeError exception is
+raised.")]
   public static bool isinstance(object o, object type) { return issubclass(Ops.GetDynamicType(o), type); }
+
+  [DocString(@"issubclass(type, parent)
+
+Return true if the type argument is a subclass (direct or indirect) of the
+parent argument. A class is considered a subclass of itself. The parent may
+be a tuple of class objects, or may recursively contain other such tuples
+(other sequence types are not accepted), in which case every entry in will
+be checked. In any other case, a TypeError exception is raised.")]
   public static bool issubclass(DynamicType type, object parentType)
   { Tuple tup = parentType as Tuple;
     if(tup==null) return type.IsSubclassOf(parentType);
-    for(int i=0; i<tup.items.Length; i++) if(type.IsSubclassOf(tup.items[i])) return true;
+    for(int i=0; i<tup.items.Length; i++) if(issubclass(type, tup.items[i])) return true;
     return false;
   }
 
+  [DocString(@"enumerator(object[, sentinel])
+
+Return an iterator object. The first argument is interpreted very differently
+depending on the presence of the second argument. Without a second argument,
+the first argument must be a collection object which supports the iteration
+protocol (the __iter__() method), or it must support the sequence protocol
+(the __getitem__()  method with integer arguments starting at 0). If it does
+not support either of those protocols, TypeError is raised. If the second
+argument, sentinel, is given, then the object must be callable. The iterator
+created in this case will call the object with no arguments for each call to
+its next() method; if the value returned is equal to sentinel, StopIteration
+will be raised, otherwise the value will be returned.")]
   public static IEnumerator iter(object o) { return Ops.GetEnumerator(o); }
   public static IEnumerator iter(object o, object sentinel)
   { return new SentinelEnumerator(Ops.GetEnumerator(o), sentinel);
   }
 
+  [DocString(@"len(object)
+
+Return the length (the number of items) of an object. The argument may be a
+sequence (string, tuple or list) or a mapping (dictionary).")]
   public static int len(object o)
   { string s = o as string;
     if(s!=null) return s.Length;
@@ -285,6 +511,19 @@ public sealed class __builtin__
     return Ops.ToInt(Ops.Invoke(o, "__len__"));    
   }
 
+  // TODO: locals()
+
+  [DocString(@"map(function, seq1, ...)
+
+Takes a function object (or null) and one or more sequences, and applies the
+function to the items of the sequences and return a list of the results. The
+function must take as many arguments as the number of sequences passed. The
+function will be applied to the items of all lists in parallel; if a list is
+shorter than another it is assumed to be extended with null items. If
+the function is null, the identity function is assumed; if there are multiple
+list arguments, map() returns a list consisting of tuples containing the
+corresponding items from all lists (a kind of transpose operation). The list
+arguments may be any kind of sequence; the result is always a list.")]
   public static List map(object function, object seq)
   { List ret;
     IEnumerator e;
@@ -307,16 +546,23 @@ public sealed class __builtin__
 
     object[] items = new object[enums.Length];
     bool done=false;
-    while(!done)
+    while(true)
     { done=true;
       for(int i=0; i<enums.Length; i++)
         if(enums[i].MoveNext()) { items[i]=enums[i].Current; done=false; }
         else items[i]=null;
-      ret.append(function==null ? new Tuple(items) : Ops.CallWithArgsSequence(function, items));
+      if(done) break;
+      ret.append(function==null ? new Tuple((object[])items.Clone()) : Ops.CallWithArgsSequence(function, items));
     }
     return ret;
   }
 
+  [DocString(@"max(sequence)
+max(value1, value2, ...)
+
+With a single argument s, returns the largest item of a non-empty sequence
+(such as a string, tuple or list). With more than one argument, returns the
+largest of the arguments.")]
   public static object max(object seq)
   { IEnumerator e = Ops.GetEnumerator(seq);
     if(!e.MoveNext()) throw Ops.ValueError("sequence is empty");
@@ -332,6 +578,12 @@ public sealed class __builtin__
     return ret;
   }
 
+  [DocString(@"min(sequence)
+min(value1, value2, ...)
+
+With a single argument s, returns the smallest item of a non-empty sequence
+(such as a string, tuple or list). With more than one argument, returns the
+smallest of the arguments.")]
   public static object min(object seq)
   { IEnumerator e = Ops.GetEnumerator(seq);
     if(!e.MoveNext()) throw Ops.ValueError("sequence is empty");
@@ -347,23 +599,67 @@ public sealed class __builtin__
     return ret;
   }
 
+  [DocString(@"oct(value)
+
+Convert an integer number (of any size) to an octal string. The result is a
+valid Boa expression. Note: this always yields an unsigned literal. For
+example, on a 32-bit machine, oct(-1) yields '037777777777'. When evaluated
+on a machine with the same word size, this literal is evaluated as -1; at a
+different word size, it may turn up as a large positive number or raise an
+OverflowError exception.")]
   public static object oct(object o)
   { throw new NotImplementedException();
     return Ops.Invoke(o, "__oct__");
   }
 
-  public static BoaFile open(string filename, string made)
-  { throw new NotImplementedException();
-  }
+  [DocString(@"ord(char)
 
+Return the ASCII value of a string of one character. Eg, ord('a') returns
+the integer 97, ord('\u2020') returns 8224. This is the inverse of chr().")]
   public static int ord(string s)
   { if(s.Length!=1) throw Ops.TypeError("ord() expected a character but got string of length {0}", s.Length);
     return (int)s[0];
   }
 
+  [DocString(@"pow(x, y[, z])
+
+Returns x to the power y; if z is present, returns x to the power y,
+modulo z (possibly computed more efficiently than pow(x, y) % z). The
+arguments must have numeric types. With mixed operand types, the coercion
+rules for binary arithmetic operators apply. For int and long int operands,
+the result has the same type as the operands (after coercion) unless the
+second argument is negative; in that case, all arguments are converted to
+float and a float result is delivered. For example, 10**2 returns 100,
+but 10**-2 returns 0.01.")]
   public static object pow(object value, object power) { return Ops.Power(value, power); }
   public static object pow(object value, object power, object mod) { return Ops.PowerMod(value, power, mod); }
 
+  [DocString(@"range([start,] stop[, step])
+
+This is a versatile function to create lists containing arithmetic
+progressions. It is most often used in for loops. The arguments must be
+plain integers. If the step argument is omitted, it defaults to 1. If the
+start argument is omitted, it defaults to 0. The full form returns a list
+of plain integers [start, start + step, start + 2 * step, ...]. If step is
+positive, the last element is the largest start + i * step less than stop;
+if step is negative, the last element is the largest start + i * step
+greater than stop. step must not be zero (or else ValueError is raised).
+Example:
+
+>>> range(10)
+[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+>>> range(1, 11)
+[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+>>> range(0, 30, 5)
+[0, 5, 10, 15, 20, 25]
+>>> range(0, 10, 3)
+[0, 3, 6, 9]
+>>> range(0, -10, -1)
+[0, -1, -2, -3, -4, -5, -6, -7, -8, -9]
+>>> range(0)
+[]
+>>> range(1, 0)
+[]")]
   public static List range(int stop) { return range(0, stop, 1); }
   public static List range(int start, int stop) { return range(start, stop, 1); }
   public static List range(int start, int stop, int step)
@@ -375,6 +671,16 @@ public sealed class __builtin__
     return ret;
   }
 
+  [DocString(@"reduce(function, sequence[, initializer])
+
+Apply function of two arguments cumulatively to the items of sequence, from
+left to right, so as to reduce the sequence to a single value. For example,
+reduce(lambda x,y: x+y, [1, 2, 3, 4, 5]) calculates ((((1+2)+3)+4)+5). The
+left argument, x, is the accumulated value and the right argument, y, is the
+update value from the sequence. If the optional initializer is present, it
+is placed before the items of the sequence in the calculation, and serves as
+a default when the sequence is empty. If initializer is not given and
+sequence contains only one item, the first item is returned.")]
   public static object reduce(object function, object seq)
   { IEnumerator e = Ops.GetEnumerator(seq);
     if(!e.MoveNext()) throw Ops.TypeError("reduce() of empty sequence with no initial value");
@@ -389,8 +695,23 @@ public sealed class __builtin__
   }
 
   public static Module reload(Module module) { throw new NotImplementedException(); }
+
+  [DocString(@"repr(object)
+
+Return a string containing a printable representation of an object. This is
+the same value yielded by conversions (reverse quotes). It is sometimes
+useful to be able to access this operation as an ordinary function. For many
+types, this function makes an attempt to return a string that would yield an
+object with the same value when passed to eval().")]
   public static string repr(object o) { return Ops.Repr(o); }
 
+  [DocString(@"round(x[, n])
+
+Returns the floating point value x rounded to n digits after the decimal
+point. If n is omitted, it defaults to zero. The result is a floating point
+number. Values are rounded to the closest multiple of 10 to the power minus
+n; if two multiples are equally close, rounding is done away from odd
+integers (so, for example, both 1.5 and 2.5 round to 2.0).")]
   public static double round(double value) { return Math.Round(value); }
   public static double round(double value, int ndigits)
   { if(ndigits<0)
@@ -400,11 +721,32 @@ public sealed class __builtin__
     return Math.Round(value, Math.Min(ndigits, 15));
   }
 
+  [DocString(@"setattr(object, name, value)
+
+This is the counterpart of getattr(). The arguments are an object, a string
+and an arbitrary value. The string may name an existing attribute or a new
+attribute. The function assigns the value to the attribute, provided the
+object allows it. For example, setattr(x, 'foobar', 123) is equivalent to
+x.foobar = 123.")]
   public static void setattr(object o, string name, object value) { Ops.SetAttr(value, o, name); }
 
+  [DocString(@"str([object])
+
+Return a string containing a nicely printable representation of an object.
+For strings, this returns the string itself. The difference with
+repr(object) is that str(object) does not always attempt to return a string
+that is acceptable to eval(); its goal is to return a printable string. If
+no argument is given, returns the empty string, ''.")]
   public static string str() { return string.Empty; }
   public static string str(object o) { return Ops.Str(o); }
 
+  [DocString(@"sum(sequence[, start])
+
+Sums start and the items of a sequence, from left to right, and returns the
+total. start defaults to 0. The sequence's items are normally numbers, but
+could be strings. However, the fast, correct way to concatenate sequence of
+strings is by calling string.join(). Note that sum(range(n), m) is equivalent
+to reduce(operator.add, range(n), m).")]
   public static object sum(object seq) { return sum(seq, 0); }
   public static object sum(object seq, object start)
   { IEnumerator e = Ops.GetEnumerator(seq);
@@ -412,15 +754,28 @@ public sealed class __builtin__
     return start;
   }
   
+  [DocString(@"type(object)
+
+Returns the type of an object. The return value is a type object.")]
   public static DynamicType type(object obj) { return Ops.GetDynamicType(obj); }
 
+  // TODO: vars()
+
+  [DocString(@"zip(seq1, ...)
+
+This function returns a list of tuples, where the i-th tuple contains the
+i-th element from each of the argument sequences. At least one sequence is
+required, otherwise a TypeError is raised. The returned list is truncated
+in length to the length of the shortest argument sequence. When there are
+multiple argument sequences which are all of the same length, zip() is
+similar to map() with an initial argument of null. With a single sequence
+argument, it returns a list of 1-tuples.")]
   public static List zip(params object[] seqs)
   { if(seqs.Length==0) throw Ops.TypeError("zip() requires at least one sequence");
 
     List ret = new List();
     IEnumerator[] enums = new IEnumerator[seqs.Length];
     for(int i=0; i<enums.Length; i++) enums[i] = Ops.GetEnumerator(seqs[i]);
-
     object[] items = new object[enums.Length];
     while(true)
     { for(int i=0; i<enums.Length; i++)
@@ -430,8 +785,17 @@ public sealed class __builtin__
     }
   }
 
+  [DocString(@"This value is set to the result of the last expression evaluated in
+interactive mode by the default sys.displayhook handler.")]
   public static object _;
+
+  [DocString(@"This value is 1 when the interpreter/compiler is running in debug mode and
+0 otherwise. Debug mode alters many facets of Boa's internal operation,
+including whether or not 'assert' statements will be executed and whether
+or not optimizations will be performed. This value cannot be altered at
+runtime.")]
   public static int __debug__ { get { return Options.Debug ? 1 : 0; } }
+
   public static object exit = "Use Ctrl-Z plus Return (eg EOF) to exit.";
   public static object quit = "Use Ctrl-Z plus Return (eg EOF) to exit.";
 
@@ -439,7 +803,9 @@ public sealed class __builtin__
   // (perhaps by modifying ReflectedType.cons)
   #region Data types
   //public static readonly object @bool   = ReflectedType.FromType(typeof(bool));
+  // TODO: complex([real[, imag]])
   public static readonly object dict    = ReflectedType.FromType(typeof(Dict));
+  // TODO: file(filename[, mode[, bufsize]])
   //public static readonly object @float  = ReflectedType.FromType(typeof(double));
   //public static readonly object @int    = ReflectedType.FromType(typeof(int));
   public static readonly object list    = ReflectedType.FromType(typeof(List));

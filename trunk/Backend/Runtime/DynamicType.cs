@@ -35,12 +35,12 @@ public abstract class DynamicType
   public object __name__;
 }
 
-public class NoneType : DynamicType
-{ NoneType() { __name__ = "NoneType"; }
+public class NullType : DynamicType
+{ NullType() { __name__ = "NullType"; }
 
   public override bool IsSubclassOf(object other) { return other==this; }
 
-  public static readonly NoneType Value = new NoneType();
+  public static readonly NullType Value = new NullType();
 }
 
 } // namespace Boa.Runtime
