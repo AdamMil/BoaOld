@@ -80,7 +80,7 @@ public class List : IMutableSequence, IList, IComparable, ICloneable
   public void __delitem__(Slice slice)
   { Tuple tup = slice.indices(size);
     int start=(int)tup.items[0], stop=(int)tup.items[1], step=(int)tup.items[2];
-    if(start==stop) return;
+    if(step<0 && start<=stop || step>0 && start>=stop) return;
 
     if(step==1) RemoveRange(start, stop-start);
     else if(step==-1) RemoveRange(stop+1, start-stop);
@@ -103,27 +103,31 @@ public class List : IMutableSequence, IList, IComparable, ICloneable
   public void __setitem__(Slice slice, object value)
   { Tuple tup = slice.indices(size);
     int start=(int)tup.items[0], stop=(int)tup.items[1], step=(int)tup.items[2];
+    if(step<0 && start<=stop || step>0 && start>=stop) return;
+    int sign=Math.Sign(step), slen=(stop-start+step-sign)/step;
 
-    if(step<0)
-    { int t = start;
-      start = start + (((stop-start+step+1)/step)-1)*step;
-      stop  = t;
-      step  = -step;
-    }
-    int slen=(stop-start+step-1)/step;
-
-    if(value is ISequence)
-    { ISequence seq = (ISequence)value;
-      int len = seq.__len__();
-      if(step==1)
-      { if(len<slen) RemoveRange(start+len, slen-len);
-        else if(len>slen) Insert(start+slen, len-slen);
-        for(int i=0; i<len; i++) items[i+start] = seq.__getitem__(i);
+    ISequence seq = value as ISequence;
+    if(seq==null && value is string) seq = new StringOps.SequenceWrapper((string)value);
+    if(seq!=null)
+    { int len = seq.__len__();
+      if(step==1 || step==-1)
+      { int diff = Math.Abs(len-slen);
+        if(step==1)
+        { if(len<slen) RemoveRange(start+len, diff);
+          else if(len>slen) Insert(start+slen, diff);
+          for(int i=0; i<len; i++) items[i+start] = seq.__getitem__(i);
+        }
+        else
+        { if(len>slen) { Insert(stop+1, diff); start += diff; }
+          else if(len<slen) { RemoveRange(stop+1, diff); start -= diff; }
+          for(int i=0; i<len; i++) items[start-i] = seq.__getitem__(i);
+        }
       }
       else
       { if(len!=slen)
           throw Ops.ValueError("can't assign sequence of size {0} to extended slice of size {1}", len, slen);
-        for(int i=0; start<stop; i++,start+=step) items[start] = seq.__getitem__(i);
+        if(step>0) for(int i=0; start<stop; i++,start+=step) items[start] = seq.__getitem__(i);
+        else for(int i=0; start>stop; i++,start+=step) items[start] = seq.__getitem__(i);
       }
     }
     else throw new NotImplementedException();

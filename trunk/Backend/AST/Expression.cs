@@ -526,23 +526,16 @@ public class SliceExpression : Expression
   public override void Emit(CodeGenerator cg)
   { if(IsConstant) cg.EmitConstant(GetValue());
     else
-    { MethodInfo mi = typeof(Ops).GetMethod("ToInt");
-      Start.Emit(cg);
-      cg.EmitCall(mi);
+    { Start.Emit(cg);
       Stop.Emit(cg);
-      cg.EmitCall(mi);
-      if(Step==null) cg.EmitNew(typeof(Slice), new Type[] { typeof(int), typeof(int) });
-      else
-      { Step.Emit(cg);
-        cg.EmitCall(mi);
-        cg.EmitNew(typeof(Slice), new Type[] { typeof(int), typeof(int), typeof(int) });
-      }
+      if(Step==null) cg.ILG.Emit(OpCodes.Ldnull);
+      else Step.Emit(cg);
+      cg.EmitNew(typeof(Slice), new Type[] { typeof(object), typeof(object), typeof(object) });
     }
   }
   
   public override object Evaluate(Frame frame)
-  { return new Slice(Ops.ToInt(Start.Evaluate(frame)), Ops.ToInt(Stop.Evaluate(frame)),
-                     Step==null ? 1 : Ops.ToInt(Step.Evaluate(frame)));
+  { return new Slice(Start.Evaluate(frame), Stop.Evaluate(frame), Step==null ? null : Step.Evaluate(frame));
   }
 
   public override void Optimize()
