@@ -132,7 +132,7 @@ public sealed class IntOps
     switch(Convert.GetTypeCode(b))
     { case TypeCode.Boolean: return (bool)b ? a-1 : a;
       case TypeCode.Byte: return a - (byte)b;
-      case TypeCode.Char: return a - (char)b;
+      case TypeCode.Char: case TypeCode.String: return -1;
       case TypeCode.Decimal:
       { Decimal v = (Decimal)b;
         return a<v ? -1 : a>v ? 1 : 0;
@@ -158,7 +158,6 @@ public sealed class IntOps
       { float av=a, bv=(float)b;
         return av<bv ? -1 : av>bv ? 1 : 0;
       }
-      case TypeCode.String: return -1;
       case TypeCode.UInt16: return a - (ushort)b;
       case TypeCode.UInt32: return a<0 ? -1 : (int)((uint)a - (uint)b);
       case TypeCode.UInt64: return a<0 ? -1 : (int)((ulong)a - (ulong)b);

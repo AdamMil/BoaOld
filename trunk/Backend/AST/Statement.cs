@@ -50,10 +50,20 @@ namespace for the exec. (In other words, "exec obj" would be illegal, but "exec 
 // TODO: using exceptions is very slow
 #region Exceptions (used to aid implementation)
 public class BreakException : Exception
-{ public static BreakException Value = new BreakException();
+{ public BreakException() { }
+  public BreakException(string name) { Name=name; }
+
+  public string Name;
+
+  public static BreakException Value = new BreakException();
 }
 public class ContinueException : Exception
-{ public static ContinueException Value = new ContinueException();
+{ public ContinueException() { }
+  public ContinueException(string name) { Name=name; }
+
+  public string Name;
+
+  public static ContinueException Value = new ContinueException();
 }
 public class ReturnException : Exception
 { public ReturnException(object value) { Value=value; }
@@ -64,7 +74,7 @@ public class ReturnException : Exception
 #region Walkers
 #region JumpFinder
 class JumpFinder : IWalker
-{ public JumpFinder(Label start, Label end) { this.start=start; this.end=end; }
+{ public JumpFinder(string name, Label start, Label end) { this.name=name; this.start=start; this.end=end; }
 
   public void PostWalk(Node node)
   { if(node is TryStatement) inTry--;
@@ -73,15 +83,19 @@ class JumpFinder : IWalker
   public bool Walk(Node node)
   { if(node is BreakStatement)
     { BreakStatement bs = (BreakStatement)node;
-      bs.Label = end;
-      bs.NeedsLeave = InTry;
+      if(bs.Name==name)
+      { bs.Label = end;
+        bs.NeedsLeave = InTry;
+      }
     }
     else if(node is ContinueStatement)
     { ContinueStatement cs = (ContinueStatement)node;
-      cs.Label = start;
-      cs.NeedsLeave = InTry;
+      if(cs.Name==name)
+      { cs.Label = start;
+        cs.NeedsLeave = InTry;
+      }
     }
-    else if(node is WhileStatement || node is ForStatement) return false;
+    else if(name==null && (node is WhileStatement || node is ForStatement) || node is DefStatement) return false;
     else if(node is TryStatement) inTry++;
     return true;
   }
@@ -89,6 +103,7 @@ class JumpFinder : IWalker
   bool InTry { get { return inTry>0; } }
 
   Label start, end;
+  string name;
   int inTry;
 }
 #endregion
@@ -132,12 +147,69 @@ public abstract class Statement : Node
   public void PostProcessForInterpret() { PostProcess(); }
 
   void PostProcess()
-  { Walk(new TryChecker());
+  { Walk(new JumpChecker());
+    Walk(new TryChecker());
     if(!Options.Debug) Walk(new Optimizer());
   }
 
+  #region JumpChecker
+  sealed class JumpChecker : IWalker
+  { public void PostWalk(Node node)
+    { if(node is Suite)
+      { if(((Suite)node).Name!=null) blocks.RemoveAt(blocks.Count-1);
+      }
+      else if(node is WhileStatement || node is ForStatement) blocks.RemoveAt(blocks.Count-1);
+      else if(node is DefStatement)
+      { if(blocks!=null)
+        { blocks.Clear();
+          if(flist!=null) flist = new Stack();
+          flist.Push(blocks);
+          blocks = (ArrayList)lists.Pop();
+        }
+      }
+    }
+
+    public bool Walk(Node node)
+    { if(node is Suite)
+      { if(((Suite)node).Name!=null)
+        { if(blocks==null) blocks = new ArrayList();
+          blocks.Add(node);
+        }
+      }
+      else if(node is WhileStatement || node is ForStatement)
+      { if(blocks==null) blocks = new ArrayList();
+        blocks.Add(node);
+      }
+      else if(node is JumpStatement)
+      { string name = ((JumpStatement)node).Name;
+        if(name!=null)
+        { if(blocks!=null)
+            foreach(object n in blocks)
+              if(n is Suite && ((Suite)n).Name==name) return false;
+          Ops.SyntaxError(node, "break/continue: unable to find a valid jump target named '{0}'", name);
+        }
+        else
+        { if(blocks!=null)
+            for(int i=blocks.Count; i>=0; i--)
+              if(blocks[i] is WhileStatement || blocks[i] is ForStatement) return false;
+          Ops.SyntaxError(node, "break/continue: unable to find a valid enclosing loop");
+        }
+      }
+      else if(node is DefStatement)
+      { if(lists==null) lists = new Stack();
+        lists.Push(blocks);
+        blocks = flist==null || flist.Count==0 ? null : (ArrayList)flist.Pop();
+      }
+      return true;
+    }
+
+    ArrayList blocks;
+    Stack lists, flist;
+  }
+  #endregion
+
   #region NameDecorator
-  class NameDecorator : IWalker
+  sealed class NameDecorator : IWalker
   { public void PostWalk(Node node)
     { if(node==current)
       { inDef=false;
@@ -252,7 +324,7 @@ public abstract class Statement : Node
   #endregion
   
   #region TryChecker
-  public class TryChecker : IWalker
+  sealed class TryChecker : IWalker
   { public void PostWalk(Node node) { }
 
     public bool Walk(Node node)
@@ -467,8 +539,15 @@ public class AssignStatement : Statement
 
 #region BreakStatement
 public class BreakStatement : JumpStatement
-{ public override void Execute(Frame frame) { throw BreakException.Value; }
-  public override void ToCode(System.Text.StringBuilder sb, int indent) { sb.Append("break"); }
+{ public BreakStatement() { }
+  public BreakStatement(string name) : base(name) { }
+  public override void Execute(Frame frame)
+  { throw Name==null ? BreakException.Value : new BreakException(Name);
+  }
+  public override void ToCode(System.Text.StringBuilder sb, int indent)
+  { sb.Append("break");
+    if(Name!=null) sb.Append(' ').Append(Name);
+  }
 }
 #endregion
 
@@ -551,8 +630,15 @@ public class ClassStatement : Statement
 
 #region ContinueStatement
 public class ContinueStatement : JumpStatement
-{ public override void Execute(Frame frame) { throw ContinueException.Value; }
-  public override void ToCode(System.Text.StringBuilder sb, int indent) { sb.Append("continue"); }
+{ public ContinueStatement() { }
+  public ContinueStatement(string name) : base(name) { }
+  public override void Execute(Frame frame)
+  { throw Name==null ? ContinueException.Value : new ContinueException(Name);
+  }
+  public override void ToCode(System.Text.StringBuilder sb, int indent)
+  { sb.Append("continue");
+    if(Name!=null) sb.Append(' ').Append(Name);
+  }
 }
 #endregion
 
@@ -910,7 +996,7 @@ public class ForStatement : Statement
     Slot list = cg.AllocLocalTemp(typeof(IEnumerator), true);
     Label start=cg.ILG.DefineLabel(), end=cg.ILG.DefineLabel(), elze=(Else==null ? end : cg.ILG.DefineLabel());
 
-    Body.Walk(new JumpFinder(start, end));
+    Body.Walk(new JumpFinder(null, start, end));
     Expression.Emit(cg);
     cg.EmitCall(typeof(Ops), "GetEnumerator", new Type[] { typeof(object) });
     list.EmitSet(cg);
@@ -944,14 +1030,14 @@ public class ForStatement : Statement
     { ce.Value=e.Current;
       ass.Execute(frame);
       try { Body.Execute(frame); }
-      catch(BreakException) { goto done; }
+      catch(BreakException ex) { if(ex.Name!=null) throw; goto done; }
       catch(StopIterationException) { goto done; }
-      catch(ContinueException) { }
+      catch(ContinueException ex) { if(ex.Name!=null) throw; }
     }
     if(Else!=null) Else.Execute(frame);
     done:;
   }
-  
+
   public override void ToCode(System.Text.StringBuilder sb, int indent)
   { sb.Append("for ");
     if(Names is TupleExpression)
@@ -1008,9 +1094,13 @@ public class GlobalStatement : Statement
 
 #region JumpStatement
 public abstract class JumpStatement : Statement
-{ public override void Emit(CodeGenerator cg) { cg.ILG.Emit(NeedsLeave ? OpCodes.Leave : OpCodes.Br, Label); }
+{ public JumpStatement() { }
+  public JumpStatement(string name) { Name=name; }
+
+  public override void Emit(CodeGenerator cg) { cg.ILG.Emit(NeedsLeave ? OpCodes.Leave : OpCodes.Br, Label); }
   public Label Label;
-  public bool  NeedsLeave;
+  public string Name;
+  public bool   NeedsLeave;
 }
 #endregion
 
@@ -1171,16 +1261,40 @@ public class Suite : Statement
 { public Suite(Statement[] stmts) { Statements=stmts; SetLocation(stmts[0].Source, stmts[0].Line, stmts[0].Column); }
 
   public override void Emit(CodeGenerator cg)
-  { foreach(Statement stmt in Statements)
+  { Label start, end;
+    if(Name!=null)
+    { start=cg.ILG.DefineLabel(); end=cg.ILG.DefineLabel();
+      Walk(new JumpFinder(Name, start, end));
+      cg.ILG.MarkLabel(start);
+    }
+    else end=new Label();
+
+    foreach(Statement stmt in Statements)
     { cg.EmitPosition(stmt);
       stmt.Emit(cg);
     }
+
+    if(Name!=null) cg.ILG.MarkLabel(end);
   }
 
-  public override void Execute(Frame frame) { foreach(Statement stmt in Statements) stmt.Execute(frame); }
+  public override void Execute(Frame frame)
+  { if(Name==null) foreach(Statement stmt in Statements) stmt.Execute(frame);
+    else
+    { restart:
+      try { foreach(Statement stmt in Statements) stmt.Execute(frame); }
+      catch(BreakException e) { if(e.Name!=Name) throw; }
+      catch(ContinueException e) { if(e.Name==Name) goto restart; throw; }
+    }
+  }
 
   public override void ToCode(System.Text.StringBuilder sb, int indent)
   { sb.Append('\n');
+
+    if(Name!=null)
+    { sb.Append(Name).Append(":\n");
+      indent += Options.IndentSize;
+    }
+
     foreach(Statement s in Statements)
     { if(indent>0) sb.Append(' ', indent);
       s.ToCode(sb, indent);
@@ -1194,6 +1308,7 @@ public class Suite : Statement
   }
 
   public Statement[] Statements;
+  public string Name;
 }
 #endregion
 
@@ -1401,7 +1516,7 @@ public class WhileStatement : Statement
   { if(!Options.Debug && Test.IsConstant && !Ops.IsTrue(Test.GetValue())) return;
 
     Label start=cg.ILG.DefineLabel(), end=cg.ILG.DefineLabel(), elze=(Else==null ? end : cg.ILG.DefineLabel());
-    Body.Walk(new JumpFinder(start, end));
+    Body.Walk(new JumpFinder(null, start, end));
     cg.ILG.BeginExceptionBlock();
     cg.ILG.MarkLabel(start);
     if(Options.Debug || !Test.IsConstant)
@@ -1424,9 +1539,9 @@ public class WhileStatement : Statement
   { try
     { while(Ops.IsTrue(Test.Evaluate(frame)))
         try { Body.Execute(frame); }
-        catch(BreakException) { goto done; }
+        catch(BreakException e) { if(e.Name!=null) throw; goto done; }
         catch(StopIterationException) { goto done; }
-        catch(ContinueException) { }
+        catch(ContinueException e) { if(e.Name!=null) throw; }
       if(Else!=null) Else.Execute(frame);
       done:;
     }

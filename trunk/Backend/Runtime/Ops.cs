@@ -360,7 +360,16 @@ public sealed class Ops
         if(b is bool) return (bool)a ? (bool)b ? 0 : 1 : (bool)b ? -1 : 0;
         return IntOps.Compare((bool)a ? 1 : 0, b);
       case TypeCode.Byte: return IntOps.Compare((int)(byte)a, b);
-      case TypeCode.Char: return IntOps.Compare((int)(char)a, b);
+      case TypeCode.Char:
+      { string sb = b as string;
+        if(sb!=null)
+        { if(sb.Length==0) return 1;
+          int diff = (int)(char)a - (int)sb[0];
+          return diff!=0 ? diff : sb.Length==1 ? 0 : -1;
+        }
+        else if(b is char) return (int)(char)a - (int)(char)b;
+        else return "string".CompareTo(TypeName(b));
+      }
       case TypeCode.Decimal:
         if(b is Decimal) return ((Decimal)a).CompareTo(b);
         try { return ((Decimal)a).CompareTo(Convert.ToDecimal(b)); }
@@ -380,7 +389,14 @@ public sealed class Ops
       case TypeCode.Single: return FloatOps.Compare((float)a, b);
       case TypeCode.String:
       { string sb = b as string;
-        return sb==null ? "string".CompareTo(TypeName(b)) : ((string)a).CompareTo(sb);
+        if(sb!=null) return ((string)a).CompareTo(sb);
+        else if(b is char)
+        { string sa = (string)a;
+          if(sa.Length==0) return -1;
+          int diff = (int)sa[0] - (int)(char)b;
+          return diff!=0 ? diff : sa.Length==1 ? 0 : 1;
+        }
+        else return "string".CompareTo(TypeName(b));
       }
       case TypeCode.UInt16: return IntOps.Compare((int)(short)a, b);
       case TypeCode.UInt32: 
@@ -857,7 +873,7 @@ public sealed class Ops
   { switch(Convert.GetTypeCode(a))
     { case TypeCode.Boolean: return IntOps.Multiply((bool)a ? 1 : 0, b);
       case TypeCode.Byte:    return IntOps.Multiply((int)(byte)a, b);
-      case TypeCode.Char:    return IntOps.Multiply((int)(char)a, b);
+      case TypeCode.Char:    return new string((char)a, ToInt(b));
       case TypeCode.Decimal:
         if(b is Decimal) return (Decimal)a * (Decimal)b;
         try { return (Decimal)a * Convert.ToDecimal(b); }
@@ -1131,9 +1147,6 @@ public sealed class Ops
   { switch(Convert.GetTypeCode(a))
     { case TypeCode.Boolean: return IntOps.Subtract((bool)a ? 1 : 0, b);
       case TypeCode.Byte:    return IntOps.Subtract((int)(byte)a, b);
-      case TypeCode.Char:
-        if(b is char) return (char)a-(char)b;
-        break;
       case TypeCode.Decimal:
         if(b is Decimal) return (Decimal)a - (Decimal)b;
         try { return (Decimal)a - Convert.ToDecimal(b); }

@@ -58,6 +58,7 @@ public sealed class FloatOps
     else switch(Convert.GetTypeCode(b))
     { case TypeCode.Boolean: bv=(bool)b ? 1 : 0; break;
       case TypeCode.Byte: bv=(byte)b; break;
+      case TypeCode.Char: case TypeCode.String: return -1;
       case TypeCode.Decimal:
         bv=((IConvertible)b).ToDouble(NumberFormatInfo.InvariantInfo); break;
       case TypeCode.Empty: return 1;
@@ -72,7 +73,6 @@ public sealed class FloatOps
         break;
       case TypeCode.SByte: bv=(sbyte)b; break;
       case TypeCode.Single: bv=(float)b; break;
-      case TypeCode.String: return -1;
       case TypeCode.UInt16: bv=(ushort)b; break;
       case TypeCode.UInt32: bv=(uint)b; break;
       case TypeCode.UInt64: bv=(ulong)b; break;
