@@ -692,6 +692,10 @@ public class ReflectedType : BoaType
       dict["lower"] = dict["ToLower"];
       dict["upper"] = dict["ToUpper"];
     }
+    else if(type==typeof(System.Text.RegularExpressions.Match))
+    { foreach(MethodInfo mi in typeof(Boa.Modules.re_internal.match).GetMethods()) AddMethod(mi);
+      foreach(PropertyInfo pi in typeof(Boa.Modules.re_internal.match).GetProperties()) AddProperty(pi);
+    }
 
     if(!dict.Contains("__doc__")) // add doc strings
     { object[] docs = type.GetCustomAttributes(typeof(DocStringAttribute), false);

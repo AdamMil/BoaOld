@@ -61,16 +61,16 @@ public sealed class _socket
     public socketobj(int family, int type, int proto) :
       this((AddressFamily)family, (SocketType)type, (ProtocolType)proto) { }
     public socketobj(AddressFamily family, SocketType type, ProtocolType proto)
-    { try { socket = new Socket(family, type, proto); }
+    { try { Socket = new Socket(family, type, proto); }
       catch(SocketException e) { throw new _error(e.ErrorCode, e.Message); }
       catch(Exception e) { throw new _error(e.Message); }
     }
 
-    public socketobj(Socket socket) { this.socket=socket; }
+    public socketobj(Socket socket) { Socket=socket; }
 
     public Tuple accept()
     { try
-      { socketobj s = new socketobj(socket.Accept());
+      { socketobj s = new socketobj(Socket.Accept());
         return new Tuple(s, s.getpeername());
       }
       catch(SocketException e) { throw new _error(e.ErrorCode, e.Message); }
@@ -78,22 +78,22 @@ public sealed class _socket
     }
     
     public void bind(Tuple address)
-    { try { socket.Bind(AddressToEndpoint(address)); }
+    { try { Socket.Bind(AddressToEndpoint(address)); }
       catch(SocketException e) { throw new _error(e.ErrorCode, e.Message); }
       catch(Exception e) { throw new _error(e.Message); }
     }
     
-    public void close() { socket.Close(); }
+    public void close() { Socket.Close(); }
 
     public void connect(Tuple address)
-    { try { socket.Connect(AddressToEndpoint(address)); }
+    { try { Socket.Connect(AddressToEndpoint(address)); }
       catch(SocketException e) { throw new _error(e.ErrorCode, e.Message); }
       catch(Exception e) { throw new _error(e.Message); }
     }
 
     public Tuple getpeername()
     { try
-      { IPEndPoint ep = (IPEndPoint)socket.RemoteEndPoint;
+      { IPEndPoint ep = (IPEndPoint)Socket.RemoteEndPoint;
         return new Tuple(ep.Address.ToString(), ep.Port);
       }
       catch(SocketException e) { throw new _error(e.ErrorCode, e.Message); }
@@ -102,7 +102,7 @@ public sealed class _socket
     
     public Tuple getsockname()
     { try
-      { IPEndPoint ep = (IPEndPoint)socket.LocalEndPoint;
+      { IPEndPoint ep = (IPEndPoint)Socket.LocalEndPoint;
         return new Tuple(ep.Address.ToString(), ep.Port);
       }
       catch(SocketException e) { throw new _error(e.ErrorCode, e.Message); }
@@ -110,19 +110,19 @@ public sealed class _socket
     }
 
     public object getsockopt(int level, int name)
-    { try { return socket.GetSocketOption((SocketOptionLevel)level, (SocketOptionName)name); }
+    { try { return Socket.GetSocketOption((SocketOptionLevel)level, (SocketOptionName)name); }
       catch(SocketException e) { throw new _error(e.ErrorCode, e.Message); }
       catch(Exception e) { throw new _error(e.Message); }
     }
 
     public void listen() { listen(5); }
     public void listen(int backlog)
-    { try { socket.Listen(backlog); }
+    { try { Socket.Listen(backlog); }
       catch(SocketException e) { throw new _error(e.ErrorCode, e.Message); }
       catch(Exception e) { throw new _error(e.Message); }
     }
 
-    public BoaFile makefile() { return new BoaFile(new NetworkStream(socket, false)); }
+    public BoaFile makefile() { return new BoaFile(new NetworkStream(Socket, false)); }
     public BoaFile makefile(string mode) { return makefile(); }
     public BoaFile makefile(string mode, int bufsize) { return makefile(); }
 
@@ -130,7 +130,7 @@ public sealed class _socket
     public byte[] recv(int bufsize, int flags)
     { try
       { byte[] arr = new byte[Math.Min(bufsize, 4096)];
-        int read = socket.Receive(arr, (SocketFlags)flags);
+        int read = Socket.Receive(arr, (SocketFlags)flags);
         if(read==arr.Length) return arr;
         byte[] ret = new byte[read];
         if(read>0) Array.Copy(arr, ret, read);
@@ -140,8 +140,8 @@ public sealed class _socket
       catch(Exception e) { throw new _error(e.Message); }
     }
 
-    public string recvascii(int bufsize) { return recvascii(bufsize, 0); }
-    public string recvascii(int bufsize, int flags)
+    public string recvstr(int bufsize) { return recvstr(bufsize, 0); }
+    public string recvstr(int bufsize, int flags)
     { return System.Text.Encoding.ASCII.GetString(recv(bufsize, flags));
     }
 
@@ -150,7 +150,7 @@ public sealed class _socket
     { try
       { EndPoint ep = new IPEndPoint(IPAddress.Any, 0);
         byte[] arr = new byte[Math.Min(bufsize, 4096)];
-        int read = socket.ReceiveFrom(arr, (SocketFlags)flags, ref ep);
+        int read = Socket.ReceiveFrom(arr, (SocketFlags)flags, ref ep);
         if(read!=arr.Length)
         { byte[] narr = new byte[read];
           if(read>0) Array.Copy(arr, narr, read);
@@ -163,8 +163,8 @@ public sealed class _socket
       catch(Exception e) { throw new _error(e.Message); }
     }
 
-    public Tuple recvasciifrom(int bufsize) { return recvasciifrom(bufsize, 0); }
-    public Tuple recvasciifrom(int bufsize, int flags)
+    public Tuple recvstrfrom(int bufsize) { return recvstrfrom(bufsize, 0); }
+    public Tuple recvstrfrom(int bufsize, int flags)
     { Tuple tup = recvfrom(bufsize, flags);
       tup.items[0] = System.Text.Encoding.ASCII.GetString((byte[])tup.items[0]);
       return tup;
@@ -172,51 +172,51 @@ public sealed class _socket
 
     public int send(byte[] data) { return send(data, 0); }
     public int send(byte[] data, int flags)
-    { try { return socket.Send(data, (SocketFlags)flags); }
+    { try { return Socket.Send(data, (SocketFlags)flags); }
       catch(SocketException e) { throw new _error(e.ErrorCode, e.Message); }
       catch(Exception e) { throw new _error(e.Message); }
     }
 
-    public int sendascii(string str) { return sendascii(str, 0); }
-    public int sendascii(string str, int flags) { return send(System.Text.Encoding.ASCII.GetBytes(str), flags); }
+    public int send(string str) { return send(str, 0); }
+    public int send(string str, int flags) { return send(System.Text.Encoding.ASCII.GetBytes(str), flags); }
 
     public void sendall(byte[] data) { sendall(data, 0); }
     public void sendall(byte[] data, int flags)
     { try
       { int sent=0;
-        while(sent<data.Length) sent += socket.Send(data, sent, data.Length-sent, (SocketFlags)flags);
+        while(sent<data.Length) sent += Socket.Send(data, sent, data.Length-sent, (SocketFlags)flags);
       }
       catch(SocketException e) { throw new _error(e.ErrorCode, e.Message); }
       catch(Exception e) { throw new _error(e.Message); }
     }
 
-    public void sendallascii(string str) { sendallascii(str, 0); }
-    public void sendallascii(string str, int flags) { sendall(System.Text.Encoding.ASCII.GetBytes(str), flags); }
+    public void sendall(string str) { sendall(str, 0); }
+    public void sendall(string str, int flags) { sendall(System.Text.Encoding.ASCII.GetBytes(str), flags); }
 
     public int sendto(byte[] data, Tuple address) { return sendto(data, 0, address); }
     public int sendto(byte[] data, int flags, Tuple address)
-    { try { return socket.SendTo(data, (SocketFlags)flags, AddressToEndpoint(address)); }
+    { try { return Socket.SendTo(data, (SocketFlags)flags, AddressToEndpoint(address)); }
       catch(SocketException e) { throw new _error(e.ErrorCode, e.Message); }
       catch(Exception e) { throw new _error(e.Message); }
     }
     
-    public void setblocking(object value) { socket.Blocking = Ops.IsTrue(value); }
+    public void setblocking(object value) { Socket.Blocking = Ops.IsTrue(value); }
 
     public void setsockopt(int level, int name, object value)
-    { try { socket.SetSocketOption((SocketOptionLevel)level, (SocketOptionName)name, value); }
+    { try { Socket.SetSocketOption((SocketOptionLevel)level, (SocketOptionName)name, value); }
       catch(SocketException e) { throw new _error(e.ErrorCode, e.Message); }
       catch(Exception e) { throw new _error(e.Message); }
     }
 
     public void shutdown(int how)
-    { try { socket.Shutdown((SocketShutdown)how); }
+    { try { Socket.Shutdown((SocketShutdown)how); }
       catch(SocketException e) { throw new _error(e.ErrorCode, e.Message); }
       catch(Exception e) { throw new _error(e.Message); }
     }
     
     public override string ToString() { return "<socket object>"; }
 
-    public Socket socket;
+    public Socket Socket;
     
     static IPEndPoint AddressToEndpoint(Tuple address)
     { IPHostEntry he = Resolve(Ops.ToString(address.__getitem__(0)));

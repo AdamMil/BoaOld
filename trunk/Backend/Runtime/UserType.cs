@@ -79,7 +79,7 @@ public class UserType : BoaType
     { Function func = e.Value as Function;
       this.dict[e.Key] = func!=null && func.Type==FunctionType.Class ? new ClassWrapper(func, this) : e.Value;
     }
-    
+
     List[] mros = new List[bases.Count+1];
     mros[0] = new List(bases.items);
     for(int i=0; i<bases.Count; i++) mros[i+1] = new List(((BoaType)bases.items[i]).mro);
@@ -88,7 +88,7 @@ public class UserType : BoaType
     mrolist.Add(this);
     bool done=false;
     do mrolist.Add(MergeMRO(mros, ref done)); while(!done);
-    
+
     mro = new Tuple(mrolist);
   }
 

@@ -162,6 +162,8 @@ public class BoaFile : IFile, IEnumerable
     }
     catch(IOException e) { throw Ops.IOError(e.Message); }
   }
+  
+  public string readstr() { return Encoding.GetString(read()); }
 
   public byte[] read(int bytes)
   { AssertOpen();
@@ -175,6 +177,8 @@ public class BoaFile : IFile, IEnumerable
     }
     catch(IOException e) { throw Ops.IOError(e.Message); }
   }
+
+  public string readstr(int bytes) { return Encoding.GetString(read(bytes)); }
 
   public int readbyte()
   { AssertOpen();

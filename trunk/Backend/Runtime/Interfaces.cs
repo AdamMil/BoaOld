@@ -66,6 +66,8 @@ public interface IFile
   string next();
   byte[] read();
   byte[] read(int bytes);
+  string readstr();
+  string readstr(int bytes);
   int readbyte();
   string readline();
   string readline(int size);

@@ -27,13 +27,34 @@ using Boa.Runtime;
 namespace Boa.Modules
 {
 
+namespace re_internal
+{ 
+  internal class match
+  { public static string expand(Match m, string template) { throw new NotImplementedException(); }
+    public static string group(Match m, params object[] groups) { throw new NotImplementedException(); }
+    public static Tuple groups(Match m) { throw new NotImplementedException(); }
+    public static Tuple groups(Match m, object defaultValue) { throw new NotImplementedException(); }
+    public static Dict groupdict(Match m) { throw new NotImplementedException(); }
+    public static Dict groupdict(Match m, object defaultValue) { throw new NotImplementedException(); }
+    public static int start(Match m) { throw new NotImplementedException(); }
+    public static int start(Match m, object group) { throw new NotImplementedException(); }
+    public static int end(Match m) { throw new NotImplementedException(); }
+    public static int end(Match m, object group) { throw new NotImplementedException(); }
+    public static Tuple span(Match m) { throw new NotImplementedException(); }
+    public static Tuple span(Match m, object group) { throw new NotImplementedException(); }
+    
+    public static int lastindex { get; } // these aren't accepting a Match... :-/
+    public static string lastgroup { get; }
+  }
+}
+
 // TODO: optimize by using Match.NextMatch()
 
 [BoaType("module")]
 public sealed class re
 { re() { }
 
-  #region Support classes
+  #region FindEnumerator
   public class FindEnumerator : IEnumerator
   { public FindEnumerator(Regex regex, string str) { this.regex=regex; this.str=str; state=State.BOF; }
   
@@ -61,7 +82,9 @@ public sealed class re
     Match match;
     State state;
   }
+  #endregion
 
+  #region regex
   public class regex : Regex, IRepresentable
   { public regex(string pattern, RegexOptions options) : base(pattern, options) { }
     
@@ -145,7 +168,9 @@ public sealed class re
 
     Dict groups;
   }
+  #endregion
 
+  #region RegexErrorException
   [DocString(@"Exception raised when a string passed to one of the functions here is not a
 valid regular expression (for example, it might contain unmatched
 parentheses) or when some other error occurs during compilation or matching.
@@ -154,7 +179,7 @@ It is never an error if a string contains no match for a pattern.")]
   { public RegexErrorException(string message) : base(message) { }
   }
   #endregion
-
+  
   public static string __repr__() { return "<module 're' (built-in)>"; }
   public static string __str__() { return __repr__(); }
 
