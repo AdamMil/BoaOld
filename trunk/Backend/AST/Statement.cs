@@ -148,8 +148,127 @@ public class AssignStatement : Statement
 { public AssignStatement(Expression lhs, Expression rhs) { LHS=lhs; RHS=rhs; }
 
   public override void Emit(CodeGenerator cg)
-  { RHS.Emit(cg);
-    LHS.EmitSet(cg);
+  { if(LHS is TupleExpression)
+    { TupleExpression lhs = (TupleExpression)LHS;
+      if(false/*RHS.IsConstant*/) // TODO: implement this optimization
+      { 
+      }
+      else
+      { 
+        #region lots of MSIL code here
+        Label notseq = cg.ILG.DefineLabel(), notstr = cg.ILG.DefineLabel(), badlen = cg.ILG.DefineLabel(),
+              end = cg.ILG.DefineLabel();
+        Slot lenslot = cg.AllocLocalTemp(typeof(int)), seqslot = cg.AllocLocalTemp(typeof(ISequence)),
+             strslot = cg.AllocLocalTemp(typeof(string)), objslot = cg.AllocLocalTemp(typeof(object));
+
+        RHS.Emit(cg);
+        cg.ILG.Emit(OpCodes.Dup);
+        cg.ILG.Emit(OpCodes.Isinst, typeof(ISequence)); // this does return a valid object. use it somehow?
+        cg.ILG.Emit(OpCodes.Brfalse, notseq);
+        // it's a sequence
+        cg.ILG.Emit(OpCodes.Castclass, typeof(ISequence));  
+        cg.ILG.Emit(OpCodes.Dup);
+        seqslot.EmitSet(cg);
+        cg.EmitCall(typeof(IContainer), "__len__");
+        cg.ILG.Emit(OpCodes.Dup);
+        lenslot.EmitSet(cg);
+        cg.EmitInt(lhs.Expressions.Length);
+        cg.ILG.Emit(OpCodes.Ceq);
+        cg.ILG.Emit(OpCodes.Brfalse, badlen);
+        lenslot.EmitGet(cg);
+        cg.EmitInt(0);
+        cg.ILG.Emit(OpCodes.Ceq);
+        cg.ILG.Emit(OpCodes.Brtrue, end);
+        // sequence is the right length and >0
+        seqslot.EmitGet(cg);
+        for(int i=0; i<lhs.Expressions.Length; i++)
+        { if(i!=lhs.Expressions.Length-1) cg.ILG.Emit(OpCodes.Dup);
+          cg.EmitInt(i);
+          cg.EmitCall(typeof(ISequence), "__getitem__");
+          lhs.Expressions[i].EmitSet(cg);
+        }
+        cg.ILG.Emit(OpCodes.Br, end);
+        cg.ILG.MarkLabel(notseq);
+        // it's not a sequence. maybe it's a string
+        cg.ILG.Emit(OpCodes.Dup);
+        cg.ILG.Emit(OpCodes.Isinst, typeof(string));
+        cg.ILG.Emit(OpCodes.Brfalse, notstr);
+        // it's a string, cast and check the length
+        cg.ILG.Emit(OpCodes.Castclass, typeof(string));
+        cg.ILG.Emit(OpCodes.Dup);
+        strslot.EmitSet(cg);
+        cg.EmitPropGet(typeof(string), "Length");
+        cg.ILG.Emit(OpCodes.Dup);
+        lenslot.EmitSet(cg);
+        cg.EmitInt(lhs.Expressions.Length);
+        cg.ILG.Emit(OpCodes.Ceq);
+        cg.ILG.Emit(OpCodes.Brfalse, badlen);
+        lenslot.EmitGet(cg);
+        cg.EmitInt(0);
+        cg.ILG.Emit(OpCodes.Ceq);
+        cg.ILG.Emit(OpCodes.Brtrue, end);
+        // it's a string of the right length (>0)
+        strslot.EmitGet(cg);
+        for(int i=0; i<lhs.Expressions.Length; i++)
+        { if(i!=lhs.Expressions.Length-1) cg.ILG.Emit(OpCodes.Dup);
+          cg.EmitInt(i);
+          cg.EmitCall(typeof(string), "get_Chars");
+          cg.EmitInt(1);
+          cg.EmitNew(typeof(string), new Type[] { typeof(char), typeof(int) });
+          lhs.Expressions[i].EmitSet(cg);
+        }
+        cg.ILG.Emit(OpCodes.Br, end);
+        cg.ILG.MarkLabel(notstr);
+        // it's not a string. assume it's a dynamic sequence
+        cg.ILG.Emit(OpCodes.Dup);
+        objslot.EmitSet(cg); // just sticking the object here temporarily
+        cg.EmitString("__len__");
+        cg.EmitCall(typeof(Ops), "GetAttr", new Type[] { typeof(object), typeof(string) });
+        cg.EmitCall(typeof(Ops), "Call0");
+        cg.EmitCall(typeof(Ops), "ToInt");
+        cg.ILG.Emit(OpCodes.Dup);
+        lenslot.EmitSet(cg);
+        cg.EmitInt(lhs.Expressions.Length);
+        cg.ILG.Emit(OpCodes.Ceq);
+        cg.ILG.Emit(OpCodes.Brfalse, badlen);
+        lenslot.EmitGet(cg);
+        cg.EmitInt(0);
+        cg.ILG.Emit(OpCodes.Ceq);
+        cg.ILG.Emit(OpCodes.Brtrue, end);
+        // well, it has a __len__ attribute and it returns the correct non-zero length
+        objslot.EmitGet(cg);
+        cg.EmitString("__getitem__");
+        cg.EmitCall(typeof(Ops), "GetAttr", new Type[] { typeof(object), typeof(string) });
+        for(int i=0; i<lhs.Expressions.Length; i++)
+        { if(i!=lhs.Expressions.Length-1) cg.ILG.Emit(OpCodes.Dup);
+          cg.EmitInt(i);
+          cg.EmitCall(typeof(Ops), "Call1");
+          lhs.Expressions[i].EmitSet(cg);
+        }
+        cg.ILG.Emit(OpCodes.Br, end);
+        cg.ILG.MarkLabel(badlen);
+        cg.EmitString("too many values to unpack (expected {0}, got {1})");
+        cg.EmitNewArray(typeof(object), 2);
+        cg.ILG.Emit(OpCodes.Dup);
+        cg.EmitInt(0);
+        cg.EmitInt(lhs.Expressions.Length);
+        cg.ILG.Emit(OpCodes.Box, typeof(int));
+        cg.ILG.Emit(OpCodes.Stelem_Ref);
+        cg.ILG.Emit(OpCodes.Dup);
+        cg.EmitInt(1);
+        lenslot.EmitGet(cg);
+        cg.ILG.Emit(OpCodes.Box, typeof(int));
+        cg.ILG.Emit(OpCodes.Stelem_Ref);
+        cg.EmitCall(typeof(Ops), "ValueError");
+        cg.ILG.Emit(OpCodes.Throw);
+        cg.ILG.MarkLabel(end); // phew!
+        #endregion
+      }
+    }
+    else
+    { RHS.Emit(cg);
+      LHS.EmitSet(cg);
+    }
   }
 
   public override void Execute(Frame frame) { LHS.Assign(RHS.Evaluate(frame), frame); }
@@ -341,9 +460,14 @@ public class ExpressionStatement : Statement
   public override void Emit(CodeGenerator cg)
   { Expression.Emit(cg);
     if(Options.Interactive)
-    { // TODO: add call to sys.displayhook()
+    { Slot temp = cg.AllocLocalTemp(typeof(object));
+      temp.EmitSet(cg);
+      cg.EmitFieldGet(typeof(Boa.Modules.sys), "displayhook");
+      temp.EmitGet(cg);
+      cg.EmitCall(typeof(Ops), "Call1");
+      cg.FreeLocalTemp(temp);
     }
-    else cg.ILG.Emit(OpCodes.Pop);
+    cg.ILG.Emit(OpCodes.Pop);
   }
   public override void Execute(Frame frame)
   { object ret = Expression.Evaluate(frame);

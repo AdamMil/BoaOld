@@ -71,6 +71,11 @@ public class CodeGenerator
 
   public void EmitGet(Name name) { Namespace.GetSlotForGet(name).EmitGet(this); }
   public void EmitSet(Name name) { Namespace.GetSlotForSet(name).EmitSet(this); }
+  
+  public void EmitPropGet(Type type, string name) { EmitPropGet(type.GetProperty(name)); }
+  public void EmitPropGet(PropertyInfo pi) { EmitCall(pi.GetGetMethod()); }
+  public void EmitPropSet(Type type, string name) { EmitPropSet(type.GetProperty(name)); }
+  public void EmitPropSet(PropertyInfo pi) { EmitCall(pi.GetSetMethod()); }
 
   public void EmitInt(int value)
   { OpCode op;

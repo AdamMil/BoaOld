@@ -13,7 +13,7 @@ public class BoaTypeAttribute : Attribute
 
 public abstract class BoaType : DynamicType, IDynamicObject, ICallable, IHasAttributes
 { public BoaType(Type type)
-  { this.type=type; dict=new Dict();
+  { this.type=type;
 
     if(type==typeof(object)) __name__ = "object";
     else
@@ -32,7 +32,8 @@ public abstract class BoaType : DynamicType, IDynamicObject, ICallable, IHasAttr
 
   #region IHasAttributes
   public List __attrs__()
-  { List ret = dict.keys();
+  { Initialize();
+    List ret = dict.keys();
     ret.sort();
     return ret;
   }
@@ -66,8 +67,11 @@ public abstract class BoaType : DynamicType, IDynamicObject, ICallable, IHasAttr
 
   internal object LookupSlot(string name) { return RawGetSlot(name); }
 
+  protected virtual void Initialize() { dict=new Dict(); initialized=true; }
+
   protected object RawGetSlot(string name)
-  { if(name=="__dict__") return dict;
+  { Initialize();
+    if(name=="__dict__") return dict;
     /*if(name=="__getattr__") return getAttributeF;
     if(name=="__setattr__") return setAttributeF;
     if(name=="__cmp__") return cmpF;
@@ -81,6 +85,7 @@ public abstract class BoaType : DynamicType, IDynamicObject, ICallable, IHasAttr
 
   protected Dict dict;
   protected Type type;
+  protected bool initialized;
 }
 
 } // namespace Boa.Runtime

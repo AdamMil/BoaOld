@@ -1,4 +1,4 @@
-//#define COMPILED
+#define COMPILED
 
 using System;
 using Boa.AST;
@@ -27,9 +27,7 @@ public class Text
         string source = Console.ReadLine();
         if(source=="quit" || source=="exit") break;
 
-        try
-        { stmt = Parser.FromString(source).Parse();
-        }
+        try { stmt = Parser.FromString(source).Parse(); }
         catch(SyntaxErrorException e)
         { if(e.Message.IndexOf("expected indent")==-1) throw;
           source += '\n';

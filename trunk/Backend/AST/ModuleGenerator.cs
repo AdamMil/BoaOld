@@ -16,7 +16,7 @@ public sealed class ModuleGenerator
     TypeGenerator tg = ag.DefineType(name, typeof(Boa.Runtime.Module));
 
     ConstructorBuilder cons = tg.TypeBuilder.DefineDefaultConstructor(MethodAttributes.Public);
-    CodeGenerator icg = tg.DefineMethod(MethodAttributes.Virtual|MethodAttributes.Public, "Initialize",
+    CodeGenerator icg = tg.DefineMethod(MethodAttributes.Virtual|MethodAttributes.Public, "Run",
                                         typeof(void), new Type[] { typeof(Boa.Runtime.Frame) });
     icg.Namespace = new FrameNamespace(tg, icg);
     icg.ILG.Emit(OpCodes.Ldarg_0);
