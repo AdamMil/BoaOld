@@ -68,8 +68,35 @@ public struct Integer : IConvertible, IRepresentable, IComparable, ICloneable
   }
 
   public Integer(ulong i) { sign=1; data=new uint[2] { (uint)i, (uint)(i>>32) }; length=2; }
+  
+  public Integer(string s) : this(s, 10) { }
+  public Integer(string s, int radix)
+  { throw new NotImplementedException();
+  }
+  
+  public Integer(double d)
+  { if(double.IsInfinity(d)) throw Ops.OverflowError("cannot convert float infinity to long");
+    double frac;
+    int expo;
 
-  Integer(int sign, params uint[] data)
+    frac = Boa.Modules._math.frexp(d, out expo);
+    if(expo<=0) { sign=0; data=Zero.data; length=0; return; }
+
+    length = (ushort)(((expo-1)>>5)+1);
+    data = new uint[length];
+    frac = Boa.Modules._math.ldexp(frac, ((expo-1)&31)+1);
+
+    if(length==1) data[0] = (uint)frac;
+    else
+    { uint bits = (uint)frac;
+      data[1] = bits;
+      data[0] = (uint)Boa.Modules._math.ldexp(frac-bits, 32);
+    }
+    
+    sign = (short)(d<0 ? -1 : 1);
+  }
+
+  internal Integer(int sign, params uint[] data)
   { int length = calcLength(data);
     if(length>ushort.MaxValue) throw new NotImplementedException("Integer values larger than 2097120 bits");
     this.sign=(short)sign; this.data=data; this.length=(ushort)length;
@@ -97,8 +124,8 @@ public struct Integer : IConvertible, IRepresentable, IComparable, ICloneable
   }
   #endregion
 
-  public static Integer Parse(string s) { return Parse(s, 10); }
-  public static Integer Parse(string s, int radix) { throw new NotImplementedException(); }
+  public static Integer Parse(string s) { return new Integer(s, 10); }
+  public static Integer Parse(string s, int radix) { return new Integer(s, radix); }
 
   public static readonly Integer MinusOne = new Integer(-1, new uint[1]{1});
   public static readonly Integer One  = new Integer(1, new uint[1]{1});
@@ -169,8 +196,16 @@ public struct Integer : IConvertible, IRepresentable, IComparable, ICloneable
   #region Arithmetic operators
   #region Addition
   public static Integer operator+(Integer a, Integer b)
-  { return a.sign==b.sign ? new Integer(a.sign, add(a.data, a.length, b.data, b.length))
-                          : a - new Integer(-b.sign, b.data);
+  { int c = a.AbsCompareTo(b);
+    if(c==0) return Integer.Zero;
+    if(a.sign==b.sign) // addition
+    { if(c>0) return new Integer(a.sign, add(a.data, a.length, b.data, b.length));
+      else return new Integer(b.sign, add(b.data, b.length, a.data, a.length));
+    }
+    else // subtraction
+    { if(c>0) return new Integer(a.sign, sub(a.data, a.length, b.data, b.length));
+      else return new Integer(b.sign, sub(b.data, b.length, a.data, a.length));
+    }
   }
   public static Integer operator+(Integer a, int b)   { return a + new Integer(b); }
   public static Integer operator+(Integer a, uint b)  { return a + new Integer(b); }
@@ -184,15 +219,17 @@ public struct Integer : IConvertible, IRepresentable, IComparable, ICloneable
   
   #region Subtraction
   public static Integer operator-(Integer a, Integer b)
-  { int c = a.CompareTo(b);
+  { int c = a.AbsCompareTo(b);
     if(c==0) return Integer.Zero;
-    c = Math.Sign(c);
-
-    uint[] n;
-    if(a.sign==b.sign)
-      n = c==a.sign ? sub(a.data, a.length, b.data, b.length) : sub(b.data, b.length, a.data, a.length);
-    else n = add(a.data, a.length, b.data, b.length);
-    return new Integer(c, n);
+    
+    if(a.sign==b.sign) // subtraction
+    { if(c>0) return new Integer(a.sign, sub(a.data, a.length, b.data, b.length));
+      else return new Integer(-b.sign, sub(b.data, b.length, a.data, a.length));
+    }
+    else // addition
+    { if(c>0) return new Integer(a.sign, add(a.data, a.length, b.data, b.length));
+      else return new Integer(-b.sign, add(b.data, b.length, a.data, a.length));
+    }
   }
   public static Integer operator-(Integer a, int b)   { return a - new Integer(b); }
   public static Integer operator-(Integer a, uint b)  { return a - new Integer(b); }
@@ -362,7 +399,19 @@ public struct Integer : IConvertible, IRepresentable, IComparable, ICloneable
   public sbyte ToSByte(IFormatProvider provider) { return ToSByte(); }
 
   public double ToDouble()
-  { throw new NotImplementedException();
+  { if(length==0) return 0.0;
+    int    len = length-1;
+    double ret = data[len];
+    if(len>0)
+    { ret = ret*4294967296.0 + data[--len];
+      if(len>int.MaxValue/32) throw Ops.OverflowError("long int too large to convert to float");
+      if(len>0)
+      { ret = Boa.Modules._math.ldexp(ret, len*32);
+        if(double.IsPositiveInfinity(ret)) throw Ops.OverflowError("long int too large to convert to float");
+      }
+    }
+    if(sign<0) ret = -ret;
+    return ret;
   }
   public double ToDouble(IFormatProvider provider) { return ToDouble(); }
 
@@ -490,18 +539,21 @@ public struct Integer : IConvertible, IRepresentable, IComparable, ICloneable
   internal Integer Pow(Integer power) { return Pow(power.ToUInt32()); }
   internal Integer Pow(Integer power, object mod) { return Pow(power.ToUInt32(), mod); }
   #endregion
-  
-  Integer squared() { return this*this; } // TODO: this can be optimized much better
 
-  uint[] data;
-  short sign;
-  ushort length;
-
-  static uint[] add(uint[] a, int alen, uint[] b, int blen)
-  { return blen>alen ? addArrays(b, blen, a, alen) : addArrays(a, alen, b, blen);
+  int AbsCompareTo(Integer o)
+  { int len=length, olen=o.length;
+    if(len!=olen) return len-olen;
+    for(int i=len-1; i>=0; i--) if(data[i]!=o.data[i]) return (int)(data[i]-o.data[i]);
+    return 0;
   }
 
-  static uint[] addArrays(uint[] a, int alen, uint[] b, int blen) // assumes alen >= blen
+  Integer squared() { return this*this; } // TODO: this can be optimized much better
+
+  internal uint[] data;
+  internal ushort length;
+  short sign;
+
+  static uint[] add(uint[] a, int alen, uint[] b, int blen) // assumes alen >= blen
   { uint[] n = new uint[alen];
     ulong sum = 0;
     int i=0;
@@ -548,16 +600,16 @@ public struct Integer : IConvertible, IRepresentable, IComparable, ICloneable
       { if(ai==0) ai=0xffffffff;
         else borrow = bi > --ai;
       }
+      else if(bi>ai) borrow = true;
       n[i] = ai-bi;
     }
 
     if(borrow)
-    { for(; i<alen; i++)
+      for(; i<alen; i++)
       { ai = a[i];
         n[i] = ai-1;
         if(ai!=0) { i++; break; }
       }
-    }
     for(; i<alen; i++) n[i] = a[i];
     return n;
   }

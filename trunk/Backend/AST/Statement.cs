@@ -308,7 +308,7 @@ public class AssertStatement : Statement
       cg.EmitString("assertion failed: ");
       cg.EmitString(Expression.ToCode());
       cg.EmitCall(typeof(string), "Concat", new Type[] { typeof(string), typeof(string) });
-      cg.EmitNew(typeof(AssertionErrorException));
+      cg.EmitNew(typeof(AssertionErrorException), new Type[] { typeof(string) });
       cg.ILG.Emit(OpCodes.Throw);
       cg.ILG.MarkLabel(good);
     }
@@ -896,20 +896,20 @@ public class ImportStatement : Statement
 
 #region ForStatement
 public class ForStatement : Statement
-{ public ForStatement(Name[] names, Expression expr, Statement body)
+{ public ForStatement(Name[] names, Expression expr, Statement body, Statement elze)
   { if(names.Length==1) Names = new NameExpression(names[0]);
     else
     { Expression[] ne = new Expression[names.Length];
       for(int i=0; i<names.Length; i++) ne[i] = new NameExpression(names[i]);
       Names=new TupleExpression(ne);
     }
-    Expression=expr; Body=body;
+    Expression=expr; Body=body; Else=elze;
   }
 
   public override void Emit(CodeGenerator cg)
   { AssignStatement ass = new AssignStatement(Names);
     Slot list = cg.AllocLocalTemp(typeof(IEnumerator), true);
-    Label start=cg.ILG.DefineLabel(), end=cg.ILG.DefineLabel();
+    Label start=cg.ILG.DefineLabel(), end=cg.ILG.DefineLabel(), elze=(Else==null ? end : cg.ILG.DefineLabel());
 
     Body.Walk(new JumpFinder(start, end));
     Expression.Emit(cg);
@@ -919,12 +919,16 @@ public class ForStatement : Statement
     cg.ILG.MarkLabel(start);
     list.EmitGet(cg);
     cg.EmitCall(typeof(IEnumerator), "MoveNext");
-    cg.ILG.Emit(OpCodes.Brfalse, end);
+    cg.ILG.Emit(OpCodes.Brfalse, elze);
     list.EmitGet(cg);
     cg.EmitPropGet(typeof(IEnumerator), "Current");
     ass.Emit(cg);
     Body.Emit(cg);
     cg.ILG.Emit(OpCodes.Br, start);
+    if(Else!=null)
+    { cg.ILG.MarkLabel(elze);
+      Else.Emit(cg);
+    }
     cg.ILG.MarkLabel(end);
     cg.ILG.BeginCatchBlock(typeof(StopIterationException));
     cg.ILG.EndExceptionBlock();
@@ -941,10 +945,12 @@ public class ForStatement : Statement
     { ce.Value=e.Current;
       ass.Execute(frame);
       try { Body.Execute(frame); }
-      catch(BreakException) { break; }
-      catch(StopIterationException) { break; }
+      catch(BreakException) { goto done; }
+      catch(StopIterationException) { goto done; }
       catch(ContinueException) { }
     }
+    if(Else!=null) Else.Execute(frame);
+    done:;
   }
   
   public override void ToCode(System.Text.StringBuilder sb, int indent)
@@ -968,13 +974,14 @@ public class ForStatement : Statement
     { Names.Walk(w);
       Expression.Walk(w);
       Body.Walk(w);
+      if(Else!=null) Else.Walk(w);
     }
     w.PostWalk(this);
   }
 
   public Expression Names;
   public Expression Expression;
-  public Statement  Body;
+  public Statement  Body, Else;
 }
 #endregion
 
@@ -1389,22 +1396,26 @@ public class TryStatement : Statement
 
 #region WhileStatement
 public class WhileStatement : Statement
-{ public WhileStatement(Expression test, Statement body) { Test=test; Body=body; }
+{ public WhileStatement(Expression test, Statement body, Statement elze) { Test=test; Body=body; Else=elze; }
 
   public override void Emit(CodeGenerator cg)
   { if(!Options.Debug && Test.IsConstant && !Ops.IsTrue(Test.GetValue())) return;
 
-    Label start=cg.ILG.DefineLabel(), end=cg.ILG.DefineLabel();
+    Label start=cg.ILG.DefineLabel(), end=cg.ILG.DefineLabel(), elze=(Else==null ? end : cg.ILG.DefineLabel());
     Body.Walk(new JumpFinder(start, end));
     cg.ILG.BeginExceptionBlock();
     cg.ILG.MarkLabel(start);
     if(Options.Debug || !Test.IsConstant)
     { Test.Emit(cg);
       cg.EmitCall(typeof(Ops), "IsTrue");
-      cg.ILG.Emit(OpCodes.Brfalse, end);
+      cg.ILG.Emit(OpCodes.Brfalse, elze);
     }
     Body.Emit(cg);
     cg.ILG.Emit(OpCodes.Br, start);
+    if(Else!=null)
+    { cg.ILG.MarkLabel(elze);
+      Else.Emit(cg);
+    }
     cg.ILG.MarkLabel(end);
     cg.ILG.BeginCatchBlock(typeof(StopIterationException));
     cg.ILG.EndExceptionBlock();
@@ -1414,8 +1425,11 @@ public class WhileStatement : Statement
   { try
     { while(Ops.IsTrue(Test.Evaluate(frame)))
         try { Body.Execute(frame); }
-        catch(BreakException) { break; }
+        catch(BreakException) { goto done; }
+        catch(StopIterationException) { goto done; }
         catch(ContinueException) { }
+      if(Else!=null) Else.Execute(frame);
+      done:;
     }
     catch(StopIterationException) { }
   }
@@ -1431,12 +1445,13 @@ public class WhileStatement : Statement
   { if(w.Walk(this))
     { Test.Walk(w);
       Body.Walk(w);
+      if(Else!=null) Else.Walk(w);
     }
     w.PostWalk(this);
   }
 
   public Expression Test;
-  public Statement  Body;
+  public Statement  Body, Else;
 }
 #endregion
 

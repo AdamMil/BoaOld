@@ -62,11 +62,11 @@ public sealed class _math
   public static double radians(double degs) { return degs*DegreesToRadians; }
 
   [DllImport(ImportDll, CallingConvention=CallingConvention.Cdecl)]
-  static extern double frexp(double v, out int e);
+  internal static extern double frexp(double v, out int e);
   [DllImport(ImportDll, CallingConvention=CallingConvention.Cdecl)]
-  static extern double ldexp(double m, int e);
+  internal static extern double ldexp(double m, int e);
   [DllImport(ImportDll, CallingConvention=CallingConvention.Cdecl)]
-  static extern double modf(double v, out double whole);
+  internal static extern double modf(double v, out double whole);
 
   const double DegreesToRadians = Math.PI/180;
   const double RadiansToDegrees = 180/Math.PI;

@@ -33,9 +33,9 @@ using Boa.Runtime;
 // TODO: support unicode string parsing
 // FIXME: make this parse:   (lambda: print)
 // TODO: disallow assignment to constants
-// TODO: make string parsing more close to python's if possible
+// TODO: make string parsing closer to python's if possible
 // TODO: add proper parsing of octal numbers
-// TODO: support numbers in scientific notation
+// TODO: add support for parsing numbers in any base (eg 3#1212 is 1212 in base 3)
 
 namespace Boa.AST
 {
@@ -429,14 +429,15 @@ public class Parser
 
   // for_stmt := 'for' <namelist> 'in' <expression> <suite>
   Statement ParseFor()
-  { Eat(Token.For);
+  { int indent=this.indent;
+    Eat(Token.For);
     Name[] names = ParseNameList();
     Eat(Token.In);
     Expression loopExp = ParseExpression();
     loopDepth++;
-    Statement body = ParseSuite();
+    Statement body = ParseSuite(), elze=this.indent==indent && TryEat(Token.Else) ? ParseSuite() : null;
     loopDepth--;
-    return AP(new ForStatement(names, loopExp, body));
+    return AP(new ForStatement(names, loopExp, body, elze));
   }
 
   // global_stmt := 'global' <namelist> EOL
@@ -943,9 +944,9 @@ public class Parser
   { Eat(Token.While);
     Expression expr = ParseExpression();
     loopDepth++;
-    Statement body = ParseSuite();
+    Statement body = ParseSuite(), elze=this.indent==indent && TryEat(Token.Else) ? ParseSuite() : null;
     loopDepth--;
-    return AP(new WhileStatement(expr, body));
+    return AP(new WhileStatement(expr, body, elze));
   }
 
   Token PeekToken()
@@ -1015,6 +1016,24 @@ public class Parser
         { if(char.ToUpper(c)=='J')
           { if(hex) SyntaxError("'J' modifier cannot be used with hex numbers");
             value = new Complex(0, double.Parse(s));
+          }
+          else if(char.ToUpper(c)=='E')
+          { if(hex) SyntaxError("'E' modifier cannot be used with hex numbers");
+            double num=double.Parse(s), exp;
+            bool   neg=false;
+            s = string.Empty;
+            c = ReadChar();
+            if(c=='-') { neg=true; c=ReadChar(); }
+            else if(c=='+') c=ReadChar();
+            if(!char.IsNumber(c)) SyntaxError("Expected number in scientific notation.");
+            do
+            { s += c;
+              c = ReadChar();
+            } while(char.IsNumber(c));
+            lastChar = c;
+
+            exp = double.Parse(s);
+            value = num * Math.Pow(10, neg ? -exp : exp);
           }
           else if(period)
           { if(hex) SyntaxError("invalid number or attribute reference");

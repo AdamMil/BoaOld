@@ -333,7 +333,7 @@ public abstract class ReflectedMethodBase : ReflectedMember, IFancyCallable
 
     for(int i=0; i<args.Length; i++) types[i] = args[i]==null ? null : args[i].GetType();
 
-    for(int mi=0; mi<sigs.Length; mi++) // TODO: cache the binding results somehow?
+    for(int mi=0; mi<sigs.Length; mi++) // TODO: speed the binding up somehow?
     { if(instance==null && !sigs[mi].IsStatic && !sigs[mi].IsConstructor) continue;
       ParameterInfo[] parms = sigs[mi].GetParameters();
       bool paramArray = parms.Length>0 && IsParamArray(parms[parms.Length-1]);

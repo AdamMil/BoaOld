@@ -84,11 +84,13 @@ public sealed class sys
   public static object stdout = __stdout__;
   public static object stderr = __stderr__;
   
+  public static List warnoptions = new List(); // TODO: populate this list on startup
+  
   public static int recursionlimit = 1000; // TODO: make this take effect
   public static int tracebacklimit = 1000; // TODO: make this take effect
 
-  public static string version = "0.1.0";
-  public static Tuple version_info = new Tuple(0, 1, 0, "devel");
+  public static string version = "0.2.0";
+  public static Tuple version_info = new Tuple(0, 2, 0, "devel");
 
   internal static Stack Exceptions = new Stack();
 
