@@ -432,8 +432,11 @@ public class AssignStatement : Statement
   }
 
   public override void Execute(Frame frame)
-  { object value = RHS.Evaluate(frame);
-    for(int i=LHS.Length-1; i>=0; i--) LHS[i].Assign(value, frame);
+  { if(Op!=null) LHS[0].Assign(new BinaryOpExpression(Op, LHS[0], RHS).Evaluate(frame), frame);
+    else
+    { object value = RHS.Evaluate(frame);
+      for(int i=LHS.Length-1; i>=0; i--) LHS[i].Assign(value, frame);
+    }
   }
 
   public override object GetValue() { return RHS.GetValue(); }

@@ -650,7 +650,14 @@ public sealed class Ops
     { Slice slice = index as Slice;
       return slice==null ? seq.__getitem__(ToInt(index)) : seq.__getitem__(slice);
     }
-    else return Ops.Invoke(obj, "__getitem__", index);
+    else
+    { string s = obj as string;
+      if(s!=null)
+      { Slice slice = index as Slice;
+        return slice==null ? new string(s[FixIndex(ToInt(index), s.Length)], 1) : StringOps.Slice(s, slice);
+      }
+    }
+    return Ops.Invoke(obj, "__getitem__", index);
   }
 
   public static ImportErrorException ImportError(string format, params object[] args)

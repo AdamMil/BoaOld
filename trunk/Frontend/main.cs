@@ -72,7 +72,6 @@ sys.path[1] = "c:/code/Boa/Backend/lib";
       }
       catch(Exception e)
       { if(e is SystemExitException) throw;
-        if(e.InnerException is SystemExitException) throw e.InnerException;
         Console.Error.WriteLine();
         Console.Error.WriteLine(e);
       }

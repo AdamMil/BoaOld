@@ -36,7 +36,7 @@ public sealed class StringOps
 
     #region ISequence Members
     public object __add__(object o) { throw Ops.TypeError("strings are immutable"); }
-    public object __getitem__(int index) { return new string(str[index], 1); }
+    public object __getitem__(int index) { return new string(str[Ops.FixIndex(index, str.Length)], 1); }
     object Boa.Runtime.ISequence.__getitem__(Slice slice) { return StringOps.Slice(str, slice); }
     public int __len__() { return str.Length; }
     public bool __contains__(object value)

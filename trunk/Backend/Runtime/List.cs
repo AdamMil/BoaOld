@@ -91,6 +91,17 @@ public class List : IMutableSequence, IList, IComparable, ICloneable, IRepresent
   public void sort() { Array.Sort(items, 0, size, Ops.DefaultComparer); }
   public void sort(object cmpfunc) { Array.Sort(items, 0, size, new FunctionComparer(cmpfunc)); }
 
+  public List sorted()
+  { List ret = new List(this);
+    ret.sort();
+    return ret;
+  }
+  public List sorted(object cmpfunc)
+  { List ret = new List(this);
+    ret.sort(cmpfunc);
+    return ret;
+  }
+
   public Tuple ToTuple()
   { object[] ti = new object[size];
     items.CopyTo(ti, 0);

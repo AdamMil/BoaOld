@@ -163,14 +163,8 @@ sequences or when many of a range's elements are never used.")]
     
     #region ISequence Members
     public object __add__(object o) { throw Ops.TypeError("xrange concatenation is not supported"); }
-
-    public object __getitem__(int index)
-    { if(index<0 || index>=length) throw Ops.IndexError("xrange object index out of range");
-      return start + step*index;
-    }
-
+    public object __getitem__(int index) { return start + step*Ops.FixIndex(index, length); }
     public object __getitem__(Slice slice) { return Ops.SequenceSlice(this, slice); }
-
     public int __len__() { return length; }
 
     public bool __contains__(object value)
