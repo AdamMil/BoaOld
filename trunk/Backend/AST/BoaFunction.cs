@@ -1,3 +1,24 @@
+/*
+Boa is the reference implementation for a language similar to Python,
+also called Boa. This implementation is both interpreted and compiled,
+targeting the Microsoft .NET Framework.
+
+http://www.adammil.net/
+Copyright (C) 2004 Adam Milazzo
+
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 2
+of the License, or (at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+*/
+
 using System;using System.Collections;using System.Reflection;using System.Reflection.Emit;using Boa.Runtime;// TODO: implement function documentation stringsnamespace Boa.AST{public sealed class BoaFunction : Node{ public BoaFunction(Node from, Parameter[] parms, Statement body)  { Parameters=parms; Body=body; SetLocation(from.Source, from.Line, from.Column);    Yields = YieldFinder.Find(body);    if(Yields!=null) body.Walk(new ReturnMarker());        Suite suite = body as Suite;    if(suite!=null && suite.Statements[0] is ExpressionStatement) // TODO: strip uniform whitespace after second line    { ExpressionStatement es = (ExpressionStatement)suite.Statements[0];      if(es.Expression is ConstantExpression) docstring = ((ConstantExpression)es.Expression).Value as string;    }  }  public BoaFunction(Node from, string name, Parameter[] parms, Statement body) : this(from, parms, body)  { Name=new Name(name);  }  public Name   Name;  public Name[] Inherit, Globals;  public Parameter[] Parameters;  public YieldStatement[] Yields;  public Statement Body;  public string FuncName { get { return Name==null ? "lambda" : Name.String; } }  public void Emit(CodeGenerator cg)  { Initialize();
     CodeGenerator impl = MakeImplMethod(cg);
     Type targetType = Inherit==null ? typeof(CallTargetN) : typeof(CallTargetFN);
