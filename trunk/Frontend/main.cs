@@ -1,4 +1,4 @@
-#define COMPILED
+//#define COMPILED
 
 using System;
 using Boa.AST;
@@ -16,7 +16,7 @@ public class Text
     Module top = new Module();
     Frame topFrame = new Frame(top);
     Ops.Frames.Push(topFrame);
-
+    
     top.__setattr__("__builtins__", Importer.Import("__builtin__"));
     top.__setattr__("__name__", "main");
 

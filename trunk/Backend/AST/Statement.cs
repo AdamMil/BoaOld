@@ -8,8 +8,8 @@ using Boa.Runtime;
 namespace Boa.AST
 {
 
-// FIXME: update post processing to know about 'for' loops and tuple assignment
-// TODO: using exceptions is extremely slow! stop it!
+// TODO: possibly rework compiled closures
+// TODO: using exceptions is extremely slow
 #region Exceptions (used to aid implementation)
 public class BreakException : Exception
 { public static BreakException Value = new BreakException();
@@ -23,6 +23,7 @@ public class ReturnException : Exception
 }
 #endregion
 
+#region Walkers
 #region JumpFinder
 class JumpFinder : IWalker
 { public JumpFinder(Label start, Label end) { this.start=start; this.end=end; }
@@ -32,12 +33,13 @@ class JumpFinder : IWalker
   public bool Walk(Node node)
   { if(node is BreakStatement) ((BreakStatement)node).Label = end;
     else if(node is ContinueStatement) ((ContinueStatement)node).Label = start;
-    else if(node is WhileStatement) return false;
+    else if(node is WhileStatement || node is ForStatement) return false;
     return true;
   }
 
   Label start, end;
 }
+#endregion
 #endregion
 
 #region Statement
@@ -54,14 +56,13 @@ public abstract class Statement : Node
   void PostProcess() { }
 
   #region NameDecorator
-  // TODO: handle lambda, pragma global, and other types of assignments
   class NameDecorator : IWalker
   { public void PostWalk(Node node)
     { if(node==current)
       { inDef=false;
 
         ArrayList inherit = innerFuncs.Count==0 ? null : new ArrayList();
-        foreach(DefStatement def in innerFuncs)
+        foreach(BoaFunction def in innerFuncs)
         { NameDecorator dec = new NameDecorator();
           def.Walk(dec);
           foreach(Name dname in dec.names.Values)
@@ -88,25 +89,30 @@ public abstract class Statement : Node
     { if(inDef)
       { if(node is DefStatement)
         { DefStatement de = (DefStatement)node;
-          innerFuncs.Add(node);
-          de.Name = AddName(de.Name);
-          de.Name.Scope = Scope.Local;
+          innerFuncs.Add(de.Function);
+          de.Function.Name = AddName(de.Function.Name);
+          de.Function.Name.Scope = Scope.Local;
           return false;
+        }
+        else if(node is LambdaExpression)
+        { innerFuncs.Add(((LambdaExpression)node).Function);
+          return false;
+        }
+        else if(node is AssignStatement)
+        { AssignStatement ass = (AssignStatement)node;
+          HandleAssignment(ass.LHS);
+        }
+        else if(node is ForStatement)
+        { ForStatement fs = (ForStatement)node;
+          HandleAssignment(fs.Names);
+        }
+        else if(node is ListCompExpression)
+        { ListCompExpression lc = (ListCompExpression)node;
+          HandleAssignment(lc.Names);
         }
         else if(node is NameExpression)
         { NameExpression ne = (NameExpression)node;
           ne.Name = AddName(ne.Name);
-        }
-        else if(node is AssignStatement)
-        { AssignStatement ass = (AssignStatement)node;
-          if(ass.LHS is NameExpression)
-          { NameExpression ne = (NameExpression)ass.LHS;
-            ne.Name = AddName(ne.Name);
-            ne.Name.Scope = Scope.Local;
-          }
-          else throw Ops.NotImplemented("Unhandled type '{0}' in NameDecorator", node.GetType());
-          Walk(ass.RHS);
-          return false;
         }
       }
       else if(node is DefStatement)
@@ -116,21 +122,32 @@ public abstract class Statement : Node
         }
 
         DefStatement def = (DefStatement)node;
-        foreach(Parameter p in def.Parameters)
-        { if(def.Globals!=null)
-            for(int i=0; i<def.Globals.Length; i++) if(def.Globals[i].String==p.Name.String)
-              throw Ops.SyntaxError("'{0}' is both local and global", p.Name.String);
+        foreach(Parameter p in def.Function.Parameters)
+        { if(def.Function.Globals!=null)
+            for(int i=0; i<def.Function.Globals.Length; i++)
+              if(def.Function.Globals[i].String==p.Name.String)
+                throw Ops.SyntaxError("'{0}' is both local and global", p.Name.String);
           names[p.Name.String] = p.Name;
         }
         current=def; inDef=true;
       }
       return true;
     }
-    
+
     Name AddName(Name name)
     { Name lname = (Name)names[name.String];
       if(lname==null) names[name.String] = lname = name;
       return lname;
+    }
+    
+    void HandleAssignment(Expression assignedTo)
+    { if(assignedTo is NameExpression)
+      { NameExpression ne = (NameExpression)assignedTo;
+        ne.Name = AddName(ne.Name);
+        ne.Name.Scope = Scope.Local;
+      }
+      else if(assignedTo is TupleExpression)
+        foreach(Expression e in ((TupleExpression)assignedTo).Expressions) HandleAssignment(e);
     }
 
     DefStatement current;
@@ -328,47 +345,43 @@ public class ContinueStatement : Statement
 #region DefStatement
 public class DefStatement : Statement
 { public DefStatement(string name, Parameter[] parms, Statement body)
-  { Name=new Name(name); Parameters=parms; Body=body;
+  { Function = new BoaFunction(name, parms, body);
     GlobalFinder gf = new GlobalFinder();
-    Body.Walk(gf);
-    Globals = gf.Globals==null || gf.Globals.Count==0 ? null : (Name[])gf.Globals.ToArray(typeof(Name));
+    Function.Body.Walk(gf);
+    Function.Globals = gf.Globals==null || gf.Globals.Count==0 ? null : (Name[])gf.Globals.ToArray(typeof(Name));
   }
 
   public override void Emit(CodeGenerator cg)
-  { CodeGenerator impl = MakeImplMethod(cg);
+  { CodeGenerator impl = Function.MakeImplMethod(cg);
 
-    Type targetType = Inherit==null ? typeof(CallTargetN) : typeof(CallTargetFN);
-    Type funcType   = Inherit==null ? typeof(CompiledFunctionN) : typeof(CompiledFunctionFN);
-    Slot funcSlot   = cg.Namespace.GetSlotForSet(Name);
+    Name[] inherit = Function.Inherit;
 
-    cg.EmitString(Name.String);
-    GetParmsSlot(cg).EmitGet(cg);
-    EmitClosedGet(cg);
+    Type targetType = inherit==null ? typeof(CallTargetN) : typeof(CallTargetFN);
+    Type funcType   = inherit==null ? typeof(CompiledFunctionN) : typeof(CompiledFunctionFN);
+    Slot funcSlot   = cg.Namespace.GetSlotForSet(Function.Name);
+
+    cg.EmitString(Function.Name.String);
+    Function.GetParmsSlot(cg).EmitGet(cg);
+    Function.EmitClosedGet(cg);
     cg.ILG.Emit(OpCodes.Ldnull); // create delegate
     cg.ILG.Emit(OpCodes.Ldftn, impl.MethodBuilder);
     cg.EmitNew((ConstructorInfo)targetType.GetMember(".ctor")[0]);
     cg.EmitNew(funcType, new Type[] { typeof(string), typeof(Parameter[]), typeof(ClosedVar[]), targetType });
     funcSlot.EmitSet(cg);
-    index++;
   }
 
-  public override void Execute(Frame frame) { frame.Set(Name.String, MakeFunction(frame)); }
-  
-  public override void Walk(IWalker w)
-  { if(w.Walk(this)) Body.Walk(w);
-    w.PostWalk(this);
-  }
+  public override void Execute(Frame frame) { frame.Set(Function.FuncName, Function.MakeFunction(frame)); }
 
-  public Name[] Inherit, Globals;
-  public Parameter[] Parameters;
-  public Name Name;
-  public Statement Body;
+  public override void Walk(IWalker w) { Function.Walk(w); }
 
+  public BoaFunction Function;
+
+  #region GlobalFinder
   class GlobalFinder : IWalker
   { public void PostWalk(Node node) { }
 
     public bool Walk(Node node)
-    { if(node is DefStatement) return false;
+    { if(node is DefStatement || node is LambdaExpression) return false; // TODO: what if 'def' and 'global' collide?
       else if(node is GlobalStatement)
       { if(Globals==null) Globals = new ArrayList();
         foreach(Name n in ((GlobalStatement)node).Names)
@@ -378,100 +391,26 @@ public class DefStatement : Statement
         return false;
       }
       else if(node is AssignStatement)
-      { AssignStatement ass = (AssignStatement)node;
-        if(ass.LHS is NameExpression)
-        { if(assigned==null) assigned=new HybridDictionary();
-          assigned[((NameExpression)ass.LHS).Name.String] = null;
-        }
+      { HandleAssignment(((AssignStatement)node).LHS);
         return false;
       }
+      else if(node is ForStatement) HandleAssignment(((ForStatement)node).Names);
+      else if(node is ListCompExpression) HandleAssignment(((ListCompExpression)node).Names);
       return true;
     }
-    
+
+    void HandleAssignment(Expression e)
+    { if(e is NameExpression)
+      { if(assigned==null) assigned=new HybridDictionary();
+        assigned[((NameExpression)e).Name.String] = null;
+      }
+      else if(e is TupleExpression) foreach(Expression te in ((TupleExpression)e).Expressions) HandleAssignment(te);
+    }
+
     public ArrayList Globals;
     HybridDictionary assigned;
   }
-
-  void EmitClosedGet(CodeGenerator cg)
-  { if(Inherit==null) cg.ILG.Emit(OpCodes.Ldnull);
-    else
-    { cg.EmitNewArray(typeof(ClosedVar), Inherit.Length);
-      ConstructorInfo ci = typeof(ClosedVar).GetConstructor(new Type[] { typeof(string) });
-      FieldInfo fi = typeof(ClosedVar).GetField("Value");
-
-      for(int i=0; i<Inherit.Length; i++)
-      { cg.ILG.Emit(OpCodes.Dup);
-        cg.EmitInt(i);
-        Slot slot = cg.Namespace.GetLocalSlot(Inherit[i]);
-        ClosedSlot cs = slot as ClosedSlot;
-        if(cs!=null) cs.Storage.EmitGet(cg);
-        else
-        { cg.EmitString(Inherit[i].String);
-          cg.EmitNew(ci);
-          cg.ILG.Emit(OpCodes.Dup);
-          slot.EmitGet(cg);
-          cg.EmitFieldSet(fi);
-        }
-        cg.ILG.Emit(OpCodes.Stelem_Ref);
-      }
-    }
-  }
-
-  Slot GetParmsSlot(CodeGenerator cg)
-  { if(namesSlot==null)
-    { namesSlot = cg.TypeGenerator.AddStaticSlot(Name.String+"$parms"+index, typeof(Parameter[]));
-      CodeGenerator icg = cg.TypeGenerator.GetInitializer();
-      ConstructorInfo nci = typeof(Name).GetConstructor(new Type[] { typeof(string), typeof(Scope) });
-      ConstructorInfo pci = typeof(Parameter).GetConstructor(new Type[] { typeof(Name) });
-
-      icg.EmitNewArray(typeof(Parameter), Parameters.Length);
-      for(int i=0; i<Parameters.Length; i++)
-      { icg.ILG.Emit(OpCodes.Dup);
-        icg.EmitInt(i);
-        icg.ILG.Emit(OpCodes.Ldelema, typeof(Parameter));
-        icg.EmitString(Parameters[i].Name.String);
-        icg.EmitInt((int)Parameters[i].Name.Scope);
-        icg.EmitNew(nci);
-        icg.EmitNew(pci);
-        icg.ILG.Emit(OpCodes.Stobj, typeof(Parameter));
-      }
-      namesSlot.EmitSet(icg);
-    }
-    return namesSlot;
-  }
-
-  CodeGenerator MakeImplMethod(CodeGenerator cg)
-  { Name[] names = new Name[Parameters.Length]; 
-    for(int i=0; i<Parameters.Length; i++) names[i] = Parameters[i].Name;
-
-    Type[] parmTypes = Inherit==null ? new Type[] { typeof(object[]) }
-                                     : new Type[] { typeof(CompiledFunction), typeof(object[]) };
-    CodeGenerator icg = cg.TypeGenerator.DefineMethod(Name.String + "$f" + index++, typeof(object), parmTypes);
-    LocalNamespace ns = new LocalNamespace(cg.Namespace, icg);
-    icg.Namespace = ns;
-    //icg.SetArgs(names, 1);
-    ns.SetArgs(names, icg, new ArgSlot(icg.MethodBuilder, Inherit==null ? 0 : 1, "$names", typeof(object[])));
-
-    if(Inherit!=null && Inherit.Length>0)
-    { icg.EmitArgGet(0);
-      icg.EmitFieldGet(typeof(CompiledFunction), "Closed");
-      for(int i=0; i<Inherit.Length; i++)
-      { if(i!=Inherit.Length-1) icg.ILG.Emit(OpCodes.Dup);
-        icg.EmitInt(i);
-        icg.ILG.Emit(OpCodes.Ldelem_Ref);
-        ns.UnpackClosedVar(Inherit[i], icg);
-      }
-    }
-    Body.Emit(icg);
-    icg.EmitReturn(null);
-    icg.Finish();
-    return icg;
-  }
-
-  object MakeFunction(Frame frame) { return new InterpretedFunction(frame, Name.String, Parameters, Globals, Body); }
-  
-  Slot namesSlot;
-  static int index;
+  #endregion
 }
 #endregion
 

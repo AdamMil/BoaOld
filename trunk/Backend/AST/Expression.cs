@@ -166,23 +166,20 @@ public class HashExpression : Expression
 
 #region LambdaExpression
 public class LambdaExpression : Expression
-{ public LambdaExpression(Parameter[] parms, Statement body) { Parameters=parms; Body=body; }
+{ public LambdaExpression(Parameter[] parms, Statement body)
+  { if(body is ExpressionStatement) body = new ReturnStatement(((ExpressionStatement)body).Expression);
+    Function = new BoaFunction(parms, body);
+  }
 
   public override void Emit(CodeGenerator cg)
   { throw new NotImplementedException();
   }
-  
-  public override object Evaluate(Frame frame)
-  { return new InterpretedFunction(frame, null, Parameters, null, Body);
-  }
 
-  public override void Walk(IWalker w)
-  { if(w.Walk(this)) Body.Walk(w);
-    w.PostWalk(this);
-  }
+  public override object Evaluate(Frame frame) { return Function.MakeFunction(frame); }
 
-  public Parameter[] Parameters;
-  public Statement Body;
+  public override void Walk(IWalker w) { Function.Walk(w); }
+
+  public BoaFunction Function;
 }
 #endregion
 
