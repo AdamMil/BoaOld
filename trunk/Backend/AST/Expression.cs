@@ -1205,6 +1205,8 @@ public class TupleExpression : Expression
     badlen: throw Ops.ValueError("wrong number of values to unpack");
   }
 
+  public override void EmitDel(CodeGenerator cg) { foreach(Expression e in Expressions) e.EmitDel(cg); }
+
   public override void Emit(CodeGenerator cg)
   { if(IsConstant) cg.EmitConstant(GetValue());
     else

@@ -26,8 +26,6 @@ using System.IO;
 namespace Boa.Runtime
 {
 
-// FIXME: standardize line endings and make readline(), etc match python's
-
 #region FileEnumerator
 public class FileEnumerator : IEnumerator
 { public FileEnumerator(IFile file) { this.file=file; state=State.BOF; }
@@ -202,14 +200,20 @@ public class BoaFile : IFile, IEnumerable
     { int pos=0;
       while(true)
       { if(bufLen>pos)
-        { int idx = Array.IndexOf(buf, (byte)'\n', pos, bufLen-pos);
+        { bool trimOne=false;
+          int idx = Array.IndexOf(buf, (byte)'\n', pos, bufLen-pos);
+          if(idx==-1)
+          { idx = Array.IndexOf(buf, (byte)'\r', pos, bufLen-pos);
+            if(idx!=-1) buf[idx] = (byte)'\n';
+          }
+          else if(idx>0 && buf[idx-1]=='\r') { trimOne=true; buf[--idx]=(byte)'\n'; }
+
           if(idx==-1) pos = bufLen;
           else
-          { int elen = 1;
-            if(idx>0 && buf[idx-1]=='\r') { elen++; idx--; }
-            if(max>=0 && idx>max) { idx=max; elen = (idx==max+1) ? 1 : 0; }
-            string ret = Encoding.GetString(buf, 0, idx);
-            bufLen -= (idx+=elen);
+          { if(max>=0 && idx>max) { idx=max; trimOne=false; }
+            string ret = Encoding.GetString(buf, 0, ++idx);
+            if(trimOne) idx++;
+            bufLen -= idx;
             if(bufLen>0) Array.Copy(buf, idx, buf, 0, bufLen);
             return ret;
           }

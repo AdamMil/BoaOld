@@ -168,7 +168,7 @@ public class StringJoin : IDescriptor, ICallable
   public object Call(params object[] args)
   { if(args.Length!=1) throw Ops.WrongNumArgs("__getitem__", args.Length, 1);
     if(instance==null) throw Ops.MethodCalledWithoutInstance("string.join()");
-    return Boa.Modules.@string.join(args[0], instance);
+    return Boa.Modules._string.join(args[0], instance);
   }
 
   public override string ToString() { return "<method 'join' on 'System.String'>"; }

@@ -148,7 +148,7 @@ public sealed class StringOps
             }
             if(f.Length>0 && s.Length<f.Length)
             { if(f.HasFlag('-')) s = s.PadRight(f.Length, ' ');
-              else if(f.HasFlag('0')) s = Boa.Modules.@string.zfill(s, f.Length);
+              else if(f.HasFlag('0')) s = Boa.Modules._string.zfill(s, f.Length);
               else s = s.PadLeft(f.Length, ' ');
             }
             sb.Append(s);

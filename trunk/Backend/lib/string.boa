@@ -1,0 +1,8 @@
+from _string import *
+
+import _string
+for _f in ('capitalize', 'capwords', 'center', 'count', 'expandtabs', 'find', 'index', 'ljust',
+           'lstrip', 'replace', 'rfind', 'rindex', 'rjust', 'rstrip', 'split', 'strip',
+           'swapcase', 'tobytes', 'translate', 'zfill'):
+  setattr(string, _f, _method(getattr(_string, _f))) # 'string' should change to 'str'
+del _f, _string
