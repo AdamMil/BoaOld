@@ -422,6 +422,10 @@ public sealed class Ops
     throw TypeError("unsupported operand type(s) for >>: '{0}' and '{1}'", a.GetType(), b.GetType());
   }
 
+  public static RuntimeException RuntimeError(string format, params object[] args)
+  { return new RuntimeException(string.Format(format, args));
+  }
+
   public static void SetAttr(object value, object o, string name)
   { IHasAttributes iha = o as IHasAttributes;
     if(iha!=null)  iha.__setattr__(name, value);

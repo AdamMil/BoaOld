@@ -9,6 +9,7 @@ namespace Boa.Runtime
 public class Dict : HybridDictionary, IComparable, IMapping
 { public Dict() { }
   public Dict(IDictionary dict) { foreach(DictionaryEntry e in dict) Add(e.Key, e.Value); }
+  internal Dict(int size) : base(size) { }
 
   public void clear() { Clear(); }
 

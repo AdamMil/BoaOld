@@ -36,7 +36,7 @@ public class NameErrorException : RuntimeException
 { public NameErrorException(string message) : base(message) { }
 }
 
-public abstract class RuntimeException : BoaException
+public class RuntimeException : BoaException
 { public RuntimeException() { }
   public RuntimeException(string message) : base(message) { }
 }
