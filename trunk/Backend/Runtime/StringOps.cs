@@ -50,7 +50,7 @@ public sealed class StringOps
         case '\v': sb.Append(@"\v"); break;
         default: 
           if(c==quote) { sb.Append('\\'); sb.Append(c); }
-          else if(c<32 || c>=0x7f) sb.AppendFormat(@"\x{0:x4}", (int)c);
+          else if(c<32 || c>=0x7f) sb.AppendFormat(c>0xff ? @"\x{0:x4}" : @"\x{0:x2}", (int)c);
           else sb.Append(c);
           break;
       }

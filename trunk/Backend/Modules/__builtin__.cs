@@ -152,8 +152,14 @@ public sealed class __builtin__
   public static string chr(int value) { return new string((char)value, 1); }
   public static int cmp(object a, object b) { return Ops.Compare(a, b); }
   public static void delattr(object o, string name) { Ops.DelAttr(o, name); }
+
   public static List dir() { return dir(Ops.GetExecutingModule()); }
-  public static List dir(object o) { return Ops.GetAttrNames(o); }
+  public static List dir(object o)
+  { List list = Ops.GetAttrNames(o);
+    list.sort();
+    return list;
+  }
+
   public static Tuple divmod(object a, object b) { return new Tuple(Ops.Divide(a, b), Ops.Modulus(a, b)); }
   public static IEnumerator enumerate(object o) { return new EnumerateEnumerator(Ops.GetEnumerator(o)); }
 

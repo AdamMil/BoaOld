@@ -8,10 +8,12 @@ using Boa.Runtime;
 namespace Boa.AST
 {
 
-// FIXME: 'while' and 'for' don't catch StopIterationException in the compiled versions
 // FIXME: update post processing to know about 'for' loops and tuple assignment
 // TODO: using exceptions is extremely slow! stop it!
 #region Exceptions (used to aid implementation)
+public class BreakException : Exception
+{ public static BreakException Value = new BreakException();
+}
 public class ContinueException : Exception
 { public static ContinueException Value = new ContinueException();
 }
@@ -308,7 +310,7 @@ public class AssignStatement : Statement
 #region BreakStatement
 public class BreakStatement : Statement
 { public override void Emit(CodeGenerator cg) { cg.ILG.Emit(OpCodes.Br, Label); }
-  public override void Execute(Frame frame) { throw new StopIterationException(); }
+  public override void Execute(Frame frame) { throw BreakException.Value; }
 
   public Label Label;
 }
@@ -634,7 +636,7 @@ public class ForStatement : Statement
     { ce.Value = e.Current;
       ass.Execute(frame);
       try { Body.Execute(frame); }
-      catch(StopIterationException) { break; }
+      catch(BreakException) { break; }
       catch(ContinueException) { }
     }
   }
@@ -744,7 +746,7 @@ public class WhileStatement : Statement
   public override void Execute(Frame frame)
   { while(Ops.IsTrue(Test.Evaluate(frame)))
       try { Body.Execute(frame); }
-      catch(StopIterationException) { break; }
+      catch(BreakException) { break; }
       catch(ContinueException) { }
   }
 

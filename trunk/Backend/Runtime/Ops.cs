@@ -1,6 +1,8 @@
 using System;
 using System.Collections;
 
+// TODO: investigate python's changes to the division operator
+
 namespace Boa.Runtime
 {
 
@@ -297,8 +299,6 @@ public sealed class Ops
     throw new InvalidOperationException("No executing module");
   }
 
-  public static object Identical(object a, object b) { return a==b ? TRUE : FALSE; }
-
   public static void Import(Module module, string[] names, string[] asNames)
   { for(int i=0; i<names.Length; i++)
     { string dname = asNames[i]!=null ? asNames[i] : names[i].IndexOf('.')==-1 ? names[i] : names[i].Split('.')[0];
@@ -441,7 +441,8 @@ public sealed class Ops
   }
 
   public static string Str(object o)
-  { object ret;
+  { if(o is string) return (string)o;
+    object ret;
     if(TryInvoke(o, "__str__", out ret)) return Ops.ToString(ret);
     return o.ToString();
   }

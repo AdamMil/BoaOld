@@ -4,7 +4,6 @@ using System.Reflection;
 using System.Reflection.Emit;
 using Boa.Runtime;
 
-// FIXME: make compiled list comprehension respect 'StopIteration'
 namespace Boa.AST
 {
 
@@ -235,14 +234,11 @@ public class ListCompExpression : Expression
     AssignStatement ass = new AssignStatement(Names, ce);
     List list = new List();
     IEnumerator e = Ops.GetEnumerator(List.Evaluate(frame));
-    try
-    { while(e.MoveNext())
-      { ce.Value = e.Current;
-        ass.Execute(frame);
-        if(Test==null || Ops.IsTrue(Test.Evaluate(frame))) list.append(Item.Evaluate(frame));
-      }
+    while(e.MoveNext())
+    { ce.Value = e.Current;
+      ass.Execute(frame);
+      if(Test==null || Ops.IsTrue(Test.Evaluate(frame))) list.append(Item.Evaluate(frame));
     }
-    catch(StopIterationException) { }
     return list;
   }
 
