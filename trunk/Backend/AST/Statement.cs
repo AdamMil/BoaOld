@@ -262,7 +262,7 @@ public class AssertStatement : Statement
 
   public override void ToCode(System.Text.StringBuilder sb, int indent)
   { sb.Append("assert ");
-    Expression.ToCode(sb, indent);
+    Expression.ToCode(sb, 0);
     sb.Append('\n');
   }
 
@@ -481,10 +481,10 @@ public class AssignStatement : Statement
 
   public override void ToCode(System.Text.StringBuilder sb, int indent)
   { foreach(Expression e in LHS)
-    { e.ToCode(sb, indent);
+    { e.ToCode(sb, 0);
       sb.Append(" = ");
     }
-    RHS.ToCode(sb, indent);
+    RHS.ToCode(sb, 0);
   }
 
   public override void Walk(IWalker w)
@@ -529,7 +529,7 @@ public class ClassStatement : Statement
     sb.Append(" (");
     for(int i=0; i<Bases.Length; i++)
     { if(i!=0) sb.Append(", ");
-      Bases[i].ToCode(sb, indent);
+      Bases[i].ToCode(sb, 0);
     }
     sb.Append("):");
     StatementToCode(sb, Body, indent+Options.IndentSize);
@@ -640,7 +640,7 @@ public class DelStatement : Statement
 
   public override void ToCode(System.Text.StringBuilder sb, int indent)
   { sb.Append("del ");
-    Expression.ToCode(sb, indent);
+    Expression.ToCode(sb, 0);
   }
 
   public override void Walk(IWalker w)
@@ -729,7 +729,7 @@ public class IfStatement : Statement
 
   void ToCode(System.Text.StringBuilder sb, int indent, bool elif)
   { sb.Append(elif ? "elif " : "if ");
-    Test.ToCode(sb, indent);
+    Test.ToCode(sb, 0);
     sb.Append(':');
     StatementToCode(sb, Body, indent+Options.IndentSize);
     if(Else!=null)
@@ -869,12 +869,12 @@ public class ForStatement : Statement
     { TupleExpression te = (TupleExpression)Names;
       for(int i=0; i<te.Expressions.Length; i++)
       { if(i!=0) sb.Append(',');
-        te.Expressions[i].ToCode(sb, indent);
+        te.Expressions[i].ToCode(sb, 0);
       }
     }
-    else Names.ToCode(sb, indent);
+    else Names.ToCode(sb, 0);
     sb.Append(" in ");
-    Expression.ToCode(sb, indent);
+    Expression.ToCode(sb, 0);
     sb.Append(':');
     StatementToCode(sb, Body, indent+Options.IndentSize);
   }
@@ -957,7 +957,7 @@ public class PrintStatement : Statement
   { sb.Append("print ");
     for(int i=0; i<Expressions.Length; i++)
     { if(i!=0) sb.Append(", ");
-      Expressions[i].ToCode(sb, indent);
+      Expressions[i].ToCode(sb, 0);
     }
     if(!TrailingNewline) sb.Append(',');
   }
@@ -1008,7 +1008,7 @@ public class RaiseStatement : Statement
   { if(Expression==null) sb.Append("raise");
     else
     { sb.Append("raise ");
-      Expression.ToCode(sb, indent);
+      Expression.ToCode(sb, 0);
     }
   }
 
@@ -1035,7 +1035,7 @@ public class ReturnStatement : Statement
   { if(Expression==null) sb.Append("return");
     else
     { sb.Append("return ");
-      Expression.ToCode(sb, indent);
+      Expression.ToCode(sb, 0);
     }
   }
 
@@ -1207,7 +1207,7 @@ public class TryStatement : Statement
 
     foreach(ExceptClause ec in Except)
     { sb.Append(' ', indent);
-      ec.ToCode(sb, indent);
+      ec.ToCode(sb, 0);
     }
     if(Else!=null)
     { sb.Append(' ', indent);
@@ -1264,7 +1264,7 @@ public class WhileStatement : Statement
 
   public override void ToCode(System.Text.StringBuilder sb, int indent)
   { sb.Append("while ");
-    Test.ToCode(sb, indent);
+    Test.ToCode(sb, 0);
     sb.Append(':');
     StatementToCode(sb, Body, indent+Options.IndentSize);
   }
