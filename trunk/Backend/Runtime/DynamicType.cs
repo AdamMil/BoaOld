@@ -5,9 +5,7 @@ namespace Boa.Runtime
 {
 
 public abstract class DynamicType
-{ public virtual void DelAttr(object self, string name)
-  { throw new NotImplementedException();
-  }
+{ public virtual void DelAttr(object self, string name) { throw new NotSupportedException(); }
 
   public object GetAttr(object self, string name)
   { object value;
@@ -22,7 +20,7 @@ public abstract class DynamicType
 
   public virtual List GetAttrNames(object self) { return new List(0); }
 
-  public virtual bool IsSubclassOf(object other) { throw new NotImplementedException(); }
+  public virtual bool IsSubclassOf(object other) { throw new NotSupportedException(); }
 
   public virtual string Repr(object self)
   { object ret;

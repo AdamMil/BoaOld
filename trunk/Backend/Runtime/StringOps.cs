@@ -57,7 +57,7 @@ public sealed class StringOps
 
   public static IEnumerator GetEnumerator(string s) { return new BoaCharEnumerator(s); }
 
-  public static string Quote(string s)
+  public static string Escape(string s)
   { System.Text.StringBuilder sb = new System.Text.StringBuilder(s.Length+10);
     char quote = '\'';
     if(s.IndexOf('\'')!=-1 && s.IndexOf('\"')==-1) quote = '\"';
@@ -95,6 +95,11 @@ public sealed class StringOps
       else for(; start<stop; start+=step) sb.Append(s[start]);
       return sb.ToString();
     }
+  }
+  
+  public static string Unescape(string s) { return Unescape(s, null); }
+  public static string Unescape(string s, System.Text.RegularExpressions.Match m)
+  { throw new NotImplementedException();
   }
 }
 

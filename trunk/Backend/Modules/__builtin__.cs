@@ -259,8 +259,13 @@ public sealed class __builtin__
   }
 
   public static string intern(string s) { return string.Intern(s); }
-  public static bool isInstance(object o, object type) { throw new NotImplementedException(); }
-  public static bool isSubClass(object XX, object YY) { throw new NotImplementedException(); }
+  public static bool isinstance(object o, object type) { return issubclass(Ops.GetDynamicType(o), type); }
+  public static bool issubclass(DynamicType type, object parentType)
+  { Tuple tup = parentType as Tuple;
+    if(tup==null) return type.IsSubclassOf(parentType);
+    for(int i=0; i<tup.items.Length; i++) if(type.IsSubclassOf(tup.items[i])) return true;
+    return false;
+  }
 
   public static IEnumerator iter(object o) { return Ops.GetEnumerator(o); }
   public static IEnumerator iter(object o, object sentinel)

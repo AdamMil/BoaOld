@@ -80,7 +80,7 @@ public abstract class Node
     set { if(value) Flags|=NodeFlag.Constant; else Flags&=~NodeFlag.Constant; }
   }
 
-  public virtual object GetValue() { throw new NotImplementedException(); }
+  public virtual object GetValue() { throw new NotSupportedException(); }
   public virtual void Optimize() { }
 
   public string ToCode()

@@ -107,15 +107,13 @@ public abstract class Statement : Node
     { while(node is ParenExpression) node = ((ParenExpression)node).Expression;
 
       if(inDef)
-      { if(node is DefStatement)
-        { DefStatement de = (DefStatement)node;
-          innerFuncs.Add(de.Function);
-          de.Function.Name = AddName(de.Function.Name);
-          de.Function.Name.Scope = Scope.Local;
-          return false;
-        }
-        else if(node is LambdaExpression)
-        { innerFuncs.Add(((LambdaExpression)node).Function);
+      { if(node is BoaFunction)
+        { BoaFunction fun = (BoaFunction)node;
+          innerFuncs.Add(fun);
+          if(fun.Name!=null)
+          { fun.Name = AddName(fun.Name);
+            fun.Name.Scope = Scope.Local;
+          }
           return false;
         }
         else if(node is AssignStatement)
@@ -370,7 +368,7 @@ public class AssignStatement : Statement
             for(int i=0; i<lhs.Expressions.Length; i++)
             { if(i!=lhs.Expressions.Length-1) cg.ILG.Emit(OpCodes.Dup);
               cg.EmitInt(i);
-              cg.EmitCall(typeof(ISequence), "__getitem__");
+              cg.EmitCall(typeof(ISequence), "__getitem__", new Type[] { typeof(int) });
               lhs.Expressions[i].EmitSet(cg);
             }
             cg.ILG.Emit(OpCodes.Br, end);
@@ -567,21 +565,8 @@ public class DefStatement : Statement
   }
 
   public override void Emit(CodeGenerator cg)
-  { CodeGenerator impl = Function.MakeImplMethod(cg);
-
-    Name[] inherit = Function.Inherit;
-
-    Type targetType = inherit==null ? typeof(CallTargetN) : typeof(CallTargetFN);
-    Type funcType   = inherit==null ? typeof(CompiledFunctionN) : typeof(CompiledFunctionFN);
-    Slot funcSlot   = cg.Namespace.GetSlotForSet(Function.Name);
-
-    cg.EmitString(Function.Name.String);
-    Function.GetParmsSlot(cg).EmitGet(cg);
-    Function.EmitClosedGet(cg);
-    cg.ILG.Emit(OpCodes.Ldnull); // create delegate
-    cg.ILG.Emit(OpCodes.Ldftn, impl.MethodBuilder);
-    cg.EmitNew((ConstructorInfo)targetType.GetMember(".ctor")[0]);
-    cg.EmitNew(funcType, new Type[] { typeof(string), typeof(Parameter[]), typeof(ClosedVar[]), targetType });
+  { Slot funcSlot = cg.Namespace.GetSlotForSet(Function.Name);
+    Function.Emit(cg);
     funcSlot.EmitSet(cg);
   }
 

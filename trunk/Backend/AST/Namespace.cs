@@ -28,7 +28,7 @@ public abstract class Namespace
   public Slot GetSlotForSet(Name name) { return GetSlot(name); }
   
   public virtual void SetArgs(Name[] names, int offset, MethodBuilder mb)
-  { throw new NotImplementedException("SetArgs: "+GetType());
+  { throw new NotSupportedException("SetArgs: "+GetType());
   }
 
   public Namespace Parent, Global;

@@ -8,6 +8,9 @@ namespace Boa.Modules
 public sealed class @operator
 { @operator() { }
 
+  public static string __repr__() { return __str__(); }
+  public static string __str__() { return "<module 'operator' (built-in)>"; }
+
   // boolean
   /*public static object contains(object a, object b) { return Ops.In(a, b); }*/ // TODO: implement this
   public static object eq(object a, object b) { return Ops.Equal(a, b); }
@@ -38,10 +41,21 @@ public sealed class @operator
   public static object xor(object a, object b) { return Ops.BitwiseXor(a, b); }
   
   // indexing
-  /*public static object getitem(object o, object i) { return Ops.GetIndex(o, i); }*/ // TODO: implement this
-  /*public static object getslice(object o, object s, object e) { return Ops.GetSlice(o, s, e); }*/ // TODO: implement this
-  /*public static object setitem(object o, object i, object v) { return Ops.SetIndex(o, i, v); }*/ // TODO: implement this
-  /*public static object setslice(object o, object s, object e, object v) { return Ops.SetSlice(o, s, e, v); }*/ // TODO: implement this
+  public static void delitem(object obj, object index) { Ops.DelIndex(obj, index); }
+  public static void delslice(object obj, Slice slice) { Ops.DelIndex(obj, slice); }
+  public static void delslice(object obj, object start, object end) { Ops.DelIndex(obj, new Slice(start, end)); }
+
+  public static object getitem(object obj, object index) { return Ops.GetIndex(obj, index); }
+  public static object getslice(object obj, Slice slice) { return Ops.GetIndex(obj, slice); }
+  public static object getslice(object obj, object start, object end)
+  { return Ops.GetIndex(obj, new Slice(start, end));
+  }
+
+  public static void setitem(object obj, object index, object value) { Ops.SetIndex(obj, index, value); }
+  public static void setslice(object obj, Slice slice, object value) { Ops.SetIndex(obj, slice, value); }
+  public static void setslice(object obj, object start, object end, object value)
+  { Ops.SetIndex(obj, new Slice(start, end), value);
+  }
 }
 
 } // namespace Boa.Modules

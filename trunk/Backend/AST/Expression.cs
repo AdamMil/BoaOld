@@ -9,11 +9,11 @@ namespace Boa.AST
 
 #region Expression
 public abstract class Expression : Node
-{ public virtual void Assign(object value, Frame frame) { throw new NotImplementedException("Assign: "+GetType()); }
-  public virtual void Delete(Frame frame) { throw new NotImplementedException("Delete: "+GetType()); }
+{ public virtual void Assign(object value, Frame frame) { throw new NotSupportedException("Assign: "+GetType()); }
+  public virtual void Delete(Frame frame) { throw new NotSupportedException("Delete: "+GetType()); }
   public abstract void Emit(CodeGenerator cg);
-  public virtual void EmitSet(CodeGenerator cg) { throw new NotImplementedException("EmitSet: "+GetType()); }
-  public virtual void EmitDel(CodeGenerator cg) { throw new NotImplementedException("EmitDel: "+GetType()); }
+  public virtual void EmitSet(CodeGenerator cg) { throw new NotSupportedException("EmitSet: "+GetType()); }
+  public virtual void EmitDel(CodeGenerator cg) { throw new NotSupportedException("EmitDel: "+GetType()); }
   public abstract object Evaluate(Frame frame);
 
   public override object GetValue()
@@ -184,7 +184,7 @@ public class ConstantExpression : Expression
   public override void ToCode(System.Text.StringBuilder sb, int indent)
   { if(Value==null) sb.Append("null");
     else if(Value is bool) sb.Append((bool)Value ? "true" : "false");
-    else if(Value is string) sb.Append(StringOps.Quote((string)Value));
+    else if(Value is string) sb.Append(StringOps.Escape((string)Value));
     else sb.Append(Value);
   }
 
@@ -300,12 +300,15 @@ public class IndexExpression : Expression
 public class LambdaExpression : Expression
 { public LambdaExpression(Parameter[] parms, Statement body)
   { if(body is ExpressionStatement) body = new ReturnStatement(((ExpressionStatement)body).Expression);
+    else if(body is Suite)
+    { Suite suite = (Suite)body;
+      if(suite.Statements.Length==1 && suite.Statements[0] is ExpressionStatement)
+        body = new ReturnStatement(((ExpressionStatement)suite.Statements[0]).Expression);
+    }
     Function = new BoaFunction(this, parms, body);
   }
 
-  public override void Emit(CodeGenerator cg)
-  { throw new NotImplementedException();
-  }
+  public override void Emit(CodeGenerator cg) { Function.Emit(cg); }
 
   public override object Evaluate(Frame frame) { return Function.MakeFunction(frame); }
 
@@ -393,7 +396,36 @@ public class ListCompExpression : Expression
 
   public override void Emit(CodeGenerator cg)
   { if(IsConstant) cg.EmitConstant(GetValue());
-    else throw new NotImplementedException();
+    else
+    { AssignStatement ass = new AssignStatement(Names);
+      Label next = cg.ILG.DefineLabel(), end = cg.ILG.DefineLabel();
+      Slot  list = cg.AllocLocalTemp(typeof(List));
+
+      cg.EmitNew(typeof(List), Type.EmptyTypes);
+      list.EmitSet(cg);
+      List.Emit(cg);
+      cg.EmitCall(typeof(Ops), "GetEnumerator", new Type[] { typeof(object) });
+      cg.ILG.MarkLabel(next);
+      cg.ILG.Emit(OpCodes.Dup);
+      cg.EmitCall(typeof(IEnumerator), "MoveNext");
+      cg.ILG.Emit(OpCodes.Brfalse, end);
+      cg.ILG.Emit(OpCodes.Dup);
+      cg.EmitPropGet(typeof(IEnumerator), "Current");
+      ass.Emit(cg);
+      if(Test!=null)
+      { Test.Emit(cg);
+        cg.EmitIsTrue();
+        cg.ILG.Emit(OpCodes.Brfalse, next);
+      }
+      list.EmitGet(cg);
+      Item.Emit(cg);
+      cg.EmitCall(typeof(List), "append");
+      cg.ILG.Emit(OpCodes.Br, next);
+      cg.ILG.MarkLabel(end);
+      cg.ILG.Emit(OpCodes.Pop);
+      list.EmitGet(cg);
+      cg.FreeLocalTemp(list);
+    }
   }
 
   public override object Evaluate(Frame frame)
