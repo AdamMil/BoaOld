@@ -59,6 +59,11 @@ public class TypeGenerator
     return cg;
   }
 
+  public CodeGenerator DefineDefaultConstructor(MethodAttributes attrs)
+  { ConstructorBuilder cb = TypeBuilder.DefineDefaultConstructor(attrs);
+    return new CodeGenerator(this, cb, cb.GetILGenerator());
+  }
+
   public Slot DefineField(string name, Type type) { return DefineField(name, type, FieldAttributes.Public); }
   public Slot DefineField(string name, Type type, FieldAttributes access)
   { return new FieldSlot(new ThisSlot(TypeBuilder), TypeBuilder.DefineField(name, type, access));

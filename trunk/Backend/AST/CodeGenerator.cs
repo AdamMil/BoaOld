@@ -69,6 +69,7 @@ public class CodeGenerator
 
   public void EmitBool(bool value) { ILG.Emit(value ? OpCodes.Ldc_I4_1 : OpCodes.Ldc_I4_0); }
 
+  public void EmitCall(ConstructorInfo ci) { ILG.Emit(OpCodes.Call, ci); }
   public void EmitCall(MethodInfo mi)
   { if(mi.IsVirtual) ILG.Emit(OpCodes.Callvirt, mi);
     else ILG.Emit(OpCodes.Call, mi);

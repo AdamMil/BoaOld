@@ -33,7 +33,7 @@ public class Text
 { static void DoInteractive()
   { Options.Interactive = true;
 Options.Debug = true;
-sys.path[1] = "c:/code/Boa/Backend/lib";
+sys.path.append("c:/code/Boa/Backend/lib");
 
     Module top = new Module();
     Frame topFrame = new Frame(top);
