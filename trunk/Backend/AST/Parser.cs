@@ -1036,6 +1036,7 @@ public class Parser
             if(c==delim) triple = true;
             else { lastChar=c; value=string.Empty; return Token.Literal; }
           }
+          else if(c=='\\') { char e = GetEscapeChar(); if(e!=0) sb.Append(e); }
           else sb.Append(c);
 
           while(true)
@@ -1045,9 +1046,17 @@ public class Parser
             { if(!triple) break;
               if((c=ReadChar())==delim)
               { if((c=ReadChar())==delim) break;
-                else { sb.Append(delim, 2); sb.Append(c); }
+                else
+                { sb.Append(delim, 2);
+                  if(c=='\\') { char e = GetEscapeChar(); if(e!=0) sb.Append(e); }
+                  else sb.Append(c);
+                }
               }
-              else { sb.Append(delim); sb.Append(c); }
+              else
+              { sb.Append(delim);
+                if(c=='\\') { char e = GetEscapeChar(); if(e!=0) sb.Append(e); }
+                else sb.Append(c);
+              }
             }
             else if(c==0) SyntaxError("unexpected EOF in string literal");
             else sb.Append(c);
