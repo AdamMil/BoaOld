@@ -47,6 +47,12 @@ public class SyntaxErrorException : CompileTimeException
 { public SyntaxErrorException(string message) : base(message) { }
 }
 
+public class SystemExitException : RuntimeException
+{ public SystemExitException(object exitarg) { ExitArg=exitarg; }
+
+  public object ExitArg;
+}
+
 public class TypeErrorException : RuntimeException
 { public TypeErrorException(string message) : base(message) { }
 }

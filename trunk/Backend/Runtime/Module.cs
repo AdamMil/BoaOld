@@ -25,6 +25,8 @@ public class Module : IHasAttributes
   #endregion
 
   public readonly IDictionary __dict__;
+  
+  protected internal virtual void Initialize(Frame frame) { }
 
   static ReflectedType builtins = ReflectedType.FromType(typeof(Boa.Modules.__builtin__));
 }

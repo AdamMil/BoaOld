@@ -3,39 +3,27 @@
 using System;
 using Boa.AST;
 using Boa.Runtime;
+using Boa.Modules;
 
 namespace Boa.Frontend
 {
 
-public class Test
-{ public string Foo { get { return foo; } set { foo=value; if(FooChanged!=null) FooChanged(this, new EventArgs()); } }
-  public string Foo2 { get { return foo.Replace(" ", ""); } }
-  public object a=1, b=2, c=3;
-
-  public event EventHandler FooChanged;
-
-  public override string ToString()
-  { return string.Format("<{0}, foo={1}>", GetType().FullName, Ops.Repr(foo));
-  }
-
-  string foo;
-}
-
 public class Text
 { static void DoInteractive()
   { Options.Interactive = true;
+    sys.path.append("");
 
     Module top = new Module();
     Frame topFrame = new Frame(top);
+    Ops.Frames.Push(topFrame);
 
     top.__setattr__("__builtins__", Importer.Import("__builtin__"));
     top.__setattr__("__name__", "main");
-    top.__setattr__("_", null);
 
     while(true)
     { try
       { Statement stmt=null;
-        Console.Write(">>> ");
+        Console.Write(sys.ps1);
         string source = Console.ReadLine();
         if(source=="quit" || source=="exit") break;
 
@@ -46,7 +34,7 @@ public class Text
         { if(e.Message.IndexOf("expected indent")==-1) throw;
           source += '\n';
           while(true)
-          { Console.Write("... ");
+          { Console.Write(sys.ps2);
             string line = Console.ReadLine();
             if(line==null) break;
             source += line + '\n';
@@ -54,30 +42,37 @@ public class Text
           stmt = Parser.FromString(source).Parse();
         }
 
-        topFrame.SetGlobal("_", null);
         #if COMPILED
         stmt.PostProcessForCompile();
-        object ret = SnippetMaker.Generate(stmt).Run(topFrame);
-        if(ret==null) ret = topFrame.GetGlobal("_");
+        SnippetMaker.Generate(stmt).Run(topFrame);
         #else
         stmt.PostProcessForInterpret();
-        Ops.Frames.Push(topFrame);
         stmt.Execute(topFrame);
-        Ops.Frames.Pop();
-        object ret = topFrame.GetGlobal("_");
         #endif
-        if(ret!=null) Console.WriteLine(Ops.Str(ret));
       }
       catch(Exception e)
-      { Console.Error.WriteLine();
+      { if(e is SystemExitException) throw;
+        Console.Error.WriteLine();
         Console.Error.WriteLine(e);
       }
     }
     SnippetMaker.DumpAssembly();
   }
 
-  static void Main()
-  { DoInteractive();
+  static int Main()
+  { try
+    { DoInteractive();
+    }
+    catch(SystemExitException e)
+    { if(e.ExitArg==null) return 0;
+      if(e.ExitArg is int) return (int)e.ExitArg;
+      Console.Error.WriteLine(Ops.Str(e.ExitArg));
+      return 1;
+    }
+    finally
+    { if(sys.exitfunc!=null) Ops.Call(sys.exitfunc);
+    }
+    return 0;
   }
 }
 

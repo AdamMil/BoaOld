@@ -276,13 +276,14 @@ public sealed class Ops
   }
 
   public static Module GetExecutingModule()
-  { if(Frames.Count>0) return ((Frame)Frames.Peek()).Module;
-    System.Diagnostics.StackTrace trace = new System.Diagnostics.StackTrace();
+  { System.Diagnostics.StackTrace trace = new System.Diagnostics.StackTrace();
     for(int i=trace.FrameCount-1; i>=0; i--)
     { Type type = trace.GetFrame(i).GetMethod().DeclaringType;
       System.Reflection.FieldInfo fi = type.GetField(Module.FieldName);
-      if(fi!=null) return (Module)fi.GetValue(null);
+      if(fi!=null && (type.IsSubclassOf(typeof(Module)) || type.IsSubclassOf(typeof(Boa.AST.Snippet))))
+        return (Module)fi.GetValue(null);
     }
+    if(Frames.Count>0) return ((Frame)Frames.Peek()).Module;
     throw new InvalidOperationException("No executing module");
   }
 
@@ -302,16 +303,25 @@ public sealed class Ops
     if(names[0]=="*") ImportStar(module, moduleName);
     else
     { object imod = Importer.Import(moduleName);
-      DynamicType dt = Ops.GetDynamicType(imod);
-      for(int i=0; i<names.Length; i++)
-        module.__setattr__(asNames[i]==null ? names[i] : asNames[i], dt.GetAttr(imod, names[i]));
+      Module mod = imod as Module;
+      if(mod!=null) for(int i=0; i<names.Length; i++)
+        module.__setattr__(asNames[i]==null ? names[i] : asNames[i], mod.__getattr__(names[i]));
+      else
+      { DynamicType dt = Ops.GetDynamicType(imod);
+        for(int i=0; i<names.Length; i++)
+          module.__setattr__(asNames[i]==null ? names[i] : asNames[i], dt.GetAttr(imod, names[i]));
+      }
     }
   }
 
   public static void ImportStar(Module module, string moduleName)
   { object imod = Importer.Import(moduleName);
-    DynamicType dt = Ops.GetDynamicType(imod);
-    foreach(string name in dt.GetAttrNames(imod)) module.__setattr__(name, dt.GetAttr(imod, name));
+    Module mod = imod as Module;
+    if(mod!=null) foreach(string name in mod.__attrs__()) module.__setattr__(name, mod.__getattr__(name));
+    else
+    { DynamicType dt = Ops.GetDynamicType(imod);
+      foreach(string name in dt.GetAttrNames(imod)) module.__setattr__(name, dt.GetAttr(imod, name));
+    }
   }
 
   public static IndexErrorException IndexError(string format, params object[] args)

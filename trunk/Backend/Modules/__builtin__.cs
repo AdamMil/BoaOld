@@ -163,7 +163,10 @@ public sealed class __builtin__
   }
   public static object eval(string expr, IDictionary globals) { return eval(expr, globals, globals); }
   public static object eval(string expr, IDictionary globals, IDictionary locals)
-  { return Parser.FromString(expr).ParseExpression().Evaluate(new Frame(locals, globals));
+  { Frame frame = new Frame(locals, globals);
+    Ops.Frames.Push(frame);
+    try { return Parser.FromString(expr).ParseExpression().Evaluate(frame); }
+    finally { Ops.Frames.Pop(); }
   }
 
   public static object filter(object function, object seq)
@@ -200,9 +203,9 @@ public sealed class __builtin__
     return Ops.GetAttr(o, name, out ret) ? ret : defaultValue;
   }
 
-  public static object globals() { throw new NotImplementedException(); }
+  public static object globals() { return Ops.GetExecutingModule().__dict__; }
   public static object hasattr(object o, string name) { object dummy; return Ops.GetAttr(o, name, out dummy); }
-  
+
   // FIXME: python says: Numeric values that compare equal have the same hash value (even if they are of
   //                     different types, as is the case for 1 and 1.0).
   public static int hash(object o) { return o.GetHashCode(); }
@@ -221,6 +224,14 @@ public sealed class __builtin__
   }
 
   public static int id(object o) { throw new NotImplementedException(); }
+
+  public static string input() { return input(null); }
+  public static string input(string prompt)
+  { if(prompt!=null) Console.Write(prompt);
+    string line = Console.ReadLine();
+    if(line==null) throw Ops.EOFError("raw_input() reached EOF");
+    return line;
+  }
 
   public static int @int(string s) { return int.Parse(s); }
   public static int @int(object o) { return Ops.ToInt(o); }
@@ -354,14 +365,6 @@ public sealed class __builtin__
     return ret;
   }
   
-  public static string raw_input() { return raw_input(null); }
-  public static string raw_input(string prompt)
-  { if(prompt!=null) Console.Write(prompt);
-    string line = Console.ReadLine();
-    if(line==null) throw Ops.EOFError("raw_input() reached EOF");
-    return line;
-  }
-
   public static object reduce(object function, object seq)
   { IEnumerator e = Ops.GetEnumerator(seq);
     if(!e.MoveNext()) throw Ops.TypeError("reduce() of empty sequence with no initial value");
@@ -399,6 +402,8 @@ public sealed class __builtin__
     return start;
   }
   
+  public static DynamicType type(object obj) { return Ops.GetDynamicType(obj); }
+
   public static List zip(params object[] seqs)
   { if(seqs.Length==0) throw Ops.TypeError("zip() requires at least one sequence");
 
@@ -415,6 +420,10 @@ public sealed class __builtin__
     }
   }
 
+  public static object _;
+
+  // TODO: figure out how to handle these types that collide with the functions
+  // (perhaps by modifying ReflectedType.cons)
   #region Data types
   //public static readonly object @bool   = ReflectedType.FromType(typeof(bool));
   public static readonly object dict    = ReflectedType.FromType(typeof(Dict));
@@ -428,19 +437,20 @@ public sealed class __builtin__
   #endregion
 
   #region Exceptions
-  public static readonly object StopIteration = ReflectedType.FromType(typeof(StopIterationException));
-  public static readonly object ValueError = ReflectedType.FromType(typeof(ValueErrorException));
   public static readonly object EOFError = ReflectedType.FromType(typeof(EOFErrorException));
   //public static readonly object FloatingPointError = ReflectedType.FromType(typeof(FloatingPointErrorException));
-  //public static readonly object ImportError = ReflectedType.FromType(typeof(ImportErrorException));
+  public static readonly object ImportError = ReflectedType.FromType(typeof(ImportErrorException));
   public static readonly object IndexError = ReflectedType.FromType(typeof(IndexErrorException));
   public static readonly object KeyError = ReflectedType.FromType(typeof(KeyErrorException));
   //public static readonly object LookupError = ReflectedType.FromType(typeof(LookupErrorException));
   public static readonly object NameError = ReflectedType.FromType(typeof(NameErrorException));
   //public static readonly object NotImplementedError = ReflectedType.FromType(typeof(NotImplementedErrorException));
   //public static readonly object OverflowError = ReflectedType.FromType(typeof(OverflowErrorException));
+  public static readonly object StopIteration = ReflectedType.FromType(typeof(StopIterationException));
   public static readonly object SyntaxError = ReflectedType.FromType(typeof(SyntaxErrorException));
+  public static readonly object SystemExit = ReflectedType.FromType(typeof(SystemExitException));
   public static readonly object TypeError = ReflectedType.FromType(typeof(TypeErrorException));
+  public static readonly object ValueError = ReflectedType.FromType(typeof(ValueErrorException));
   #endregion
 }
   
