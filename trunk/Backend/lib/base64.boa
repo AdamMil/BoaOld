@@ -2,6 +2,7 @@
 
 # Modified 04-Oct-1995 by Jack Jansen to use binascii module
 # Modified 30-Dec-2003 by Barry Warsaw to add full RFC 3548 support
+# Modified Oct-2004 by Adam Milazzo to work best with Boa
 
 import re
 import struct
