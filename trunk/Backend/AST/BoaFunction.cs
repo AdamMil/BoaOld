@@ -234,7 +234,7 @@ public sealed class BoaFunction : Node
         ncg.ILG.Emit(OpCodes.Pop);
         ncg.ILG.EndExceptionBlock();
         ncg.ILG.Emit(OpCodes.Ldc_I4_0);
-        ncg.ILG.Emit(OpCodes.Ret);
+        ncg.EmitReturn();
         ncg.Finish();
 
         cg.EmitNew(tg.TypeBuilder.DefineDefaultConstructor(MethodAttributes.Public));
@@ -243,7 +243,8 @@ public sealed class BoaFunction : Node
           cg.EmitGet(parmNames[i]);
           cg.EmitFieldSet(((FieldSlot)ncg.Namespace.GetSlotForSet(parmNames[i])).Info);
         }
-        cg.ILG.Emit(OpCodes.Ret);
+        cg.EmitReturn();
+        cg.Finish();
       }
     }
     finally { Options.Interactive = interactive; }

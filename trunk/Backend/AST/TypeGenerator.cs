@@ -100,7 +100,10 @@ public class TypeGenerator
   }
 
   public Type FinishType()
-  { if(initGen!=null) initGen.ILG.Emit(OpCodes.Ret);
+  { if(initGen!=null)
+    { initGen.EmitReturn();
+      initGen.Finish();
+    }
     Type ret = TypeBuilder.CreateType();
     if(nestedTypes!=null) foreach(TypeGenerator tg in nestedTypes) tg.FinishType();
     return ret;

@@ -149,7 +149,7 @@ public abstract class Statement : Node
   void PostProcess()
   { Walk(new JumpChecker());
     Walk(new TryChecker());
-    if(!Options.Debug) Walk(new Optimizer());
+    if(Options.Optimize) Walk(new Optimizer());
   }
 
   #region JumpChecker
@@ -190,7 +190,7 @@ public abstract class Statement : Node
         }
         else
         { if(blocks!=null)
-            for(int i=blocks.Count; i>=0; i--)
+            for(int i=blocks.Count-1; i>=0; i--)
               if(blocks[i] is WhileStatement || blocks[i] is ForStatement) return false;
           Ops.SyntaxError(node, "break/continue: unable to find a valid enclosing loop");
         }
@@ -571,7 +571,8 @@ public class ClassStatement : Statement
       icg.Namespace = ns;
       Body.Emit(icg);
       ns.EmitLocalsDict(icg);
-      icg.ILG.Emit(OpCodes.Ret);
+      icg.EmitReturn();
+      icg.Finish();
 
       cg.EmitGet(new Name("__name__"));
       cg.EmitCall(typeof(Ops), "ToString", new Type[] { typeof(object) }); // FIXME: doesn't handle non-existant __name__
@@ -811,7 +812,7 @@ public class ExpressionStatement : Statement
 
   public override void Emit(CodeGenerator cg)
   { // optimize away expressions that do nothing
-    if(!Options.Debug && Expression.IsConstant && !Options.Interactive) return;
+    if(Options.Optimize && Expression.IsConstant && !Options.Interactive) return;
     Expression.Emit(cg);
     if(Options.Interactive)
     { Slot temp = cg.AllocLocalTemp(typeof(object));
@@ -825,7 +826,7 @@ public class ExpressionStatement : Statement
   }
 
   public override void Execute(Frame frame)
-  { if(!Options.Debug && Expression.IsConstant) return;
+  { if(Options.Optimize && Expression.IsConstant) return;
     object ret = Expression.Evaluate(frame);
     if(Options.Interactive) Ops.Call(Boa.Modules.sys.displayhook, ret);
   }
@@ -846,13 +847,13 @@ public class IfStatement : Statement
 { public IfStatement(Expression test, Statement body, Statement elze) { Test=test; Body=body; Else=elze; }
 
   public override void Emit(CodeGenerator cg)
-  { if(!Options.Debug && Test.IsConstant)
+  { if(Options.Optimize && Test.IsConstant)
     { if(Ops.IsTrue(Test.GetValue())) Body.Emit(cg);
       else if(Else!=null) Else.Emit(cg);
     }
     else
     { Label endLab = cg.ILG.DefineLabel(), elseLab = Else==null ? new Label() : cg.ILG.DefineLabel();
-      if(!Options.Debug && Test is UnaryExpression && ((UnaryExpression)Test).Op==UnaryOperator.LogicalNot)
+      if(Options.Optimize && Test is UnaryExpression && ((UnaryExpression)Test).Op==UnaryOperator.LogicalNot)
       { cg.EmitIsTrue(((UnaryExpression)Test).Expression);
         cg.ILG.Emit(OpCodes.Brtrue, Else==null ? endLab : elseLab);
       }
@@ -1229,7 +1230,7 @@ public class ReturnStatement : Statement
   { if(!InGenerator) cg.EmitReturn(Expression);
     else
     { cg.ILG.Emit(OpCodes.Ldc_I4_0);
-      cg.ILG.Emit(OpCodes.Ret);
+      cg.EmitReturn();
     }
   }
 
@@ -1513,13 +1514,13 @@ public class WhileStatement : Statement
 { public WhileStatement(Expression test, Statement body, Statement elze) { Test=test; Body=body; Else=elze; }
 
   public override void Emit(CodeGenerator cg)
-  { if(!Options.Debug && Test.IsConstant && !Ops.IsTrue(Test.GetValue())) return;
+  { if(Options.Optimize && Test.IsConstant && !Ops.IsTrue(Test.GetValue())) return;
 
     Label start=cg.ILG.DefineLabel(), end=cg.ILG.DefineLabel(), elze=(Else==null ? end : cg.ILG.DefineLabel());
     Body.Walk(new JumpFinder(null, start, end));
     cg.ILG.BeginExceptionBlock();
     cg.ILG.MarkLabel(start);
-    if(Options.Debug || !Test.IsConstant)
+    if(!Options.Optimize || !Test.IsConstant)
     { Test.Emit(cg);
       cg.EmitCall(typeof(Ops), "IsTrue");
       cg.ILG.Emit(OpCodes.Brfalse, elze);
@@ -1586,7 +1587,7 @@ public class YieldStatement : Statement
     Expression.Emit(cg);
     cg.ILG.Emit(OpCodes.Stind_Ref);
     cg.ILG.Emit(OpCodes.Ldc_I4_1);
-    cg.ILG.Emit(OpCodes.Ret);
+    cg.EmitReturn();
     cg.ILG.MarkLabel(Targets[Targets.Length-1].Label);
   }
 

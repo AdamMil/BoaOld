@@ -1096,9 +1096,8 @@ interactive mode by the default sys.displayhook handler.")]
 
   [DocString(@"This value is 1 when the interpreter/compiler is running in debug mode and
 0 otherwise. Debug mode alters many facets of Boa's internal operation,
-including whether or not 'assert' statements will be executed and whether
-or not optimizations will be performed. This value cannot be altered at
-runtime.")]
+including whether or not 'assert' statements will be executed. This value
+cannot be altered at runtime.")]
   public static int __debug__ { get { return Options.Debug ? 1 : 0; } }
 
   public static object exit = "Use Ctrl-Z plus Return (eg EOF) to exit.";
