@@ -115,7 +115,7 @@ public class IdenticalOperator : BinaryOperator
 
 public class NotIdenticalOperator : BinaryOperator
 { public override void Emit(CodeGenerator cg)
-  { cg.ILG.Emit(OpCodes.Ceq); cg.ILG.Emit(OpCodes.Not);
+  { cg.ILG.Emit(OpCodes.Ceq); cg.EmitInt(0); cg.ILG.Emit(OpCodes.Ceq);
     cg.EmitCall(typeof(Ops), "FromBool");
   }
   public override object Evaluate(object lhs, object rhs) { return Ops.FromBool(lhs!=rhs); }

@@ -437,7 +437,8 @@ public sealed class Ops
   }
 
   public static bool DelDescriptor(object desc, object instance)
-  { IDataDescriptor dd = desc as IDataDescriptor;
+  { if(Convert.GetTypeCode(desc)!=TypeCode.Object) return false;
+    IDataDescriptor dd = desc as IDataDescriptor;
     if(dd != null) { dd.__delete__(instance); return true; }
     object dummy;
     return TryInvoke(desc, "__delete__", out dummy, instance);
@@ -1015,7 +1016,8 @@ public sealed class Ops
   }
 
   public static bool SetDescriptor(object desc, object instance, object value)
-  { IDataDescriptor dd = desc as IDataDescriptor;
+  { if(Convert.GetTypeCode(desc)!=TypeCode.Object) return false; // TODO: i'm not sure how much this optimization helps (if at all)
+    IDataDescriptor dd = desc as IDataDescriptor;
     if(dd!=null) { dd.__set__(instance, value); return true; }
     object dummy;
     return TryInvoke(desc, "__set__", out dummy, instance, value);

@@ -32,63 +32,63 @@ public sealed class _socket
 { _socket() { }
 
   #region Support classes
-  public class _error : RuntimeException
-  { public _error(int code, string message) : base(message) { this.code=code; }
-    public _error(string message) : base(message) { }
+  public class error : RuntimeException
+  { public error(int code, string message) : base(message) { this.code=code; }
+    public error(string message) : base(message) { }
 
     public int code;
   }
   
-  public class _herror : _error
-  { public _herror(int code, string message) : base(code, message) { }
-    public _herror(string message) : base(message) { }
+  public class herror : error
+  { public herror(int code, string message) : base(code, message) { }
+    public herror(string message) : base(message) { }
   }
   
-  public class _gaierror : _error
-  { public _gaierror(int code, string message) : base(code, message) { }
-    public _gaierror(string message) : base(message) { }
+  public class gaierror : error
+  { public gaierror(int code, string message) : base(code, message) { }
+    public gaierror(string message) : base(message) { }
   }
 
-  public class _timeout : _error
-  { public _timeout() : base("timed out") { }
+  public class timeout : error
+  { public timeout() : base("timed out") { }
   }
 
   // TODO: support IPv6 addresses
-  public class socketobj
-  { public socketobj() : this(AF_INET, SOCK_STREAM, 0) { }
-    public socketobj(int family) : this(family, SOCK_STREAM, 0) { }
-    public socketobj(int family, int type) : this(family, type, 0) { }
-    public socketobj(int family, int type, int proto) :
+  public class socket
+  { public socket() : this(AF_INET, SOCK_STREAM, 0) { }
+    public socket(int family) : this(family, SOCK_STREAM, 0) { }
+    public socket(int family, int type) : this(family, type, 0) { }
+    public socket(int family, int type, int proto) :
       this((AddressFamily)family, (SocketType)type, (ProtocolType)proto) { }
-    public socketobj(AddressFamily family, SocketType type, ProtocolType proto)
+    public socket(AddressFamily family, SocketType type, ProtocolType proto)
     { try { Socket = new Socket(family, type, proto); }
-      catch(SocketException e) { throw new _error(e.ErrorCode, e.Message); }
-      catch(Exception e) { throw new _error(e.Message); }
+      catch(SocketException e) { throw new error(e.ErrorCode, e.Message); }
+      catch(Exception e) { throw new error(e.Message); }
     }
 
-    public socketobj(Socket socket) { Socket=socket; }
+    public socket(Socket socket) { Socket=socket; }
 
     public Tuple accept()
     { try
-      { socketobj s = new socketobj(Socket.Accept());
+      { socket s = new socket(Socket.Accept());
         return new Tuple(s, s.getpeername());
       }
-      catch(SocketException e) { throw new _error(e.ErrorCode, e.Message); }
-      catch(Exception e) { throw new _error(e.Message); }
+      catch(SocketException e) { throw new error(e.ErrorCode, e.Message); }
+      catch(Exception e) { throw new error(e.Message); }
     }
     
     public void bind(Tuple address)
     { try { Socket.Bind(AddressToEndpoint(address)); }
-      catch(SocketException e) { throw new _error(e.ErrorCode, e.Message); }
-      catch(Exception e) { throw new _error(e.Message); }
+      catch(SocketException e) { throw new error(e.ErrorCode, e.Message); }
+      catch(Exception e) { throw new error(e.Message); }
     }
     
     public void close() { Socket.Close(); }
 
     public void connect(Tuple address)
     { try { Socket.Connect(AddressToEndpoint(address)); }
-      catch(SocketException e) { throw new _error(e.ErrorCode, e.Message); }
-      catch(Exception e) { throw new _error(e.Message); }
+      catch(SocketException e) { throw new error(e.ErrorCode, e.Message); }
+      catch(Exception e) { throw new error(e.Message); }
     }
 
     public Tuple getpeername()
@@ -96,8 +96,8 @@ public sealed class _socket
       { IPEndPoint ep = (IPEndPoint)Socket.RemoteEndPoint;
         return new Tuple(ep.Address.ToString(), ep.Port);
       }
-      catch(SocketException e) { throw new _error(e.ErrorCode, e.Message); }
-      catch(Exception e) { throw new _error(e.Message); }
+      catch(SocketException e) { throw new error(e.ErrorCode, e.Message); }
+      catch(Exception e) { throw new error(e.Message); }
     }
     
     public Tuple getsockname()
@@ -105,21 +105,21 @@ public sealed class _socket
       { IPEndPoint ep = (IPEndPoint)Socket.LocalEndPoint;
         return new Tuple(ep.Address.ToString(), ep.Port);
       }
-      catch(SocketException e) { throw new _error(e.ErrorCode, e.Message); }
-      catch(Exception e) { throw new _error(e.Message); }
+      catch(SocketException e) { throw new error(e.ErrorCode, e.Message); }
+      catch(Exception e) { throw new error(e.Message); }
     }
 
     public object getsockopt(int level, int name)
     { try { return Socket.GetSocketOption((SocketOptionLevel)level, (SocketOptionName)name); }
-      catch(SocketException e) { throw new _error(e.ErrorCode, e.Message); }
-      catch(Exception e) { throw new _error(e.Message); }
+      catch(SocketException e) { throw new error(e.ErrorCode, e.Message); }
+      catch(Exception e) { throw new error(e.Message); }
     }
 
     public void listen() { listen(5); }
     public void listen(int backlog)
     { try { Socket.Listen(backlog); }
-      catch(SocketException e) { throw new _error(e.ErrorCode, e.Message); }
-      catch(Exception e) { throw new _error(e.Message); }
+      catch(SocketException e) { throw new error(e.ErrorCode, e.Message); }
+      catch(Exception e) { throw new error(e.Message); }
     }
 
     public BoaFile makefile() { return new BoaFile(new NetworkStream(Socket, false)); }
@@ -136,8 +136,8 @@ public sealed class _socket
         if(read>0) Array.Copy(arr, ret, read);
         return ret;
       }
-      catch(SocketException e) { throw new _error(e.ErrorCode, e.Message); }
-      catch(Exception e) { throw new _error(e.Message); }
+      catch(SocketException e) { throw new error(e.ErrorCode, e.Message); }
+      catch(Exception e) { throw new error(e.Message); }
     }
 
     public string recvstr(int bufsize) { return recvstr(bufsize, 0); }
@@ -159,8 +159,8 @@ public sealed class _socket
         IPEndPoint iep = (IPEndPoint)ep;
         return new Tuple(arr, new Tuple(iep.Address.ToString(), iep.Port));
       }
-      catch(SocketException e) { throw new _error(e.ErrorCode, e.Message); }
-      catch(Exception e) { throw new _error(e.Message); }
+      catch(SocketException e) { throw new error(e.ErrorCode, e.Message); }
+      catch(Exception e) { throw new error(e.Message); }
     }
 
     public Tuple recvstrfrom(int bufsize) { return recvstrfrom(bufsize, 0); }
@@ -173,8 +173,8 @@ public sealed class _socket
     public int send(byte[] data) { return send(data, 0); }
     public int send(byte[] data, int flags)
     { try { return Socket.Send(data, (SocketFlags)flags); }
-      catch(SocketException e) { throw new _error(e.ErrorCode, e.Message); }
-      catch(Exception e) { throw new _error(e.Message); }
+      catch(SocketException e) { throw new error(e.ErrorCode, e.Message); }
+      catch(Exception e) { throw new error(e.Message); }
     }
 
     public int send(string str) { return send(str, 0); }
@@ -186,8 +186,8 @@ public sealed class _socket
       { int sent=0;
         while(sent<data.Length) sent += Socket.Send(data, sent, data.Length-sent, (SocketFlags)flags);
       }
-      catch(SocketException e) { throw new _error(e.ErrorCode, e.Message); }
-      catch(Exception e) { throw new _error(e.Message); }
+      catch(SocketException e) { throw new error(e.ErrorCode, e.Message); }
+      catch(Exception e) { throw new error(e.Message); }
     }
 
     public void sendall(string str) { sendall(str, 0); }
@@ -196,22 +196,22 @@ public sealed class _socket
     public int sendto(byte[] data, Tuple address) { return sendto(data, 0, address); }
     public int sendto(byte[] data, int flags, Tuple address)
     { try { return Socket.SendTo(data, (SocketFlags)flags, AddressToEndpoint(address)); }
-      catch(SocketException e) { throw new _error(e.ErrorCode, e.Message); }
-      catch(Exception e) { throw new _error(e.Message); }
+      catch(SocketException e) { throw new error(e.ErrorCode, e.Message); }
+      catch(Exception e) { throw new error(e.Message); }
     }
     
     public void setblocking(object value) { Socket.Blocking = Ops.IsTrue(value); }
 
     public void setsockopt(int level, int name, object value)
     { try { Socket.SetSocketOption((SocketOptionLevel)level, (SocketOptionName)name, value); }
-      catch(SocketException e) { throw new _error(e.ErrorCode, e.Message); }
-      catch(Exception e) { throw new _error(e.Message); }
+      catch(SocketException e) { throw new error(e.ErrorCode, e.Message); }
+      catch(Exception e) { throw new error(e.Message); }
     }
 
     public void shutdown(int how)
     { try { Socket.Shutdown((SocketShutdown)how); }
-      catch(SocketException e) { throw new _error(e.ErrorCode, e.Message); }
-      catch(Exception e) { throw new _error(e.Message); }
+      catch(SocketException e) { throw new error(e.ErrorCode, e.Message); }
+      catch(Exception e) { throw new error(e.Message); }
     }
     
     public override string ToString() { return "<socket object>"; }
@@ -273,13 +273,7 @@ public sealed class _socket
   public static readonly bool has_ipv6 = Socket.SupportsIPv6;
   #endregion
   
-  public static readonly object error = ReflectedType.FromType(typeof(_error));
-  public static readonly object herror = ReflectedType.FromType(typeof(_herror));
-  public static readonly object gaierror = ReflectedType.FromType(typeof(_gaierror));
-  public static readonly object timeout = ReflectedType.FromType(typeof(_timeout));
-
-  public static readonly object linger = ReflectedType.FromType(typeof(LingerOption));
-  public static readonly object socket = ReflectedType.FromType(typeof(socketobj));
+  public static readonly ReflectedType linger = ReflectedType.FromType(typeof(LingerOption));
 
   public static string __repr__() { return "<module 'socket' (built-in)>"; }
   public static string __str__() { return __repr__(); }
@@ -360,17 +354,17 @@ public sealed class _socket
 
   static IPHostEntry GetHostByAddress(string address)
   { try { return Dns.GetHostByAddress(address); }
-    catch(Exception e) { throw new _herror(e.Message); }
+    catch(Exception e) { throw new herror(e.Message); }
   }
 
   static IPHostEntry GetHostByAddress(IPAddress address)
   { try { return Dns.GetHostByAddress(address); }
-    catch(Exception e) { throw new _herror(e.Message); }
+    catch(Exception e) { throw new herror(e.Message); }
   }
 
   static IPHostEntry GetHostByName(string host)
   { try { return Dns.GetHostByName(host); }
-    catch(Exception e) { throw new _herror(e.Message); }
+    catch(Exception e) { throw new herror(e.Message); }
   }
 
   static Tuple HEntryToTuple(IPHostEntry he)
@@ -381,7 +375,7 @@ public sealed class _socket
 
   static IPHostEntry Resolve(string ipOrHost)
   { try { return Dns.Resolve(ipOrHost); }
-    catch(Exception e) { throw new _herror(e.Message); }
+    catch(Exception e) { throw new herror(e.Message); }
   }
 }
 

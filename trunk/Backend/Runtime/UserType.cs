@@ -6,10 +6,26 @@ using Boa.AST;
 namespace Boa.Runtime
 {
 
-// FIXME: this doesn't work properly for derived classes
+// FIXME: make these wrappers expose the attributes of the underlying functions
+// TODO: create a base class for these wrappers
+
+// FIXME: this doesn't work properly for derived classes (or does it?)
+#region FunctionWrapper
+public class FunctionWrapper : IHasAttributes
+{ public FunctionWrapper(IFancyCallable func) { this.func = func; }
+
+  protected IFancyCallable func;
+
+  public List __attrs__() { return Ops.GetAttrNames(func); }
+  public object __getattr__(string key) { return key=="__call__" ? this : Ops.GetAttr(func, key); }
+  public void __setattr__(string key, object value) { Ops.SetAttr(value, func, key); }
+  public void __delattr__(string key) { Ops.DelAttr(func, key); }
+}
+#endregion
+
 #region ClassWrapper
-public class ClassWrapper : IDescriptor, IFancyCallable
-{ public ClassWrapper(Function func, BoaType type) { this.func=func; this.type=type; }
+public class ClassWrapper : FunctionWrapper, IDescriptor, IFancyCallable
+{ public ClassWrapper(IFancyCallable func, BoaType type) : base(func) { this.type=type; }
 
   public object __get__(object instance)
   { return instance==null ? this : new ClassWrapper(func, ((IInstance)instance).__class__);
@@ -29,19 +45,19 @@ public class ClassWrapper : IDescriptor, IFancyCallable
     return func.Call(nargs);
   }
 
+  // FIXME: fix this
   public override string ToString()
-  { return string.Format("<classmethod '{0}' on '{1}'>", func.Name, type.__name__);
+  { return string.Format("<classmethod '{0}' on '{1}'>", /*func.Name*/"", type.__name__);
   }
 
-  Function func;
   BoaType type;
 }
 #endregion
 
 #region MethodWrapper
-public class MethodWrapper : IDescriptor, IFancyCallable
-{ public MethodWrapper(Function func) { this.func = func; }
-  public MethodWrapper(Function func, object instance) { this.func=func; this.instance=instance; }
+public class MethodWrapper : FunctionWrapper, IDescriptor, IFancyCallable
+{ public MethodWrapper(IFancyCallable func) : base(func) { }
+  public MethodWrapper(IFancyCallable func, object instance) : base(func) { this.instance=instance; }
 
   public object __get__(object instance) { return instance==null ? this : new MethodWrapper(func, instance); }
 
@@ -59,9 +75,12 @@ public class MethodWrapper : IDescriptor, IFancyCallable
     return func.Call(nargs);
   }
 
-  public override string ToString() { return string.Format("<method '{0}'>", func.Name); }
+  // FIXME: fix this
+  public override string ToString()
+  { return "<method>";
+    //return string.Format("<method '{0}'>", func.Name);
+  }
 
-  Function func;
   object instance;
 }
 #endregion
@@ -113,7 +132,7 @@ public class UserType : BoaType
     if(ui!=null && ui.__dict__.Contains(name)) ui.__dict__.Remove(name);
     else
     { object slot = LookupSlot(mro, index, name);
-      if(slot!=null) Ops.DelDescriptor(slot, self);
+      if(slot!=Ops.Missing) Ops.DelDescriptor(slot, self);
       else throw Ops.AttributeError("no such slot '{0}'", name);
     }
   }
@@ -128,7 +147,7 @@ public class UserType : BoaType
   public bool GetAttr(Tuple mro, int index, object self, string name, out object value)
   { object slot = LookupSlot(mro, index, name);
 
-    if(slot!=null)
+    if(slot!=Ops.Missing)
     { Function func = slot as Function;
       if(func!=null && (func.Type==FunctionType.Unmarked || func.Type==FunctionType.Method))
         value = new MethodWrapper(func, self);
@@ -186,7 +205,7 @@ public class UserType : BoaType
 
   public override void SetAttr(Tuple mro, int index, object self, string name, object value)
   { object slot = LookupSlot(mro, index, name);
-    if(slot!=null && (self==null || slot is ReflectedMember) && Ops.SetDescriptor(slot, null, value)) return;
+    if(slot!=Ops.Missing && (self==null || slot is ReflectedMember) && Ops.SetDescriptor(slot, null, value)) return;
     else if(self!=null) ((IInstance)self).__dict__[name] = value;
     else throw Ops.AttributeError("no such slot '{0}'", name);
   }
