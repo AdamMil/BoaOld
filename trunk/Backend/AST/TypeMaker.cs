@@ -37,7 +37,8 @@ public sealed class TypeMaker
   { Type baseType = FindBaseType(bases), type = (Type)types[baseType];
     if(type!=null) return type;
 
-    TypeGenerator typeGen = SnippetMaker.Assembly.DefineType("Boa.Types."+baseType.FullName, baseType);;
+    TypeGenerator typeGen = SnippetMaker.Assembly.DefineType("Boa.Types."+baseType.FullName.Replace("+", @"\+"),
+                                                             baseType);
     CodeGenerator cg;
     Slot classField, dictField;
 

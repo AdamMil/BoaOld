@@ -201,6 +201,10 @@
                     BuildAction = "None"
                 />
                 <File
+                    RelPath = "lib\linecache.boa"
+                    BuildAction = "None"
+                />
+                <File
                     RelPath = "lib\math.boa"
                     BuildAction = "None"
                 />
@@ -306,6 +310,11 @@
                 />
                 <File
                     RelPath = "Modules\_md5.cs"
+                    SubType = "Code"
+                    BuildAction = "Compile"
+                />
+                <File
+                    RelPath = "Modules\_random.cs"
                     SubType = "Code"
                     BuildAction = "Compile"
                 />

@@ -134,6 +134,16 @@ class C(B):
   }
   #endregion
 
+  #region Warnings
+  public class Warning : Exception { public Warning(string message) : base(message) { } }
+  public class UserWarning : Warning { public UserWarning(string message) : base(message) { } }
+  public class DeprecationWarning : Warning { public DeprecationWarning(string message) : base(message) { } }
+  public class PendingDeprecationWarning : Warning { public PendingDeprecationWarning(string message) : base(message) { } }
+  public class SyntaxWarning : Warning { public SyntaxWarning(string message) : base(message) { } }
+  public class RuntimeWarning : Warning { public RuntimeWarning(string message) : base(message) { } }
+  public class FutureWarning : Warning { public FutureWarning(string message) : base(message) { } }
+  #endregion
+
   #region XRange
   [BoaType("xrange")]
   [DocString(@"xrange([start,] stop[, step])
@@ -211,7 +221,7 @@ sequences or when many of a range's elements are never used.")]
     internal int start, stop, step, current;
   }
   #endregion
-
+  
   public static string __repr__() { return "<module '__builtin__' (built-in)>"; }
   public static string __str__() { return __repr__(); }
 

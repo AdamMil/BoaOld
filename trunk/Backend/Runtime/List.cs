@@ -70,7 +70,7 @@ public class List : IMutableSequence, IList, IComparable, ICloneable, IRepresent
     return IndexOrError(IndexOf(item, start, end-start));
   }
 
-  public void insert(int index, object o) { Insert(Ops.FixIndex(index, size), o); }
+  public void insert(int index, object o) { Insert(index==size ? index : Ops.FixIndex(index, size), o); }
 
   public object pop()
   { if(size==0) throw Ops.ValueError("pop off of empty list");
@@ -201,7 +201,7 @@ public class List : IMutableSequence, IList, IComparable, ICloneable, IRepresent
   }
 
   public void Insert(int index, object value)
-  { if(index<0 || index>=size) throw new IndexOutOfRangeException();
+  { if(index<0 || index>size) throw new IndexOutOfRangeException();
     ResizeTo(size+1);
     for(int i=size++; i>index; i--) items[i] = items[i-1];
     items[index] = value;

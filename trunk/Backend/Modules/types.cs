@@ -52,6 +52,7 @@ public sealed class types
   public static readonly ReflectedType UserType = ReflectedType.FromType(typeof(UserType));
   public static readonly ReflectedType MethodType = ReflectedType.FromType(typeof(MethodWrapper));
   public static readonly ReflectedType UnboundMethodType = MethodType;
+  public static readonly ReflectedType BuiltinMethodType = ReflectedType.FromType(typeof(ReflectedMethodBase));
   public static readonly ReflectedType FileType = ReflectedType.FromType(typeof(BoaFile));
   public static readonly ReflectedType XRangeType = ReflectedType.FromType(typeof(Boa.Modules.__builtin__.XRange));
   public static readonly ReflectedType SliceType = ReflectedType.FromType(typeof(Slice));
