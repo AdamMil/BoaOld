@@ -561,13 +561,33 @@ public class ClassStatement : Statement
     Bases = bases;
     Body  = body;
   }
-  
+
   public override void Emit(CodeGenerator cg)
-  { throw new NotImplementedException();
+  { CodeGenerator icg = cg.TypeGenerator.DefineMethod(Name.String+"$maker"+index++,
+                                                      typeof(IDictionary), Type.EmptyTypes);
+    LocalNamespace ns = new LocalNamespace(cg.Namespace, icg);
+    icg.Namespace = ns;
+    Body.Emit(icg);
+    ns.EmitLocalsDict(icg);
+    icg.ILG.Emit(OpCodes.Ret);
+    
+    cg.EmitGet(new Name("__name__"));
+    cg.EmitCall(typeof(Ops), "ToString", new Type[] { typeof(object) }); // FIXME: doesn't handle non-existant __name__
+    cg.EmitString(Name.String);
+    cg.EmitObjectArray(Bases);
+    cg.EmitNew(typeof(Tuple), new Type[] { typeof(object[]) });
+    cg.EmitCall(icg.MethodBuilder);
+    cg.EmitCall(typeof(Ops), "MakeClass");
+    cg.EmitSet(Name);
   }
 
   public override void Execute(Frame frame)
-  { 
+  { Frame dict = new Frame(frame);
+    Body.Execute(dict);
+    object[] bases = new object[Bases.Length];
+    for(int i=0; i<bases.Length; i++) bases[i] = Bases[i].Evaluate(frame);
+    frame.Set(Name.String,
+              Ops.MakeClass(Ops.ToString(frame.Get("__name__")), Name.String, new Tuple(bases), dict.Locals));
   }
 
   public override void ToCode(System.Text.StringBuilder sb, int indent)
@@ -593,6 +613,8 @@ public class ClassStatement : Statement
   public Name Name;
   public Expression[] Bases;
   public Statement Body;
+  
+  static int index;
 }
 #endregion
 

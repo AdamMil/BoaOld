@@ -498,6 +498,13 @@ public sealed class Ops
     return FromBool(a is Complex ? ((Complex)a).Equals(b) : Compare(a, b)==0);
   }
 
+  public static object FindMetaclass(Tuple bases, IDictionary dict)
+  { object mc = dict["__metaclass__"];
+    if(mc!=null) return mc;
+    // TODO: use a better rule for choosing the metaclass?
+    return bases.Count>0 ? GetDynamicType(bases.items[0]) : ReflectedType.FromType(typeof(object));
+  }
+
   public static int FixIndex(int index, int length)
   { if(index<0)
     { index += length;
@@ -767,6 +774,14 @@ public sealed class Ops
   { return new LookupErrorException(string.Format(format, args));
   }
 
+  public static object MakeClass(string module, string name, Tuple bases, IDictionary dict)
+  { object metaclass = FindMetaclass(bases, dict);
+    if(metaclass==ReflectedType.FromType(typeof(ReflectedType)) ||
+       metaclass==ReflectedType.FromType(typeof(UserType)))
+      return new UserType(module, name, bases, dict);
+    return Call(metaclass, name, bases, dict);
+  }
+
   public static TypeErrorException MethodCalledWithoutInstance(string name)
   { return new TypeErrorException(name+" is a method and requires an instance object");
   }
@@ -845,12 +860,15 @@ public sealed class Ops
   { switch(Convert.GetTypeCode(a))
     { case TypeCode.Boolean: return (bool)a ? -1 : 0;
       case TypeCode.Byte:  return -(int)(byte)a;
+      case TypeCode.Decimal: return -(Decimal)a;
+      case TypeCode.Double: return -(double)a;
       case TypeCode.Int16: return -(int)(short)a;
       case TypeCode.Int32: return -(int)a;
       case TypeCode.Int64: return -(long)a;
       case TypeCode.Object:
         return a is Integer ? -(Integer)a : a is Complex ? -(Complex)a : Invoke(a, "__neg__");
       case TypeCode.SByte: return -(int)(sbyte)a;
+      case TypeCode.Single: return -(float)a;
       case TypeCode.UInt16: return -(int)(short)a;
       case TypeCode.UInt32:
       { uint v = (uint)a;

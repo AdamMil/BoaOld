@@ -89,7 +89,12 @@ public abstract class BoaType : DynamicType, IDynamicObject, ICallable, IHasAttr
 
   internal object LookupSlot(string name) { return RawGetSlot(name); }
 
-  protected virtual void Initialize() { dict=new Dict(); initialized=true; }
+  protected virtual void Initialize()
+  { if(!initialized)
+    { dict=new Dict();
+      initialized=true;
+    }
+  }
 
   protected object RawGetSlot(string name)
   { Initialize();
