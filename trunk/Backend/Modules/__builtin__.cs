@@ -411,7 +411,7 @@ of object, a help page on the object is generated.")]
         Console.Write(mb.IsStatic ? ")" : ") (method)");
         if(!mb.IsConstructor)
         { Type ret = ((System.Reflection.MethodInfo)mb).ReturnType;
-          if(ret!=typeof(void)) Console.WriteLine(" --> "+typeName(ret));
+          if(ret!=typeof(void)) Console.WriteLine(" -> "+typeName(ret));
         }
         else Console.WriteLine();
       }
@@ -863,7 +863,7 @@ runtime.")]
   //public static readonly object @bool   = ReflectedType.FromType(typeof(bool));
   // TODO: complex([real[, imag]])
   public static readonly object dict    = ReflectedType.FromType(typeof(Dict));
-  // TODO: file(filename[, mode[, bufsize]])
+  public static readonly object file    = ReflectedType.FromType(typeof(BoaFile));
   //public static readonly object @float  = ReflectedType.FromType(typeof(double));
   //public static readonly object @int    = ReflectedType.FromType(typeof(int));
   //public static readonly object iter    = ReflectedType.FromType(typeof(IEnumerator));
@@ -881,8 +881,9 @@ runtime.")]
   //public static readonly object FloatingPointError = ReflectedType.FromType(typeof(FloatingPointErrorException));
   public static readonly object ImportError = ReflectedType.FromType(typeof(ImportErrorException));
   public static readonly object IndexError = ReflectedType.FromType(typeof(IndexErrorException));
+  public static readonly object IOError = ReflectedType.FromType(typeof(IOErrorException));
   public static readonly object KeyError = ReflectedType.FromType(typeof(KeyErrorException));
-  //public static readonly object LookupError = ReflectedType.FromType(typeof(LookupErrorException));
+  public static readonly object LookupError = ReflectedType.FromType(typeof(LookupErrorException));
   public static readonly object NameError = ReflectedType.FromType(typeof(NameErrorException));
   //public static readonly object NotImplementedError = ReflectedType.FromType(typeof(NotImplementedErrorException));
   //public static readonly object OverflowError = ReflectedType.FromType(typeof(OverflowErrorException));

@@ -102,11 +102,11 @@ public sealed class StringOps
   public static string Unescape(string s) { return Unescape(s, null); }
   public static string Unescape(string s, System.Text.RegularExpressions.Match m)
   { StringBuilder sb = new StringBuilder();
-    char lastChar=(char)0;
+    char lastChar='\0';
     for(int pos=0; pos<s.Length || lastChar!=0; )
     { char c;
       if(lastChar==0) c = s[pos++];
-      else { c=lastChar; lastChar=(char)0; }
+      else { c=lastChar; lastChar='\0'; }
 
       if(c!='\\') sb.Append(c);
       else
@@ -134,7 +134,7 @@ public sealed class StringOps
           }
         }
         else switch(c)
-        { case (char)0: throw Ops.ValueError("unterminated escape sequence");
+        { case '\0': throw Ops.ValueError("unterminated escape sequence");
           case 'n': sb.Append('\n'); break;
           case 't': sb.Append('\t'); break;
           case 'g':
@@ -186,7 +186,7 @@ public sealed class StringOps
     return sb.ToString();
   }
 
-  static char ReadChar(string str, ref int pos) { return pos>=str.Length ? (char)0 : str[pos++]; }
+  static char ReadChar(string str, ref int pos) { return pos>=str.Length ? '\0' : str[pos++]; }
 }
 
 } // namespace Boa.Runtime

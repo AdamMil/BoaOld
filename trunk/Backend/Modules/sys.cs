@@ -31,7 +31,8 @@ public sealed class sys
   public static readonly object __stderr__; // TODO: implement this
 
   public static readonly List argv    = new List();
-  public static readonly Tuple builtin_module_names = new Tuple("__builtin__", "operator", "re", "string", "sys");
+  public static readonly Tuple builtin_module_names =
+    new Tuple("__builtin__", "codecs", "operator", "re", "string", "sys");
 
   #if BIGENDIAN
   public static string byteorder = "big";

@@ -542,6 +542,10 @@ public sealed class Ops
   { return Call(GetAttr(target, name), args);
   }
 
+  public static IOErrorException IOError(string format, params object[] args)
+  { return new IOErrorException(string.Format(format, args));
+  }
+
   public static bool IsTrue(object o)
   { if(o==null) return false;
     switch(Convert.GetTypeCode(o))
@@ -568,6 +572,10 @@ public sealed class Ops
 
   public static object LogicalAnd(object a, object b) { return IsTrue(a) ? b : a; }
   public static object LogicalOr (object a, object b) { return IsTrue(a) ? a : b; }
+
+  public static LookupErrorException LookupError(string format, params object[] args)
+  { return new LookupErrorException(string.Format(format, args));
+  }
 
   public static TypeErrorException MethodCalledWithoutInstance(string name)
   { return new TypeErrorException(name+" is a method and requires an instance object");

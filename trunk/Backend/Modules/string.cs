@@ -180,6 +180,17 @@ public sealed class @string
     return sb.ToString();
   }
 
+  public static byte[] tobytes(string s) { return Encoding.ASCII.GetBytes(s); }
+  public static byte[] tobytes(string s, Encoding e) { return e.GetBytes(s); }
+
+  public static string tostring(byte[] bytes) { return Encoding.ASCII.GetString(bytes); }
+  public static string tostring(byte[] bytes, int offset, int length)
+  { return Encoding.ASCII.GetString(bytes, offset, length);
+  }
+
+  public static string tostring(char[] chars) { return new string(chars); }
+  public static string tostring(char[] chars, int offset, int length) { return new string(chars, offset, length); }
+
   public static string translate(string s, string table) { return translate(s, table, null); }
   public static string translate(string s, string table, string deletechars)
   { if(table.Length!=256) throw Ops.ValueError("translate() requires a 256-character table");

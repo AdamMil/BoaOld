@@ -779,8 +779,8 @@ public class Parser
 
   char ReadChar()
   { char c;
-    if(lastChar!=0) { c=lastChar; lastChar=(char)0; return c; }
-    else if(pos>=data.Length) { indent=-1; return (char)0; }
+    if(lastChar!=0) { c=lastChar; lastChar='\0'; return c; }
+    else if(pos>=data.Length) { indent=-1; return '\0'; }
     c = data[pos++]; column++;
     if(c=='\n') { line++; column=1; }
     else if(c=='\r')
@@ -935,7 +935,7 @@ public class Parser
         case '}': return Token.RBrace;
         case '?': return Token.Question;
         case ';': return Token.Semicolon;
-        case (char)0: nextToken=Token.EOF; return Token.EOL;
+        case '\0': nextToken=Token.EOF; return Token.EOL;
         default: SyntaxError(string.Format("unexpected character '{0}'", c)); break;
       }
     }
