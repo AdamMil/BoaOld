@@ -1,4 +1,4 @@
-#define COMPILED
+//#define COMPILED
 
 using System;
 using Language.AST;
@@ -8,8 +8,7 @@ namespace Language.Frontend
 {
 
 public class Text
-{ 
-  static void DoInteractive()
+{ static void DoInteractive()
   { Module top = new Module();
     Frame topFrame = new Frame(top);
 

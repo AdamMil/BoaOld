@@ -1,10 +1,10 @@
 using System;
 
-namespace Language
+namespace Boa
 {
 
-public sealed class Constants
-{ private Constants() { }
+public sealed class Misc
+{ private Misc() { }
   
   public static Type[] MakeTypeArray(Type type, int length)
   { Type[] arr = new Type[length];

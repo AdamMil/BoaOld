@@ -1,7 +1,7 @@
 using System;
 using System.Collections;
 
-namespace Language.Runtime
+namespace Boa.Runtime
 {
 
 public class Module
@@ -15,4 +15,4 @@ public class Module
   public IDictionary Names;
 }
 
-} // namespace Language.Runtime
+} // namespace Boa.Runtime

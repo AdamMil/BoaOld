@@ -1,15 +1,26 @@
 using System;
 using System.Reflection;
 using System.Reflection.Emit;
-using Language.Runtime;
+using Boa.Runtime;
 
-namespace Language.AST
+namespace Boa.AST
 {
 
 #region Statement
 public abstract class Statement : Node
 { public abstract void Emit(CodeGenerator cg);
   public abstract object Execute(Frame frame);
+  
+  public static void PostProcessForCompile()
+  { PostProcess();
+    DecorateNames();
+  }
+  public static void PostProcessForInterpret() { PostProcess(); }
+
+  static void DecorateNames()
+  { 
+  }
+  static void PostProcess() { }
 }
 #endregion
 
@@ -28,6 +39,11 @@ public class Suite : Statement
   { object ret = null;
     foreach(Statement stmt in Statements) ret = stmt.Execute(frame);
     return ret;
+  }
+
+  public override void Walk(IWalker w)
+  { if(w.Walk(this)) foreach(Statement stmt in Statements) w.Walk(stmt);
+    w.PostWalk(this);
   }
 
   public Statement[] Statements;
@@ -49,60 +65,93 @@ public class AssignStatement : Statement
     return value;
   }
 
+  public override void Walk(IWalker w)
+  { if(w.Walk(this))
+    { w.Walk(LHS);
+      w.Walk(RHS);
+    }
+    w.PostWalk(this);
+  }
+
   public Expression LHS, RHS;
 }
 #endregion
 
 #region DefStatement
 public class DefStatement : Statement
-{ public DefStatement(string name, Parameter[] parms, Statement body) { Name=name; Parameters=parms; Body=body; }
+{ public DefStatement(string name, Parameter[] parms, Statement body)
+  { Name=new Name(name); Parameters=parms; Body=body;
+  }
 
   public override void Emit(CodeGenerator cg)
-  { string[] parms = new string[Parameters.Length];
-    for(int i=0; i<Parameters.Length; i++) parms[i] = Parameters[i].Name;
+  { CodeGenerator impl = MakeImplMethod(cg);
 
-    CodeGenerator impl = MakeImplMethod(cg, parms);
-
-    cg.EmitString(Name);
-    cg.EmitStringArray(parms);
+    cg.EmitString(Name.String);
+    GetParmsSlot(cg).EmitGet(cg);
     cg.ILG.Emit(OpCodes.Ldnull);
     cg.ILG.Emit(OpCodes.Ldftn, impl.MethodBuilder);
     cg.EmitNew((ConstructorInfo)typeof(CallTarget).GetMember(".ctor")[0]);
-    cg.EmitNew(typeof(CompiledFunction), funcTypes);
+    cg.EmitNew(typeof(CompiledFunction), new Type[] { typeof(string), typeof(Parameter[]), typeof(CallTarget) });
 
     cg.EmitSet(Name);
   }
-  
+
   public override object Execute(Frame frame)
   { object func = MakeFunction(frame);
-    frame.Set(Name, func);
+    frame.Set(Name.String, func);
     return func;
   }
   
-  public string Name;
+  public override void Walk(IWalker w)
+  { if(w.Walk(this)) w.Walk(Body);
+    w.PostWalk(this);
+  }
+
+  public Name Name;
   public Parameter[] Parameters;
   public Statement Body;
 
-  CodeGenerator MakeImplMethod(CodeGenerator cg, string[] parms)
-  { CodeGenerator icg = cg.TypeGenerator.DefineMethod(Name + "$f" + index++, typeof(object),
+  Slot GetParmsSlot(CodeGenerator cg)
+  { if(namesSlot==null)
+    { namesSlot = cg.TypeGenerator.AddStaticSlot(Name.String+"$parms", typeof(Parameter[]));
+      CodeGenerator icg = cg.TypeGenerator.GetInitializer();
+      ConstructorInfo nci = typeof(Name).GetConstructor(new Type[] { typeof(string), typeof(Name.Flag) });
+      ConstructorInfo pci = typeof(Name).GetConstructor(new Type[] { typeof(Name) });
+
+      icg.EmitNewArray(typeof(Parameter), Parameters.Length);
+      for(int i=0; i<Parameters.Length; i++)
+      { icg.ILG.Emit(OpCodes.Dup);
+        icg.EmitInt(i);
+        icg.ILG.Emit(OpCodes.Ldelema);
+        icg.EmitString(Parameters[i].Name.String);
+        icg.EmitInt((int)Parameters[i].Name.Flags);
+        icg.EmitNew(nci);
+        icg.EmitNew(pci);
+        icg.ILG.Emit(OpCodes.Stobj, typeof(Parameter));
+      }
+      namesSlot.EmitSet(cg);
+    }
+    return namesSlot;
+  }
+
+  CodeGenerator MakeImplMethod(CodeGenerator cg)
+  { Name[] names = new Name[Parameters.Length]; 
+    for(int i=0; i<Parameters.Length; i++) names[i] = Parameters[i].Name;
+
+    CodeGenerator icg = cg.TypeGenerator.DefineMethod(Name + "$f" + index++, typeof(object),
                                                       new Type[] { typeof(object[]) });
     icg.Namespace = new LocalNamespace(cg.Namespace, icg);
-    icg.SetArgs(parms);
+    icg.SetArgs(names);
     Body.Emit(icg);
     icg.EmitReturn(null);
     icg.Finish();
     return icg;
   }
 
-  public object MakeFunction(Frame frame)
-  { string[] parms = new string[Parameters.Length]; // TODO: get rid of this (optimize it away)
-    for(int i=0; i<Parameters.Length; i++) parms[i] = Parameters[i].Name;
-    return new InterpretedFunction(frame, Name, parms, Body);
-  }
+  public object MakeFunction(Frame frame) { return new InterpretedFunction(frame, Name.String, Parameters, Body); }
 
+  Slot namesSlot;
   int index;
-
-  static Type[] funcTypes = { typeof(string), typeof(string[]), typeof(CallTarget) };
 }
 #endregion
 
@@ -115,6 +164,11 @@ public class ExpressionStatement : Statement
     cg.ILG.Emit(OpCodes.Pop);
   }
   public override object Execute(Frame frame) { return Expression.Evaluate(frame); }
+
+  public override void Walk(IWalker w)
+  { if(w.Walk(this)) w.Walk(Expression);
+    w.PostWalk(this);
+  }
 
   public Expression Expression;
 }
@@ -141,6 +195,15 @@ public class IfStatement : Statement
   { if(Ops.IsTrue(Test.Evaluate(frame))) return Body.Execute(frame);
     if(Else!=null) return Else.Execute(frame);
     return null;
+  }
+
+  public override void Walk(IWalker w)
+  { if(w.Walk(this))
+    { w.Walk(Test);
+      w.Walk(Body);
+      if(Else!=null) w.Walk(Else);
+    }
+    w.PostWalk(this);
   }
 
   public Expression Test;
@@ -170,6 +233,11 @@ public class PrintStatement : Statement
     return null;
   }
 
+  public override void Walk(IWalker w)
+  { if(w.Walk(this)) foreach(Expression e in Expressions) w.Walk(e);
+    w.PostWalk(this);
+  }
+
   public Expression[] Expressions;
   public bool TrailingNewline;
 }
@@ -183,8 +251,13 @@ public class ReturnStatement : Statement
   public override void Emit(CodeGenerator cg) { cg.EmitReturn(Expression); }
   public override object Execute(Frame frame) { return Expression==null ? null : Expression.Evaluate(frame); }
 
+  public override void Walk(IWalker w)
+  { if(w.Walk(this) && Expression!=null) w.Walk(Expression);
+    w.PostWalk(this);
+  }
+
   public Expression Expression;
 }
 #endregion
 
-} // namespace Language.AST
+} // namespace Boa.AST

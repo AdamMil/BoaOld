@@ -1,9 +1,11 @@
 using System;
 using System.Collections;
 using System.IO;
-using Language.Runtime;
+using Boa.Runtime;
 
-namespace Language.AST
+// TODO: improve diagnostics
+
+namespace Boa.AST
 {
 
 #region Tokens
@@ -27,15 +29,35 @@ enum Token
 }
 #endregion
 
+// TODO: move these to Node.cs (and then rename Node.cs ?)
 #region Support types
 public struct Argument
 { public Argument(Expression expr) { Expression=expr; }
   public Expression Expression;
 }
 
+public struct Name
+{ [Flags] public enum Flag : byte { Local=0, Free=1, Global=2, TypeMask=3, Closed=4 }
+
+  public Name(string name) { String=name; Flags=Flag.Local; }
+  public Name(string name, Flag flags) { String=name; Flags=flags; }
+
+  public bool IsFree   { get { return (Flags&Flag.TypeMask)==Flag.Free; } }
+  public bool IsGlobal { get { return (Flags&Flag.TypeMask)==Flag.Global; } }
+  public bool IsLocal  { get { return (Flags&Flag.TypeMask)==Flag.Local; } }
+  public Flag Type     { get { return Flags&Flag.TypeMask; } }
+
+  public override int GetHashCode() { return String.GetHashCode(); }
+
+  public string String;
+  public Flag Flags;
+}
+
 public struct Parameter
-{ public Parameter(string name) { Name=name; }
-  public string Name;
+{ public Parameter(Name name) { Name=name; }
+  public Parameter(string name) { Name=new Name(name); }
+  public override int GetHashCode() { return Name.GetHashCode(); }
+  public Name Name;
 }
 #endregion
 
@@ -284,7 +306,7 @@ public class Parser
   { Expression expr;
     switch(token)
     { case Token.Literal: expr = new ConstantExpression(value); break;
-      case Token.Identifier: expr = new NameExpression((string)value); break;
+      case Token.Identifier: expr = new NameExpression(new Name((string)value)); break;
       case Token.LParen:
         NextToken();
         expr = ParseExpression();
@@ -644,4 +666,4 @@ public class Parser
 }
 #endregion
 
-} // namespace Language.AST
+} // namespace Boa.AST

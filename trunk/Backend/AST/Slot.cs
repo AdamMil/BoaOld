@@ -2,9 +2,9 @@ using System;
 using System.Collections;
 using System.Reflection;
 using System.Reflection.Emit;
-using Language.Runtime;
+using Boa.Runtime;
 
-namespace Language.AST
+namespace Boa.AST
 {
 
 #region Slot
@@ -133,4 +133,4 @@ public class StaticSlot : Slot
 }
 #endregion
 
-} // namespace Language.AST
+} // namespace Boa.AST

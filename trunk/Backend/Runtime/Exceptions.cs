@@ -1,6 +1,6 @@
 using System;
 
-namespace Language.Runtime
+namespace Boa.Runtime
 {
 
 public abstract class LanguageException : Exception
@@ -31,4 +31,4 @@ public class TypeErrorException : RuntimeException
 { public TypeErrorException(string message) : base(message) { }
 }
 
-} // namespace Language.Runtime
+} // namespace Boa.Runtime

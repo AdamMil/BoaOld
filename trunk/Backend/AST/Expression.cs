@@ -1,12 +1,12 @@
 using System;
 using System.Reflection.Emit;
-using Language.Runtime;
+using Boa.Runtime;
 
-namespace Language.AST
+namespace Boa.AST
 {
 
 #region Expression
-public abstract class Expression
+public abstract class Expression : Node
 { public virtual void Assign(object value, Frame frame)
   { throw new NotImplementedException("Assign: "+GetType());
   }
@@ -42,7 +42,15 @@ public class AndExpression : BinaryExpression
 
 #region BinaryExpression
 public abstract class BinaryExpression : Expression
-{ public Expression LHS, RHS;
+{ public override void Walk(IWalker w)
+  { if(w.Walk(this))
+    { w.Walk(LHS);
+      w.Walk(RHS);
+    }
+    w.PostWalk(this);
+  }
+
+  public Expression LHS, RHS;
 }
 #endregion
 
@@ -83,6 +91,11 @@ public class CallExpression : Expression
     return Ops.Call(callee, parms);
   }
 
+  public override void Walk(IWalker w)
+  { if(w.Walk(this)) w.Walk(Target);
+    w.PostWalk(this);
+  }
+
   public Argument[] Arguments;
   public Expression Target;
 }
@@ -101,14 +114,14 @@ public class ConstantExpression : Expression
 
 #region NameExpression
 public class NameExpression : Expression
-{ public NameExpression(string name) { Name=name; }
+{ public NameExpression(Name name) { Name=name; }
 
-  public override void Assign(object value, Frame frame) { frame.Set(Name, value); }
+  public override void Assign(object value, Frame frame) { frame.Set(Name.String, value); }
   public override void Emit(CodeGenerator cg) { cg.EmitGet(Name); }
   public override void EmitSet(CodeGenerator cg) { cg.EmitSet(Name); }
-  public override object Evaluate(Frame frame) { return frame.Get(Name); }
+  public override object Evaluate(Frame frame) { return frame.Get(Name.String); }
 
-  public string Name;
+  public Name Name;
 }
 #endregion
 
@@ -155,6 +168,15 @@ public class TernaryExpression : Expression
   public override object Evaluate(Frame frame)
   { return Ops.IsTrue(Test.Evaluate(frame)) ? IfTrue.Evaluate(frame) : IfFalse.Evaluate(frame);
   }
+  
+  public override void Walk(IWalker w)
+  { if(w.Walk(this))
+    { w.Walk(Test);
+      w.Walk(IfTrue);
+      w.Walk(IfFalse);
+    }
+    w.PostWalk(this);
+  }
 
   public Expression Test, IfTrue, IfFalse;
 }
@@ -170,9 +192,14 @@ public class UnaryExpression : Expression
     Op.Emit(cg);
   }
 
+  public override void Walk(IWalker w)
+  { if(w.Walk(this)) w.Walk(Expression);
+    w.PostWalk(this);
+  }
+
   public Expression Expression;
   public UnaryOperator Op;
 }
 #endregion
 
-} // namespace Language.AST
+} // namespace Boa.AST

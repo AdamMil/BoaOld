@@ -2,9 +2,9 @@ using System;
 using System.Collections;
 using System.Reflection;
 using System.Reflection.Emit;
-using Language.Runtime;
+using Boa.Runtime;
 
-namespace Language.AST
+namespace Boa.AST
 {
 
 public class CodeGenerator
@@ -64,8 +64,8 @@ public class CodeGenerator
   }
   public void EmitFieldSet(FieldInfo field) { ILG.Emit(field.IsStatic ? OpCodes.Stsfld : OpCodes.Stfld, field); }
 
-  public void EmitGet(string name) { Namespace.GetSlotForGet(name).EmitGet(this); }
-  public void EmitSet(string name) { Namespace.GetSlotForSet(name).EmitSet(this); }
+  public void EmitGet(Name name) { Namespace.GetSlotForGet(name).EmitGet(this); }
+  public void EmitSet(Name name) { Namespace.GetSlotForSet(name).EmitSet(this); }
 
   public void EmitInt(int value)
   { OpCode op;
@@ -93,6 +93,7 @@ public class CodeGenerator
   public void EmitIsTrue() { EmitCall(typeof(Ops), "IsTrue"); }
   public void EmitIsTrue(Expression e) { e.Emit(this); EmitIsTrue(); }
 
+  // TODO: reenable this
   //public void EmitLine(int line) { ILG.MarkSequencePoint(TypeGenerator.Document, line, 0, line+1, 0); }
 
   public void EmitModuleInstance() { TypeGenerator.ModuleSlot.EmitGet(this); }
@@ -101,9 +102,13 @@ public class CodeGenerator
   public void EmitNew(Type type, Type[] paramTypes) { ILG.Emit(OpCodes.Newobj, type.GetConstructor(paramTypes)); }
   public void EmitNew(ConstructorInfo ci) { ILG.Emit(OpCodes.Newobj, ci); }
 
+  public void EmitNewArray(Type type, int length)
+  { EmitInt(length);
+    ILG.Emit(OpCodes.Newarr, type);
+  }
+
   public void EmitObjectArray(Expression[] exprs)
-  { EmitInt(exprs.Length);
-    ILG.Emit(OpCodes.Newarr, typeof(object));
+  { EmitNewArray(typeof(object), exprs.Length);
     for(int i=0; i<exprs.Length; i++)
     { ILG.Emit(OpCodes.Dup);
       EmitInt(i);
@@ -113,6 +118,7 @@ public class CodeGenerator
   }
 
   // TODO: make this use actual spans
+  // TODO: reenable this
   //public void EmitPosition(Node node) { ILG.MarkSequencePoint(TypeGenerator.Document, node.Line, 0, node.Line+1, 0); }
   
   public void EmitReturn() { ILG.Emit(OpCodes.Ret); }
@@ -124,8 +130,7 @@ public class CodeGenerator
   
   public void EmitString(string value) { ILG.Emit(OpCodes.Ldstr, value); }
   public void EmitStringArray(string[] strings)
-  { EmitInt(strings.Length);
-    ILG.Emit(OpCodes.Newarr, typeof(string));
+  { EmitNewArray(typeof(string), strings.Length);
     for(int i=0; i<strings.Length; i++)
     { ILG.Emit(OpCodes.Dup);
       EmitInt(i);
@@ -133,7 +138,7 @@ public class CodeGenerator
       ILG.Emit(OpCodes.Stelem_Ref);
     }
   }
-  
+
   public void EmitThis()
   { if(MethodBuilder.IsStatic) throw new InvalidOperationException("no 'this' for a static method");
     ILG.Emit(OpCodes.Ldarg_0);
@@ -145,7 +150,7 @@ public class CodeGenerator
 
   public void FreeLocalTemp(Slot slot) { localTemps.Add(slot); }
 
-  public void SetArgs(string[] names) { Namespace.SetArgs(names, MethodBuilder); }
+  public void SetArgs(Name[] names) { Namespace.SetArgs(names, MethodBuilder); }
 
   public Namespace Namespace;
 
@@ -156,4 +161,4 @@ public class CodeGenerator
   ArrayList localTemps;
 }
 
-} // namespace Language.AST
+} // namespace Boa.AST

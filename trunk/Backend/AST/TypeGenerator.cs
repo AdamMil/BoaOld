@@ -3,7 +3,7 @@ using System.Collections;
 using System.Reflection;
 using System.Reflection.Emit;
 
-namespace Language.AST
+namespace Boa.AST
 {
 
 public class TypeGenerator
@@ -13,8 +13,11 @@ public class TypeGenerator
 
   public Slot AddModuleSlot(Type moduleType)
   { if(ModuleSlot!=null) return ModuleSlot;
-    return ModuleSlot = new StaticSlot(TypeBuilder.DefineField("__myModule", moduleType,
-                                                               FieldAttributes.Public|FieldAttributes.Static));
+    return ModuleSlot = AddStaticSlot("__myModule", moduleType);
+  }
+
+  public Slot AddStaticSlot(string name, Type type)
+  { return new StaticSlot(TypeBuilder.DefineField(name, type, FieldAttributes.Public|FieldAttributes.Static));
   }
 
   public CodeGenerator DefineMethod(string name, Type retType, Type[] paramTypes)
@@ -59,7 +62,7 @@ public class TypeGenerator
     }
   }
   
-  CodeGenerator GetInitializer()
+  public CodeGenerator GetInitializer()
   { if(initGen==null) initGen = new CodeGenerator(this, null, TypeBuilder.DefineTypeInitializer().GetILGenerator());
     return initGen;
   }
@@ -67,9 +70,9 @@ public class TypeGenerator
   public AssemblyGenerator Assembly;
   public TypeBuilder TypeBuilder;
   public Slot ModuleSlot;
-  
+
   Hashtable constants = new Hashtable();
   CodeGenerator initGen;
 }
 
-} // namespace Language.AST
+} // namespace Boa.AST

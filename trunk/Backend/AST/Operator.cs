@@ -1,8 +1,8 @@
 using System;
 using System.Reflection.Emit;
-using Language.Runtime;
+using Boa.Runtime;
 
-namespace Language.AST
+namespace Boa.AST
 {
 
 #region Base classes
@@ -193,4 +193,4 @@ public class LogicalOrOperator : BinaryOperator
 }
 #endregion
 
-} // namespace Language.AST
+} // namespace Boa.AST

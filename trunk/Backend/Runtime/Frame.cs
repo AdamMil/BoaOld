@@ -1,7 +1,7 @@
 using System;
 using System.Collections;
 
-namespace Language.Runtime
+namespace Boa.Runtime
 {
 
 public class Frame
@@ -40,4 +40,4 @@ public abstract class FrameCode
 { public abstract object Run(Frame frame);
 }
 
-} // namespace Language.Runtime
+} // namespace Boa.Runtime
