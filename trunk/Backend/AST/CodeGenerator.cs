@@ -128,6 +128,16 @@ public class CodeGenerator
     }
   }
 
+  public void EmitObjectArray(object[] objs)
+  { EmitNewArray(typeof(object), objs.Length);
+    for(int i=0; i<objs.Length; i++)
+    { ILG.Emit(OpCodes.Dup);
+      EmitInt(i);
+      EmitConstant(objs[i]);
+      ILG.Emit(OpCodes.Stelem_Ref);
+    }
+  }
+
   // TODO: make this use actual spans
   public void EmitPosition(Node node)
   { if(TypeGenerator.Assembly.Symbols!=null)

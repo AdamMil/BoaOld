@@ -427,6 +427,7 @@ public sealed class __builtin__
   }
 
   public static object _;
+  public static int __debug__ { get { return Options.Debug ? 1 : 0; } }
   public static object exit = "Use Ctrl-Z plus Return (eg EOF) to exit.";
   public static object quit = "Use Ctrl-Z plus Return (eg EOF) to exit.";
 
@@ -445,6 +446,7 @@ public sealed class __builtin__
   #endregion
 
   #region Exceptions
+  public static readonly object AssertionError = ReflectedType.FromType(typeof(AssertionErrorException));
   public static readonly object EOFError = ReflectedType.FromType(typeof(EOFErrorException));
   //public static readonly object FloatingPointError = ReflectedType.FromType(typeof(FloatingPointErrorException));
   public static readonly object ImportError = ReflectedType.FromType(typeof(ImportErrorException));

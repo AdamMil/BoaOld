@@ -11,7 +11,6 @@ public sealed class ModuleGenerator
 
   public static Boa.Runtime.Module Generate(string name, string filename, Statement body)
   { body.PostProcessForCompile();
-
     AssemblyGenerator ag = new AssemblyGenerator(name, Path.GetFileNameWithoutExtension(filename)+".dll");
     TypeGenerator tg = ag.DefineType(name, typeof(Boa.Runtime.Module));
 

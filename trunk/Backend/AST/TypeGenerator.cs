@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Specialized;
 using System.Reflection;
 using System.Reflection.Emit;
+using Boa.Runtime;
 
 namespace Boa.AST
 {
@@ -41,7 +42,7 @@ public class TypeGenerator
   public Slot GetConstant(object value)
   { Slot slot = (Slot)constants[value];
     if(slot!=null) return slot;
-    
+
     FieldBuilder fb = TypeBuilder.DefineField("c$"+constants.Count, typeof(object), FieldAttributes.Static);
     constants[value] = slot = new StaticSlot(fb);
     EmitConstantInitializer(value);
@@ -52,7 +53,36 @@ public class TypeGenerator
 
   void EmitConstantInitializer(object value)
   { CodeGenerator cg = GetInitializer();
-    switch(Convert.GetTypeCode(value))
+
+    if(value is Tuple)
+    { Tuple tup = (Tuple)value;
+      cg.EmitObjectArray(tup.items);
+      cg.EmitNew(typeof(Tuple), new Type[] { typeof(object[]) });
+    }
+    else if(value is List)
+    { List list = (List)value;
+      cg.EmitInt(list.Count);
+      cg.EmitNew(typeof(List), new Type[] { typeof(int) });
+      MethodInfo mi = typeof(List).GetMethod("append");
+      foreach(object o in list)
+      { cg.ILG.Emit(OpCodes.Dup);
+        GetConstant(o).EmitGet(cg);
+        cg.EmitCall(mi);
+      }
+    }
+    else if(value is Dict)
+    { Dict dict = (Dict)value;
+      cg.EmitInt(dict.Count);
+      cg.EmitNew(typeof(Dict), new Type[] { typeof(int) });
+      MethodInfo mi = typeof(Dict).GetMethod("Add");
+      foreach(DictionaryEntry e in dict)
+      { cg.ILG.Emit(OpCodes.Dup);
+        GetConstant(e.Key).EmitGet(cg);
+        GetConstant(e.Value).EmitGet(cg);
+        cg.EmitCall(mi);
+      }
+    }
+    else switch(Convert.GetTypeCode(value)) // TODO: see if this is faster than using 'is'
     { case TypeCode.Int32:
         cg.EmitInt((int)value);
         cg.ILG.Emit(OpCodes.Box, typeof(int));

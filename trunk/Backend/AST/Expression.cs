@@ -17,6 +17,11 @@ public abstract class Expression : Node
   public virtual void EmitSet(CodeGenerator cg) { throw new NotImplementedException("EmitSet: "+GetType()); }
   public virtual void EmitDel(CodeGenerator cg) { throw new NotImplementedException("EmitDel: "+GetType()); }
   public abstract object Evaluate(Frame frame);
+
+  public override object GetValue()
+  { if(!IsConstant) throw new InvalidOperationException();
+    return Evaluate(null);
+  }
 }
 #endregion
 
@@ -25,19 +30,28 @@ public class AndExpression : BinaryExpression
 { public AndExpression(Expression lhs, Expression rhs) { LHS=lhs; RHS=rhs; }
 
   public override void Emit(CodeGenerator cg)
-  { LHS.Emit(cg);
-    cg.ILG.Emit(OpCodes.Dup);
-    cg.EmitIsTrue();
-    Label lab = cg.ILG.DefineLabel();
-    cg.ILG.Emit(OpCodes.Brfalse, lab);
-    cg.ILG.Emit(OpCodes.Pop);
-    RHS.Emit(cg);
-    cg.ILG.MarkLabel(lab);
+  { if(IsConstant) cg.EmitConstant(GetValue());
+    else
+    { LHS.Emit(cg);
+      cg.ILG.Emit(OpCodes.Dup);
+      cg.EmitIsTrue();
+      Label lab = cg.ILG.DefineLabel();
+      cg.ILG.Emit(OpCodes.Brfalse, lab);
+      cg.ILG.Emit(OpCodes.Pop);
+      RHS.Emit(cg);
+      cg.ILG.MarkLabel(lab);
+    }
   }
 
   public override object Evaluate(Frame frame)
   { object value = LHS.Evaluate(frame);
     return Ops.IsTrue(value) ? RHS.Evaluate(frame) : value;
+  }
+
+  public override void ToCode(System.Text.StringBuilder sb, int indent)
+  { LHS.ToCode(sb, indent);
+    sb.Append(" && ");
+    RHS.ToCode(sb, indent);
   }
 }
 #endregion
@@ -47,17 +61,26 @@ public class AttrExpression : Expression
 { public AttrExpression(Expression o, string attr) { Object=o; Attribute=attr; }
 
   public override void Assign(object value, Frame frame) { Ops.SetAttr(value, Object.Evaluate(frame), Attribute); }
+
   public override void Emit(CodeGenerator cg)
   { Object.Emit(cg);
     cg.EmitString(Attribute);
     cg.EmitCall(typeof(Ops), "GetAttr", new Type[] { typeof(object), typeof(string) });
   }
+
   public override void EmitSet(CodeGenerator cg)
   { Object.Emit(cg);
     cg.EmitString(Attribute);
     cg.EmitCall(typeof(Ops), "SetAttr", new Type[] { typeof(object), typeof(object), typeof(string) });
   }
+
   public override object Evaluate(Frame frame) { return Ops.GetAttr(Object.Evaluate(frame), Attribute); }
+
+  public override void ToCode(System.Text.StringBuilder sb, int indent)
+  { Object.ToCode(sb, indent);
+    sb.Append('.');
+    sb.Append(Attribute);
+  }
 
   public Expression Object;
   public string Attribute;
@@ -83,12 +106,21 @@ public class BinaryOpExpression : BinaryExpression
 { public BinaryOpExpression(BinaryOperator op, Expression lhs, Expression rhs) { Op=op; LHS=lhs; RHS=rhs; }
 
   public override void Emit(CodeGenerator cg)
-  { LHS.Emit(cg);
-    RHS.Emit(cg);
-    Op.Emit(cg);
+  { if(IsConstant) cg.EmitConstant(GetValue());
+    else
+    { LHS.Emit(cg);
+      RHS.Emit(cg);
+      Op.Emit(cg);
+    }
   }
 
   public override object Evaluate(Frame frame) { return Op.Evaluate(LHS.Evaluate(frame), RHS.Evaluate(frame)); }
+
+  public override void ToCode(System.Text.StringBuilder sb, int indent)
+  { LHS.ToCode(sb, indent);
+    sb.Append(Op.ToString());
+    RHS.ToCode(sb, indent);
+  }
 
   BinaryOperator Op;
 }
@@ -115,6 +147,16 @@ public class CallExpression : Expression
     return Ops.Call(callee, parms);
   }
 
+  public override void ToCode(System.Text.StringBuilder sb, int indent)
+  { Target.ToCode(sb, indent);
+    sb.Append('(');
+    for(int i=0; i<Arguments.Length; i++)
+    { if(i!=0) sb.Append(", ");
+      Arguments[i].ToCode(sb);
+    }
+    sb.Append(')');
+  }
+
   public override void Walk(IWalker w)
   { if(w.Walk(this)) Target.Walk(w);
     w.PostWalk(this);
@@ -127,10 +169,16 @@ public class CallExpression : Expression
 
 #region ConstantExpression
 public class ConstantExpression : Expression
-{ public ConstantExpression(object value) { Value=value; }
+{ public ConstantExpression(object value) { Value=value; IsConstant=true; }
   
   public override void Emit(CodeGenerator cg) { cg.EmitConstant(Value); }
   public override object Evaluate(Frame frame) { return Value; }
+  public override void ToCode(System.Text.StringBuilder sb, int indent)
+  { if(Value==null) sb.Append("null");
+    else if(Value is bool) sb.Append((bool)Value ? "true" : "false");
+    else if(Value is string) sb.Append(StringOps.Quote((string)Value));
+    else sb.Append(Value);
+  }
 
   public object Value;
 }
@@ -143,13 +191,16 @@ public class HashExpression : Expression
   public HashExpression(DictionaryEntry[] entries) { Entries=entries; }
 
   public override void Emit(CodeGenerator cg)
-  { MethodInfo mi = typeof(Dict).GetMethod("set_Item");
-    cg.EmitNew(typeof(Dict));
-    foreach(DictionaryEntry e in Entries)
-    { cg.ILG.Emit(OpCodes.Dup);
-      ((Expression)e.Key).Emit(cg);
-      ((Expression)e.Value).Emit(cg);
-      cg.EmitCall(mi);
+  { if(IsConstant) cg.EmitConstant(GetValue());
+    else
+    { MethodInfo mi = typeof(Dict).GetMethod("set_Item");
+      cg.EmitNew(typeof(Dict));
+      foreach(DictionaryEntry e in Entries)
+      { cg.ILG.Emit(OpCodes.Dup);
+        ((Expression)e.Key).Emit(cg);
+        ((Expression)e.Value).Emit(cg);
+        cg.EmitCall(mi);
+      }
     }
   }
 
@@ -160,6 +211,17 @@ public class HashExpression : Expression
     return dict;
   }
 
+  public override void ToCode(System.Text.StringBuilder sb, int indent)
+  { sb.Append('{');
+    for(int i=0; i<Entries.Length; i++)
+    { if(i!=0) sb.Append(", ");
+      ((Expression)Entries[i].Key).ToCode(sb, indent);
+      sb.Append(':');
+      ((Expression)Entries[i].Value).ToCode(sb, indent);
+    }
+    sb.Append('}');
+  }
+
   public DictionaryEntry[] Entries;
 }
 #endregion
@@ -168,7 +230,7 @@ public class HashExpression : Expression
 public class LambdaExpression : Expression
 { public LambdaExpression(Parameter[] parms, Statement body)
   { if(body is ExpressionStatement) body = new ReturnStatement(((ExpressionStatement)body).Expression);
-    Function = new BoaFunction(parms, body);
+    Function = new BoaFunction(this, parms, body);
   }
 
   public override void Emit(CodeGenerator cg)
@@ -176,6 +238,23 @@ public class LambdaExpression : Expression
   }
 
   public override object Evaluate(Frame frame) { return Function.MakeFunction(frame); }
+
+  public override void ToCode(System.Text.StringBuilder sb, int indent)
+  { sb.Append(Function.Parameters.Length==0 ? "lambda" : "lambda ");
+    for(int i=0; i<Function.Parameters.Length; i++)
+    { if(i!=0) sb.Append(", ");
+      Function.Parameters[i].ToCode(sb);
+    }
+    sb.Append(": ");
+    if(Function.Body is Suite)
+    { Suite suite = (Suite)Function.Body;
+      for(int i=0; i<suite.Statements.Length; i++)
+      { if(i!=0) sb.Append("; ");
+        suite.Statements[i].ToCode(sb, indent);
+      }
+    }
+    else Function.Body.ToCode(sb, indent);
+  }
 
   public override void Walk(IWalker w) { Function.Walk(w); }
 
@@ -189,13 +268,16 @@ public class ListExpression : Expression
   public ListExpression(Expression[] expressions) { Expressions=expressions; }
 
   public override void Emit(CodeGenerator cg)
-  { MethodInfo mi = typeof(List).GetMethod("append");
-    cg.EmitInt(Expressions.Length);
-    cg.EmitNew(typeof(List), new Type[] { typeof(int) });
-    foreach(Expression e in Expressions)
-    { cg.ILG.Emit(OpCodes.Dup);
-      e.Emit(cg);
-      cg.EmitCall(mi);
+  { if(IsConstant) cg.EmitConstant(GetValue());
+    else
+    { MethodInfo mi = typeof(List).GetMethod("append");
+      cg.EmitInt(Expressions.Length);
+      cg.EmitNew(typeof(List), new Type[] { typeof(int) });
+      foreach(Expression e in Expressions)
+      { cg.ILG.Emit(OpCodes.Dup);
+        e.Emit(cg);
+        cg.EmitCall(mi);
+      }
     }
   }
   
@@ -203,6 +285,15 @@ public class ListExpression : Expression
   { List list = new List(Expressions.Length);
     foreach(Expression e in Expressions) list.append(e);
     return list;
+  }
+
+  public override void ToCode(System.Text.StringBuilder sb, int indent)
+  { sb.Append('[');
+    for(int i=0; i<Expressions.Length; i++)
+    { if(i!=0) sb.Append(", ");
+      Expressions[i].ToCode(sb, indent);
+    }
+    sb.Append(']');
   }
 
   public Expression[] Expressions;
@@ -223,7 +314,8 @@ public class ListCompExpression : Expression
   }
 
   public override void Emit(CodeGenerator cg)
-  { throw new NotImplementedException();
+  { if(IsConstant) cg.EmitConstant(GetValue());
+    else throw new NotImplementedException();
   }
 
   public override object Evaluate(Frame frame)
@@ -237,6 +329,20 @@ public class ListCompExpression : Expression
       if(Test==null || Ops.IsTrue(Test.Evaluate(frame))) list.append(Item.Evaluate(frame));
     }
     return list;
+  }
+
+  public override void ToCode(System.Text.StringBuilder sb, int indent)
+  { sb.Append('[');
+    Item.ToCode(sb, indent);
+    sb.Append(" for ");
+    Names.ToCode(sb, indent);
+    sb.Append(" in ");
+    List.ToCode(sb, indent);
+    if(Test!=null)
+    { sb.Append(" if ");
+      Test.ToCode(sb, indent);
+    }
+    sb.Append(']');
   }
 
   public override void Walk(IWalker w)
@@ -261,6 +367,7 @@ public class NameExpression : Expression
   public override void Emit(CodeGenerator cg) { cg.EmitGet(Name); }
   public override void EmitSet(CodeGenerator cg) { cg.EmitSet(Name); }
   public override object Evaluate(Frame frame) { return frame.Get(Name.String); }
+  public override void ToCode(System.Text.StringBuilder sb, int indent) { sb.Append(Name.String); }
 
   public Name Name;
 }
@@ -271,21 +378,58 @@ public class OrExpression : BinaryExpression
 { public OrExpression(Expression lhs, Expression rhs) { LHS=lhs; RHS=rhs; }
 
   public override void Emit(CodeGenerator cg)
-  { LHS.Emit(cg);
-    cg.ILG.Emit(OpCodes.Dup);
-    cg.EmitIsTrue();
-    Label lab = cg.ILG.DefineLabel();
-    cg.ILG.Emit(OpCodes.Brtrue, lab);
-    cg.ILG.Emit(OpCodes.Pop);
-    RHS.Emit(cg);
-    cg.ILG.MarkLabel(lab);
+  { if(IsConstant) cg.EmitConstant(GetValue());
+    else
+    { LHS.Emit(cg);
+      cg.ILG.Emit(OpCodes.Dup);
+      cg.EmitIsTrue();
+      Label lab = cg.ILG.DefineLabel();
+      cg.ILG.Emit(OpCodes.Brtrue, lab);
+      cg.ILG.Emit(OpCodes.Pop);
+      RHS.Emit(cg);
+      cg.ILG.MarkLabel(lab);
+    }
   }
 
   public override object Evaluate(Frame frame)
   { object value = LHS.Evaluate(frame);
     return Ops.IsTrue(value) ? value : RHS.Evaluate(frame);
   }
+
+  public override void ToCode(System.Text.StringBuilder sb, int indent)
+  { sb.Append('(');
+    LHS.ToCode(sb, indent);
+    sb.Append(" || ");
+    RHS.ToCode(sb, indent);
+    sb.Append(')');
+  }
 }
+#endregion
+
+#region ParenExpression
+public class ParenExpression : Expression
+{ public ParenExpression(Expression e) { Expression=e; }
+
+  public override void Assign(object value, Frame frame) { Expression.Assign(value, frame); }
+  public override void Emit(CodeGenerator cg) { Expression.Emit(cg); }
+  public override void EmitDel(CodeGenerator cg) { Expression.EmitDel(cg); }
+  public override void EmitSet(CodeGenerator cg) { Expression.EmitSet(cg); }
+  public override object Evaluate(Frame frame) { return Expression.Evaluate(frame); }
+
+  public override void ToCode(System.Text.StringBuilder sb, int indent)
+  { sb.Append('(');
+    Expression.ToCode(sb, indent);
+    sb.Append(')');
+  }
+
+  public override void Walk(IWalker w)
+  { if(w.Walk(this)) Expression.Walk(w);
+    w.PostWalk(this);
+  }
+
+  public Expression Expression;
+}
+
 #endregion
 
 #region TernaryExpression
@@ -295,21 +439,32 @@ public class TernaryExpression : Expression
   }
 
   public override void Emit(CodeGenerator cg)
-  { Label end = cg.ILG.DefineLabel(), iff = cg.ILG.DefineLabel();
-    Test.Emit(cg);
-    cg.EmitIsTrue();
-    cg.ILG.Emit(OpCodes.Brfalse, iff);
-    IfTrue.Emit(cg);
-    cg.ILG.Emit(OpCodes.Br, end);
-    cg.ILG.MarkLabel(iff);
-    IfFalse.Emit(cg);
-    cg.ILG.MarkLabel(end);
+  { if(IsConstant) cg.EmitConstant(GetValue());
+    else
+    { Label end = cg.ILG.DefineLabel(), iff = cg.ILG.DefineLabel();
+      Test.Emit(cg);
+      cg.EmitIsTrue();
+      cg.ILG.Emit(OpCodes.Brfalse, iff);
+      IfTrue.Emit(cg);
+      cg.ILG.Emit(OpCodes.Br, end);
+      cg.ILG.MarkLabel(iff);
+      IfFalse.Emit(cg);
+      cg.ILG.MarkLabel(end);
+    }
   }
   
   public override object Evaluate(Frame frame)
   { return Ops.IsTrue(Test.Evaluate(frame)) ? IfTrue.Evaluate(frame) : IfFalse.Evaluate(frame);
   }
   
+  public override void ToCode(System.Text.StringBuilder sb, int indent)
+  { Test.ToCode(sb, indent);
+    sb.Append(" ? ");
+    IfTrue.ToCode(sb, indent);
+    sb.Append(" : ");
+    IfFalse.ToCode(sb, indent);
+  }
+
   public override void Walk(IWalker w)
   { if(w.Walk(this))
     { Test.Walk(w);
@@ -348,13 +503,27 @@ public class TupleExpression : Expression
   }
 
   public override void Emit(CodeGenerator cg)
-  { cg.EmitObjectArray(Expressions);
-    cg.EmitNew(typeof(Tuple), new Type[] { typeof(object[]) });
+  { if(IsConstant) cg.EmitConstant(GetValue());
+    else
+    { cg.EmitObjectArray(Expressions);
+      cg.EmitNew(typeof(Tuple), new Type[] { typeof(object[]) });
+    }
   }
+
   public override object Evaluate(Frame frame)
   { object[] arr = new object[Expressions.Length];
     for(int i=0; i<arr.Length; i++) arr[i] = Expressions[i].Evaluate(frame);
     return new Tuple(arr);
+  }
+
+  public override void ToCode(System.Text.StringBuilder sb, int indent)
+  { sb.Append('(');
+    for(int i=0; i<Expressions.Length; i++)
+    { if(i!=0) sb.Append(", ");
+      Expressions[i].ToCode(sb, indent);
+    }
+    if(Expressions.Length==1) sb.Append(',');
+    sb.Append(')');
   }
 
   public Expression[] Expressions;
@@ -366,9 +535,18 @@ public class UnaryExpression : Expression
 { public UnaryExpression(Expression expr, UnaryOperator op) { Expression=expr; Op=op; }
 
   public override object Evaluate(Frame frame) { return Op.Evaluate(Expression.Evaluate(frame)); }
+
   public override void Emit(CodeGenerator cg)
-  { Expression.Emit(cg);
-    Op.Emit(cg);
+  { if(IsConstant) cg.EmitConstant(GetValue());
+    else
+    { Expression.Emit(cg);
+      Op.Emit(cg);
+    }
+  }
+
+  public override void ToCode(System.Text.StringBuilder sb, int indent)
+  { sb.Append(Op.ToString());
+    Expression.ToCode(sb, indent);
   }
 
   public override void Walk(IWalker w)

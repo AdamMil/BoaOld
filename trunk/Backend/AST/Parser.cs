@@ -5,6 +5,7 @@ using Boa.Runtime;
 
 // TODO: allow nonparenthesized tuples
 // TODO: change === and !== to 'is' and 'is not'
+// TODO: allow chained assignment (eg, a = b = c)
 namespace Boa.AST
 {
 
@@ -22,7 +23,7 @@ enum Token
   
   // keywords
   Def, Print, Return, And, Or, Not, While, If, Elif, Else, Pass, Break, Continue, Global, Import, From, For, In,
-  Lambda, Try, Except, Finally, Raise,
+  Lambda, Try, Except, Finally, Raise, Class, Assert,
   
   // abstract
   Identifier, Literal, Assign, Compare, Call, Member, Index, Slice, Hash, List, Tuple, Suite,
@@ -44,7 +45,7 @@ public class Parser
     Token[] tokens =
     { Token.Def, Token.Print, Token.Return, Token.And, Token.Or, Token.Not, Token.While, Token.Import, Token.From,
       Token.For, Token.If,  Token.Elif, Token.Else, Token.Pass, Token.Break, Token.Continue, Token.Global, Token.In,
-      Token.Lambda, Token.Try, Token.Except, Token.Finally, Token.Raise,
+      Token.Lambda, Token.Try, Token.Except, Token.Finally, Token.Raise, Token.Class, Token.Assert,
     };
     foreach(Token token in tokens) stringTokens.Add(Enum.GetName(typeof(Token), token).ToLower(), token);
   }
@@ -74,7 +75,8 @@ public class Parser
     return expr;
   }
   // statement     := <stmt_line> | <compound_stmt>
-  // compount_stmt := <if_stmt> | <while_stmt> | <for_stmt> | <funcdef> | <try_stmt> | <global_stmt> | <import_stmt>
+  // compount_stmt := <if_stmt> | <while_stmt> | <for_stmt> | <def_stmt> | <try_stmt> | <global_stmt> |
+  //                  <import_stmt> | <class_stmt>
   public Statement ParseStatement()
   { switch(token)
     { case Token.If:     return ParseIf();
@@ -83,6 +85,7 @@ public class Parser
       case Token.Def:    return ParseDef();
       case Token.Try:    return ParseTry();
       case Token.Global: return ParseGlobal();
+      case Token.Class:  return ParseClass();
       case Token.Import: case Token.From: return ParseImport();
       default: return ParseStmtLine();
     }
@@ -209,6 +212,25 @@ public class Parser
     }
   }
 
+  // class_stmt  := 'class' <identifier> <inheritance>? <suite>
+  // inheritance := '(' <expr_list> ')'
+  Statement ParseClass()
+  { Eat(Token.Class);
+    string name = ParseIdentifier();
+    Expression[] bases=null;
+    if(TryEat(Token.LParen))
+    { if(TryEat(Token.RParen)) bases = new Expression[0];
+      else
+      { ArrayList inherit = new ArrayList();
+        do inherit.Add(ParseExpression()); while(TryEat(Token.Comma));
+        Eat(Token.RParen);
+        bases = (Expression[])inherit.ToArray(typeof(Expression));
+      }
+    }
+    else bases = new Expression[0];
+    return AP(new ClassStatement(name, bases, ParseSuite()));
+  }
+
   // compare    := <bitwise> (<compare_op> <bitwise>)*
   // compare_op := '==' | '!=' | '<' | '>' | '<=' | '>=' | '===' | '!=='
   Expression ParseCompare()
@@ -221,7 +243,7 @@ public class Parser
     return expr;
   }
 
-  // def := 'def' <identifier> '(' <param_list> ')' ':' <suite>
+  // def_stmt := 'def' <identifier> '(' <param_list> ')' ':' <suite>
   Statement ParseDef()
   { Eat(Token.Def);
     string name = ParseIdentifier();
@@ -246,7 +268,7 @@ public class Parser
     if(TryEat(Token.Assign))
     { if(lhs is NameExpression || lhs is AttrExpression || lhs is TupleExpression)
         return AP(new AssignStatement(lhs, ParseExpression()));
-      throw Ops.SyntaxError("can't assign to {0}", lhs.GetType());
+      SyntaxError("can't assign to {0}", lhs.GetType()); return null;
     }
     else return AP(new ExpressionStatement(lhs));
   }
@@ -356,7 +378,6 @@ public class Parser
   { Eat(Token.Lambda);
     Parameter[] parms = ParseParamList(Token.Colon);
     Eat(Token.Colon);
-    Statement body;
 
     ArrayList list = new ArrayList();
     do
@@ -377,8 +398,7 @@ public class Parser
 
     done:
     if(list.Count==0) Unexpected(token);
-    body = list.Count==1 ? (Statement)list[0] : new Suite((Statement[])list.ToArray(typeof(Statement)));
-    return AP(new LambdaExpression(parms, body));
+    return AP(new LambdaExpression(parms, new Suite((Statement[])list.ToArray(typeof(Statement)))));
   }
 
   // list_comprehension := <expression> 'for' <namelist> 'in' <expression> ('if' <expression>)?
@@ -444,6 +464,7 @@ public class Parser
             while(token!=Token.RParen) { list.Add(ParseExpression()); if(!TryEat(Token.Comma)) break; }
             expr = AP(new TupleExpression((Expression[])list.ToArray(typeof(Expression))));
           }
+          else expr = AP(new ParenExpression(expr));
         }
         Expect(Token.RParen);
         break;
@@ -541,27 +562,27 @@ public class Parser
     }
   }
 
-  // simple_stmt := <expr_stmt> | <print_stmt> | <break_stmt> | <continue_stmt> | <pass_stmt>  | <return_stmt>
+  // simple_stmt := <expr_stmt> | <print_stmt> | <break_stmt> | <continue_stmt> | <pass_stmt> | <return_stmt>
+  //                <assert_stmt>
   // break_stmt    := 'break' EOL
   // continue_stmt := 'continue' EOL
   // pass_stmt     := 'pass' EOL
   // raise_stmt    := 'raise' <expression>?
-  // return_stmt   := return <expression>?
+  // return_stmt   := 'return' <expression>?
+  // assert_stmt   := 'assert' <expression>
   Statement ParseSimpleStmt()
   { switch(token)
     { case Token.Print: return ParsePrintStmt();
       case Token.Break:
         // FIXME: this doesn't work if you have a break in a function nested in a loop
-        if(!InLoop) throw Ops.SyntaxError("'break' encountered outside loop");
+        if(!InLoop) SyntaxError("'break' encountered outside loop");
         NextToken();
         return AP(new BreakStatement());
       case Token.Continue:
-        if(!InLoop) throw Ops.SyntaxError("'break' encountered outside loop");
+        if(!InLoop) SyntaxError("'continue' encountered outside loop");
         NextToken();
         return AP(new ContinueStatement());
-      case Token.Pass:
-        NextToken();
-        return AP(new PassStatement());
+      case Token.Pass: NextToken(); return AP(new PassStatement());
       case Token.Return:
         NextToken();
         return AP(token==Token.EOL || token==Token.Semicolon ? new ReturnStatement()
@@ -570,6 +591,7 @@ public class Parser
         NextToken();
         return AP(token==Token.EOL || token==Token.Semicolon ? new RaiseStatement()
                                                              : new RaiseStatement(ParseExpression()));
+      case Token.Assert: NextToken(); return AP(new AssertStatement(ParseExpression()));
       default: return ParseExprStmt();
     }
   }
@@ -588,11 +610,11 @@ public class Parser
   }
 
   // suite := ':' stmt_line | ':'? NEWLINE INDENT <statement>+ UNINDENT
-  public Statement ParseSuite()
+  Statement ParseSuite()
   { if(TryEat(Token.Colon) && token!=Token.EOL) return ParseStmtLine();
     int indent=this.indent;
     Eat(Token.EOL);
-    if(this.indent<=indent) throw Ops.SyntaxError("expected indent");
+    if(this.indent<=indent) SyntaxError("expected indent");
     ArrayList stmts = new ArrayList();
     while(this.indent>indent)
     { if(TryEat(Token.EOL)) continue;
@@ -841,19 +863,20 @@ public class Parser
   }
   #endregion
 
-  void SyntaxError(string err) { throw Ops.SyntaxError("{0} near {1}({2},{3})", err, sourceFile, line, column); }
+  void SyntaxError(string format, params object[] args)
+  { BoaException e = Ops.SyntaxError(format, args);
+    e.SetPosition(sourceFile, line, column);
+    throw e;
+  }
 
   bool TryEat(Token type)
   { if(token==type) { NextToken(); return true; }
     return false;
   }
   
-  void Unexpected(Token token)
-  { throw Ops.SyntaxError("unexpected token {0} near {1}({2},{3})", token, sourceFile, line, column);
-  }
+  void Unexpected(Token token) { SyntaxError("unexpected token {0}", token, sourceFile, line, column); }
   void Unexpected(Token got, Token expect)
-  { throw Ops.SyntaxError("unexpected token {0} (expecting {1}) near {2}({3},{4})",
-                          got, expect, sourceFile, line, column);
+  { SyntaxError("unexpected token {0} (expecting {1})", got, expect, sourceFile, line, column);
   }
 
   string     sourceFile, data;
