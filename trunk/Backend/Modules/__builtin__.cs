@@ -1161,11 +1161,7 @@ will be raised, otherwise the value will be returned.")]
 
   static string TypeName(Type type)
   { if(type.IsArray) return TypeName(type.GetElementType())+"[]";
-    if(type==typeof(object)) return "object";
-    if(type==typeof(int)) return "int";
-    if(type==typeof(string)) return "str";
-    if(type==typeof(char)) return "char";
-    return type.FullName;
+    return Ops.ToString(ReflectedType.FromType(type).__name__);
   }
 
   static void WriteParameters(System.Reflection.ParameterInfo[] parms, System.Text.StringBuilder sb)

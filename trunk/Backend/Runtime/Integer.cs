@@ -24,6 +24,7 @@ using System;
 namespace Boa.Runtime
 {
 
+[BoaType("long")]
 public struct Integer : IConvertible, IRepresentable, IComparable, ICloneable
 { 
   #region Constructors
@@ -339,24 +340,53 @@ public struct Integer : IConvertible, IRepresentable, IComparable, ICloneable
   
   #region Multiplication
   public static Integer operator*(Integer a, Integer b)
-  { throw new NotImplementedException();
+  { int nsign = a.sign*b.sign;
+    return nsign==0 ? Zero : new Integer((short)nsign, multiply(a.data, a.length, b.data, b.length));
   }
-  public static Integer operator*(Integer a, int b)   { return a * new Integer(b); }
-  public static Integer operator*(Integer a, uint b)  { return a * new Integer(b); }
+  public static Integer operator*(Integer a, int b)
+  { int nsign = a.sign * Math.Sign(b);
+    return nsign==0 ? Zero : new Integer((short)nsign, multiply(a.data, a.length, intToUint(b)));
+  }
+  public static Integer operator*(Integer a, uint b)
+  { return b==0 || a.sign==0 ? Zero : new Integer(a.sign, multiply(a.data, a.length, b));
+  }
   public static Integer operator*(Integer a, long b)  { return a * new Integer(b); }
   public static Integer operator*(Integer a, ulong b) { return a * new Integer(b); }
-  public static Integer operator*(int a, Integer b)   { return new Integer(a) * b; }
-  public static Integer operator*(uint a, Integer b)  { return new Integer(a) * b; }
+  public static Integer operator*(int a, Integer b)
+  { int nsign = Math.Sign(a) * b.sign;
+    return nsign==0 ? Zero : new Integer((short)nsign, multiply(b.data, b.length, intToUint(a)));
+  }
+  public static Integer operator*(uint a, Integer b)
+  { return a==0 || b.sign==0 ? Zero : new Integer(b.sign, multiply(b.data, b.length, a));
+  }
   public static Integer operator*(long a, Integer b)  { return new Integer(a) * b; }
   public static Integer operator*(ulong a, Integer b) { return new Integer(a) * b; }
   #endregion
 
   #region Division
   public static Integer operator/(Integer a, Integer b)
-  { throw new NotImplementedException();
+  { if(b.sign==0) throw Ops.DivideByZeroError("long division by zero");
+    if(a.sign==0) return Zero;
+
+    int c = a.absCompareTo(b);
+    if(c==0) return a.sign==b.sign ? One : MinusOne;
+
+    uint[] dummy;
+    return new Integer((short)(a.sign*b.sign), c>0 ? divide(a.data, a.length, b.data, b.length, out dummy)
+                                                   : divide(b.data, b.length, a.data, a.length, out dummy));
   }
-  public static Integer operator/(Integer a, int b)   { return a / new Integer(b); }
-  public static Integer operator/(Integer a, uint b)  { return a / new Integer(b); }
+  public static Integer operator/(Integer a, int b)
+  { if(b==0) throw Ops.DivideByZeroError("long division by zero");
+    if(a.sign==0) return Zero;
+    uint dummy;
+    return new Integer((short)(a.sign*Math.Sign(b)), divide(a.data, a.length, intToUint(b), out dummy));
+  }
+  public static Integer operator/(Integer a, uint b)
+  { if(b==0) throw new DivideByZeroException("long division by zero");
+    if(a.sign==0) return Zero;
+    uint dummy;
+    return new Integer(a.sign, divide(a.data, a.length, b, out dummy));
+  }
   public static Integer operator/(Integer a, long b)  { return a / new Integer(b); }
   public static Integer operator/(Integer a, ulong b) { return a / new Integer(b); }
   public static Integer operator/(int a, Integer b)   { return new Integer(a) / b; }
@@ -367,10 +397,34 @@ public struct Integer : IConvertible, IRepresentable, IComparable, ICloneable
   
   #region Modulus
   public static Integer operator%(Integer a, Integer b)
-  { throw new NotImplementedException();
+  { if(b.sign==0) throw Ops.DivideByZeroError("long modulus by zero");
+    if(a.sign==0) return b;
+    int c = a.absCompareTo(b);
+    if(c==0) return Zero;
+
+    uint[] remainder;
+    if(c>0) divide(a.data, a.length, b.data, b.length, out remainder);
+    else divide(a.data, a.length, b.data, b.length, out remainder);
+    return new Integer(b.sign, remainder);
   }
-  public static Integer operator%(Integer a, int b)   { return a % new Integer(b); }
-  public static Integer operator%(Integer a, uint b)  { return a % new Integer(b); }
+  public static Integer operator%(Integer a, int b)
+  { if(b==0) throw Ops.DivideByZeroError("long modulus by zero");
+    if(a.sign==0) return new Integer(b);
+
+    uint remainder;
+    divide(a.data, a.length, intToUint(b), out remainder);
+    Integer ret = new Integer(remainder);
+    if(b<0) ret.sign = -1;
+    return ret;
+  }
+  public static Integer operator%(Integer a, uint b)
+  { if(b==0) throw Ops.DivideByZeroError("long modulus by zero");
+    if(a.sign==0) return new Integer(b);
+
+    uint remainder;
+    divide(a.data, a.length, b, out remainder);
+    return new Integer(remainder);
+  }
   public static Integer operator%(Integer a, long b)  { return a % new Integer(b); }
   public static Integer operator%(Integer a, ulong b) { return a % new Integer(b); }
   public static Integer operator%(int a, Integer b)   { return new Integer(a) % b; }
@@ -644,7 +698,7 @@ public struct Integer : IConvertible, IRepresentable, IComparable, ICloneable
   #endregion
 
   #region Pow
-  internal Integer Pow(uint power)
+  internal Integer Pow(uint power) // TODO: this can be optimized better
   { if(power==0) return One;
     if(power==2) return squared();
     if(power<0) throw new ArgumentOutOfRangeException("power", power, "power must be >= 0");
@@ -659,7 +713,7 @@ public struct Integer : IConvertible, IRepresentable, IComparable, ICloneable
     return result; 
   }
 
-  internal Integer Pow(uint power, object mod)
+  internal Integer Pow(uint power, object mod) // TODO: this can be optimized better
   { throw new NotImplementedException();
   }
 
@@ -957,12 +1011,12 @@ public struct Integer : IConvertible, IRepresentable, IComparable, ICloneable
     }
   }
 
-  static unsafe int divideInPlace(uint[] data, int length, uint n)
+  static unsafe int divideInPlace(uint[] data, int length, uint n) // only used for conversion to string
   { ulong rem=0;
     fixed(uint* db=data)
     { while(length--!=0)
       { rem = (rem<<32) | db[length];
-        db[length] = (uint)(rem / n);
+        db[length] = (uint)(rem/n);
         rem %= n;
       }
     }

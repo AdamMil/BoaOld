@@ -24,6 +24,7 @@ using System;
 namespace Boa.Runtime
 {
 
+[BoaType("complex")]
 public struct Complex : IRepresentable
 { public Complex(double real) { this.real=real; imag=0; }
   public Complex(double real, double imag) { this.real=real; this.imag=imag; }

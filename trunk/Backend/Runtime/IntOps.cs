@@ -420,6 +420,7 @@ public sealed class IntOps
 		catch(OverflowException) { return IntegerOps.Power(new Integer(a), b); }
   }
 
+  // FIXME: this shouldn't be so naive. the modulus should be built into the power operation
   public static object PowerMod(int a, object b, object c)
   { int mod = Ops.ToInt(c);
     if(mod==0) throw Ops.DivideByZeroError("ternary pow(): modulus by zero");
