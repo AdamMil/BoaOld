@@ -111,6 +111,7 @@ public sealed class IntegerOps
   { switch(Convert.GetTypeCode(b))
     { case TypeCode.Boolean: return a.CompareTo((bool)b ? 1 : 0);
       case TypeCode.Byte: return a.CompareTo((byte)b);
+      case TypeCode.Empty: return 1;
       case TypeCode.Int16: return a.CompareTo((short)b);
       case TypeCode.Int32: return a.CompareTo((int)b);
       case TypeCode.Int64: return a.CompareTo((long)b);

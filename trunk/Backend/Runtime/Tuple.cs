@@ -106,7 +106,7 @@ public class Tuple : ISequence, ICollection, IComparable, IRepresentable
   { if(hashCode!=null) return (int)hashCode;
 
     int hash=0;
-    for(int i=0; i<items.Length; i++) hash ^= items[i].GetHashCode();
+    foreach(object o in items) if(o!=null) hash ^= o.GetHashCode();
     hashCode = hash;
     return hash;
   }

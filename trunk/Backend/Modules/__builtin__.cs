@@ -538,7 +538,7 @@ is the name of one of the object's attributes, false if not.")]
 Return the hash value of the object (if it has one). Hash values are
 integers. They are used to quickly compare dictionary keys during a
 dictionary lookup.")]
-  public static int hash(object o) { return o.GetHashCode(); }
+  public static int hash(object o) { return o==null ? 0 : o.GetHashCode(); }
 
   [DocString(@"help([object])
 

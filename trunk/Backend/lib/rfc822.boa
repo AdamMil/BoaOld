@@ -114,7 +114,7 @@ class Message:
     def rewindbody(self):
         """Rewind the file to the start of the body (if seekable)."""
         if not self.seekable:
-            raise IOError, "unseekable file"
+            raise IOError("unseekable file")
         self.fp.seek(self.startofbody)
 
     def readheaders(self):
@@ -875,7 +875,7 @@ def parsedate_tz(data):
     if len(data) < 5:
         return None
     data = data[:5]
-    [dd, mm, yy, tm, tz] = data
+    (dd, mm, yy, tm, tz) = data
     mm = mm.lower()
     if not mm in _monthnames:
         dd, mm = mm, dd.lower()
@@ -896,10 +896,10 @@ def parsedate_tz(data):
         tm = tm[:-1]
     tm = tm.split(':')
     if len(tm) == 2:
-        [thh, tmm] = tm
+        (thh, tmm) = tm
         tss = '0'
     elif len(tm) == 3:
-        [thh, tmm, tss] = tm
+        (thh, tmm, tss) = tm
     else:
         return None
     try:

@@ -9,7 +9,8 @@ public sealed class ArrayOps
 { ArrayOps() { }
 
   public static int Compare(object a, object b)
-  { Array aa, ab, ret=null;
+  { if(b==null) return 1;
+    Array aa, ab, ret=null;
     if(a is Tuple)
     { Tuple ta = (Tuple)a, tb = b as Tuple;
       if(tb==null) goto badTypes;

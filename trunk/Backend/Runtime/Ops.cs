@@ -362,6 +362,7 @@ public sealed class Ops
         if(b is Decimal) return ((Decimal)a).CompareTo(b);
         break;
       case TypeCode.Double: return FloatOps.Compare((double)a, b);
+      case TypeCode.Empty: return b==null ? 0 : -1;
       case TypeCode.Int16: return IntOps.Compare((int)(short)a, b);
       case TypeCode.Int32: return IntOps.Compare((int)a, b);
       case TypeCode.Int64: return LongOps.Compare((long)a, b);
