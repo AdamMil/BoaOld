@@ -49,8 +49,12 @@ public class ReflectedPackage : IHasAttributes
   
   public static ReflectedPackage FromNamespace(string ns)
   { string[] bits = ns.Split('.');
-    ReflectedPackage rns = (ReflectedPackage)dict[bits[0]];
-    if(rns==null) dict[bits[0]] = rns = new ReflectedPackage(bits[0]);
+    ReflectedPackage rns;
+    lock(dict) rns = (ReflectedPackage)dict[bits[0]];
+    if(rns==null)
+    { rns = new ReflectedPackage(bits[0]);
+      lock(dict) dict[bits[0]] = rns;
+    }
 
     ns = bits[0];
     for(int i=1; i<bits.Length; i++)
@@ -64,7 +68,7 @@ public class ReflectedPackage : IHasAttributes
 
   public static ReflectedPackage GetPackage(string name)
   { Initialize(); // do we want to do this?
-    return (ReflectedPackage)dict[name];
+    lock(dict) return (ReflectedPackage)dict[name];
   }
 
   public static Assembly LoadAssemblyByName(string name) { return LoadAssemblyByName(name, true); }

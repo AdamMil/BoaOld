@@ -195,7 +195,7 @@ public sealed class _md5
     static void HH(ref uint a, uint b, uint c, uint d, uint x, uint s, uint ac) { a = RL(a+H(b,c,d)+x+ac, s)+b; }
     static void II(ref uint a, uint b, uint c, uint d, uint x, uint s, uint ac) { a = RL(a+I(b,c,d)+x+ac, s)+b; }
 
-    static byte[] padding = new byte[64];
+    static readonly byte[] padding = new byte[64];
   }
 }
 

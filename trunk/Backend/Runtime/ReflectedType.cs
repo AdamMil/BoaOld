@@ -211,7 +211,8 @@ public abstract class DelegateProxy
 	protected object callable;
 
 	public static object Make(object callable, Type delegateType)
-	{ ConstructorInfo ci = (ConstructorInfo)handlers[delegateType];
+	{ ConstructorInfo ci;
+	  lock(handlers) ci = (ConstructorInfo)handlers[delegateType];
 	  if(ci==null)
 	  { Type[] ctypes = { typeof(object) };
 
@@ -223,10 +224,11 @@ public abstract class DelegateProxy
 		  for(int i=0; i<pis.Length; i++) ptypes[i] = pis[i].ParameterType;
 
 		  Key key = new Key(mi.ReturnType, ptypes);
-      ci = (ConstructorInfo)sigs[key];
+      lock(sigs) ci = (ConstructorInfo)sigs[key];
 
 		  if(ci==null)
-		  { AST.TypeGenerator tg = AST.SnippetMaker.Assembly.DefineType("EventHandler"+index++, typeof(DelegateProxy));
+		  { AST.TypeGenerator tg = AST.SnippetMaker.Assembly.DefineType("EventHandler"+Misc.NextIndex,
+		                                                                typeof(DelegateProxy));
 
 		    ConstructorInfo pci =
 		      typeof(DelegateProxy).GetConstructor(BindingFlags.Instance|BindingFlags.NonPublic, null, ctypes, null);
@@ -257,10 +259,10 @@ public abstract class DelegateProxy
 		    cg.Finish();
 		    
 		    ci = tg.FinishType().GetConstructor(ctypes);
-		    sigs[key] = ci;
+		    lock(sigs) sigs[key] = ci;
 		  }
 
-		  handlers[delegateType] = ci;
+		  lock(handlers) handlers[delegateType] = ci;
 	  }
 
 	  return ci.Invoke(new object[] { callable });
@@ -289,7 +291,6 @@ public abstract class DelegateProxy
 
 	static Hashtable handlers = new Hashtable();
 	static Hashtable sigs = new Hashtable();
-	static uint index;
 }
 #endregion
 
@@ -743,8 +744,12 @@ public class ReflectedType : BoaType
   public string __repr__() { return string.Format("<type {0}>", Ops.Repr(__name__)); }
 
   public static ReflectedType FromType(Type type)
-  { ReflectedType rt = (ReflectedType)types[type];
-    if(rt==null) types[type] = rt = new ReflectedType(type);
+  { ReflectedType rt;
+    lock(types) rt = (ReflectedType)types[type];
+    if(rt==null)
+    { rt = new ReflectedType(type);
+      lock(types) types[type] = rt;
+    }
     return rt;
   }
 

@@ -486,7 +486,7 @@ public class ClassStatement : Statement
   { bool interactive = Options.Interactive;
     Options.Interactive = false;
     try
-    { CodeGenerator icg = cg.TypeGenerator.DefineMethod(Name.String+"$maker"+index++,
+    { CodeGenerator icg = cg.TypeGenerator.DefineMethod(Name.String+"$maker"+Misc.NextIndex,
                                                         typeof(IDictionary), Type.EmptyTypes);
       LocalNamespace ns = new LocalNamespace(cg.Namespace, icg);
       icg.Namespace = ns;
@@ -546,8 +546,6 @@ public class ClassStatement : Statement
   public Statement Body;
   
   string docstring;
-
-  static int index;
 }
 #endregion
 

@@ -32,6 +32,8 @@ namespace Boa
 public sealed class Misc
 { private Misc() { }
   
+  public static long NextIndex { get { lock(indexLock) return index++; } }
+
   public unsafe static string ArrayToHex(byte[] bytes)
   { const string hex = "0123456789abcdef";
     System.Text.StringBuilder sb = new System.Text.StringBuilder(bytes.Length*2);
@@ -62,6 +64,8 @@ public sealed class Misc
   
   public static readonly object[] EmptyArray = new object[0];
   public static readonly Type TypeOfObjectRef = Type.GetType("System.Object&");
+  static long index;
+  static object indexLock = "<Misc_INDEX_LOCK>";
 }
 
 public sealed class Options

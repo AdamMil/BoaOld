@@ -35,7 +35,8 @@ public sealed class TypeMaker
 
   // TODO: override __str__ and GetHashCode() (?) and stuff
   public static Type MakeType(string module, string name, object[] bases, IDictionary dict)
-  { Type baseType = FindBaseType(bases), type = (Type)types[baseType];
+  { Type baseType = FindBaseType(bases), type;
+    lock(types) type = (Type)types[baseType];
     if(type!=null) return type;
 
     TypeGenerator typeGen = SnippetMaker.Assembly.DefineType("Boa.Types."+namere.Replace(baseType.FullName, @"\+"),
@@ -115,7 +116,8 @@ public sealed class TypeMaker
     cg.EmitReturn();
     cg.Finish();*/
 
-    types[baseType] = type = typeGen.FinishType();
+    type = typeGen.FinishType();
+    lock(types) types[baseType] = type;
     return type;
   }
 

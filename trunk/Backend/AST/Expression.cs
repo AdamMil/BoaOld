@@ -535,7 +535,8 @@ public class GeneratorExpression : ListGenExpression
 { public GeneratorExpression(Expression item, ListCompFor[] fors) : base(item, fors) { IsGenerator=true; }
 
   public override void Emit(CodeGenerator cg)
-  { TypeGenerator tg = cg.TypeGenerator.DefineNestedType(TypeAttributes.Sealed, "ge$f"+index++, typeof(Generator));
+  { TypeGenerator tg = cg.TypeGenerator.DefineNestedType(TypeAttributes.Sealed, "ge$f"+Misc.NextIndex,
+                                                         typeof(Generator));
     CodeGenerator nc = tg.DefineMethod(MethodAttributes.Virtual|MethodAttributes.Family,
                                        "InnerNext", typeof(bool), new Type[] { Misc.TypeOfObjectRef });
     Label yield = nc.ILG.DefineLabel();
@@ -585,8 +586,6 @@ public class GeneratorExpression : ListGenExpression
     base.ToCode(sb, 0);
     sb.Append(')');
   }
-
-  static int index;
 }
 #endregion
 
