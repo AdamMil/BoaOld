@@ -56,12 +56,21 @@ public sealed class Misc
     }
     return null;
   }
+
   public static Type[] MakeTypeArray(Type type, int length)
   { Type[] arr = new Type[length];
     for(int i=0; i<length; i++) arr[i] = type;
     return arr;
   }
-  
+
+  public static Name[] ToNameArray(Expression e)
+  { TupleExpression tup = e as TupleExpression;
+    Name[] ret = new Name[tup==null ? 1 : tup.Expressions.Length];
+    if(tup==null) ret[0] = ((NameExpression)e).Name;
+    else for(int i=0; i<ret.Length; i++) ret[i] = ((NameExpression)tup.Expressions[i]).Name;
+    return ret;
+  }
+
   public static readonly object[] EmptyArray = new object[0];
   public static readonly Type TypeOfObjectRef = Type.GetType("System.Object&");
   static long index;

@@ -37,7 +37,39 @@ public abstract class Namespace
     codeGen = cg;
   }
 
+  // TODO: implement a way to free temporaries
   public virtual Slot AllocTemp(Type type) { throw new NotImplementedException(); }
+
+  public void BeginScope(Name[] names) { BeginScope(names, false); }
+  public void BeginScope(Name[] names, bool keepAround)
+  { if(names.Length==0) return;
+
+    string[] snames = new string[names.Length];
+    Slot[] oslots = new Slot[names.Length];
+    for(int i=0; i<names.Length; i++)
+    { string name;
+      snames[i] = name = names[i].String;
+      oslots[i] = (Slot)slots[name];
+      slots[name] = codeGen.AllocLocalTemp(typeof(object), keepAround);
+    }
+
+    if(scopes==null) scopes = new Stack();
+    scopes.Push(snames);
+    scopes.Push(oslots);
+  }
+  
+  public void EndScope()
+  { Slot[] oslots  = (Slot[])scopes.Pop();
+    string[] names = (string[])scopes.Pop();
+    for(int i=0; i<oslots.Length; i++)
+    { Slot s = oslots[i];
+      string n = names[i];
+      codeGen.FreeLocalTemp((Slot)slots[n]);
+      if(s==null) slots.Remove(n);
+      else slots[n] = s;
+    }
+  }
+
   // TODO: make sure this works with closures, etc
   public virtual void DeleteSlot(Name name) { slots.Remove(name.String); }
   public Slot GetLocalSlot(Name name) { return (Slot)slots[name.String]; } // does NOT make the slot!
@@ -46,7 +78,7 @@ public abstract class Namespace
 
   public Slot GetSlotForGet(Name name)
   { Slot s = (Slot)slots[name.String];
-    return s!=null ? s : name.Scope==Scope.Private ? GetSlot(name) : GetGlobalSlot(name);
+    return s!=null ? s : name.Scope==Scope.Temporary ? GetSlot(name) : GetGlobalSlot(name);
   }
   public Slot GetSlotForSet(Name name) { return GetSlot(name); }
   
@@ -55,8 +87,6 @@ public abstract class Namespace
   }
 
   public Namespace Parent, Global;
-  
-  protected string GetKey(Name name) { return name.Scope==Scope.Private ? "private$"+name.String : name.String; }
 
   protected abstract Slot MakeSlot(Name name);
 
@@ -64,14 +94,17 @@ public abstract class Namespace
   protected CodeGenerator codeGen;
 
   Slot GetSlot(Name name)
-  { string key = GetKey(name);
-    Slot ret = (Slot)slots[key];
+  { Slot ret = (Slot)slots[name.String];
     if(ret==null)
-    { ret = name.Scope==Scope.Private ? new LocalSlot(codeGen.ILG.DeclareLocal(typeof(object))) : MakeSlot(name);
-      slots[key] = ret;
+    { if(name.Scope==Scope.Temporary)
+        throw new ArgumentException("Temporary variables must be allocated with BeginScope()");
+      ret = MakeSlot(name);
+      slots[name.String] = ret;
     }
     return ret;
   }
+
+  Stack scopes;
 }
 #endregion
 
@@ -137,15 +170,12 @@ public class FrameNamespace : Namespace
   }
 
   public override void SetArgs(Name[] names, int offset, MethodBase mb)
-  { foreach(Name name in names) slots[GetKey(name)] = MakeSlot(name);
+  { foreach(Name name in names) slots[name] = MakeSlot(name);
   }
 
   public FrameObjectSlot FrameSlot;
 
-  protected override Slot MakeSlot(Name name)
-  { if(name.Scope==Scope.Private) throw new NotImplementedException();
-    return new NamedFrameSlot(FrameSlot, name.String);
-  }
+  protected override Slot MakeSlot(Name name) { return new NamedFrameSlot(FrameSlot, name.String); }
 }
 #endregion
 

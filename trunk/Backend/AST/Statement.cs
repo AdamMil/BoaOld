@@ -210,22 +210,22 @@ public abstract class Statement : Node
 
   #region NameDecorator
   sealed class NameDecorator : IWalker
-  { public void PostWalk(Node node)
+  { public NameDecorator() { }
+    NameDecorator(SortedList names) { parentNames=names; }
+
+    public void PostWalk(Node node)
     { if(node==current)
       { inDef=false;
 
         ArrayList inherit = innerFuncs.Count==0 ? null : new ArrayList();
         foreach(BoaFunction func in innerFuncs)
-        { NameDecorator dec = new NameDecorator();
+        { NameDecorator dec = new NameDecorator(names);
           func.Walk(dec);
           foreach(Name dname in dec.names.Values)
             if(dname.Scope==Scope.Free)
             { Name name = (Name)names[dname.String];
               if(name==null) names[dname.String] = dname;
-              else if(name.Scope==Scope.Local)
-              { name.Scope=Scope.Closed;
-                inherit.Add(name);
-              }
+              else if(name.Scope==Scope.Local) inherit.Add(name);
             }
           if(inherit.Count>0)
           { func.Inherit = (Name[])inherit.ToArray(typeof(Name));
@@ -312,7 +312,8 @@ public abstract class Statement : Node
       if(assignedTo is NameExpression)
       { NameExpression ne = (NameExpression)assignedTo;
         ne.Name = AddName(ne.Name);
-        if(ne.Name.Scope!=Scope.Global) ne.Name.Scope = Scope.Local;
+        if(ne.Name.Scope==Scope.Free && (parentNames==null || parentNames[ne.Name.String]==null))
+          ne.Name.Scope=Scope.Local;
       }
       else if(assignedTo is TupleExpression)
         foreach(Expression e in ((TupleExpression)assignedTo).Expressions) HandleAssignment(e);
@@ -320,7 +321,7 @@ public abstract class Statement : Node
 
     BoaFunction current;
     ArrayList  innerFuncs;
-    SortedList names;
+    SortedList names, parentNames;
     bool inDef;
   }
   #endregion
