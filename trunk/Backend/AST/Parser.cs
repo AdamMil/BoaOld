@@ -188,9 +188,12 @@ public class Parser
       else if(TryEat(Token.Power)) args.Add(new Argument(ParseExpression(), ArgType.Dict));
       else if(token!=Token.Identifier) args.Add(new Argument(ParseExpression()));
       else
-      { string ident = ParseIdentifier();
-        if(TryEat(Token.Assign)) args.Add(new Argument(ident, ParseExpression()));
-        else args.Add(new Argument(new NameExpression(ident)));
+      { Expression e = ParseExpression();
+        if(TryEat(Token.Assign))
+        { if(!(e is NameExpression)) Unexpected(Token.Assign);
+          args.Add(new Argument(((NameExpression)e).Name.String, ParseExpression()));
+        }
+        else args.Add(new Argument(e));
       }
     } while(TryEat(Token.Comma));
     return (Argument[])args.ToArray(typeof(Argument));
@@ -629,7 +632,7 @@ public class Parser
   // raise_stmt    := 'raise' <expression>?
   // return_stmt   := 'return' <expression>?
   // assert_stmt   := 'assert' <expression>
-  // del_stmt      := 'del' <lvalue>
+  // del_stmt      := 'del' <lvalue> (',' <lvalue>)*
   Statement ParseSimpleStmt()
   { switch(token)
     { case Token.Print: return ParsePrintStmt();
@@ -654,10 +657,14 @@ public class Parser
       case Token.Assert: NextToken(); return AP(new AssertStatement(ParseExpression()));
       case Token.Del:
       { NextToken();
-        Expression e = ParseExpression();
-        if(!(e is NameExpression || e is AttrExpression || e is TupleExpression || e is IndexExpression))
-          SyntaxError("can't assign to {0}", e.GetType());
-        return AP(new DelStatement(e));
+        ArrayList list = new ArrayList();
+        do
+        { Expression e = ParseExpression();
+          if(!(e is NameExpression || e is AttrExpression || e is TupleExpression || e is IndexExpression))
+            SyntaxError("can't delete {0}", e.GetType());
+          list.Add(e);
+        } while(TryEat(Token.Comma));
+        return AP(new DelStatement((Expression[])list.ToArray(typeof(Expression))));
       }
       default: return ParseExprStmt();
     }

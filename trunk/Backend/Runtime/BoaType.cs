@@ -18,6 +18,7 @@ public abstract class BoaType : DynamicType, IDynamicObject, ICallable, IHasAttr
     if(type==typeof(object)) __name__ = "object";
     else if(type==typeof(string)) __name__ = "string";
     else if(type==typeof(int)) __name__ = "int";
+    else if(type==typeof(double)) __name__ = "float";
     else
     { BoaTypeAttribute attr = (BoaTypeAttribute)Attribute.GetCustomAttribute(type, typeof(BoaTypeAttribute), false);
       __name__ = attr==null ? type.FullName : attr.Name;
@@ -72,10 +73,6 @@ public abstract class BoaType : DynamicType, IDynamicObject, ICallable, IHasAttr
   protected object RawGetSlot(string name)
   { Initialize();
     if(name=="__dict__") return dict;
-    /*if(name=="__getattr__") return getAttributeF;
-    if(name=="__setattr__") return setAttributeF;
-    if(name=="__cmp__") return cmpF;
-    if(name=="__repr__") return reprF;*/
     return dict[name];
   }
 

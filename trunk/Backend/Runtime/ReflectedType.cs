@@ -163,6 +163,7 @@ public class ReflectedMember
 }
 #endregion
 
+// TODO: allow extra keyword parameters to set properties?
 #region ReflectedConstructor
 public class ReflectedConstructor : ReflectedMethodBase
 { public ReflectedConstructor(ConstructorInfo ci) : base(ci) { }
@@ -249,11 +250,12 @@ public class ReflectedMethod : ReflectedMethodBase, IDescriptor
 }
 #endregion
 
+// TODO: respect default parameters
 #region ReflectedMethodBase
 public abstract class ReflectedMethodBase : ReflectedMember, IFancyCallable
 { protected ReflectedMethodBase(MethodBase mb) : base(mb)
   { sigs = new MethodBase[] { mb };
-    allStatic = mb.IsStatic;
+    hasStatic = allStatic = mb.IsStatic;
   }
   protected ReflectedMethodBase(MethodBase[] sigs, object instance, string docs) : base(docs)
   { this.sigs=sigs; this.instance=instance;
@@ -273,69 +275,108 @@ public abstract class ReflectedMethodBase : ReflectedMember, IFancyCallable
       ParameterInfo[] parms = sigs[mi].GetParameters();
       bool paramArray = parms.Length>0 && IsParamArray(parms[parms.Length-1]);
       int lastRP      = paramArray ? parms.Length-1 : parms.Length;
-      byte alreadyPA  = 0;
       if(args.Length<lastRP || !paramArray && args.Length!=parms.Length) continue;
 
-      res[mi].Conv = Conversion.Identity;
-      // check types of all parameters except the parameter array if there is one
-      for(int i=0; i<lastRP; i++)
-      { Conversion conv = Ops.ConvertTo(types[i], parms[i].ParameterType);
-        if(conv==Conversion.None || conv<res[mi].Conv)
-        { res[mi].Conv=conv;
-          if(conv==Conversion.None) goto nextSig;
-        }
+      TryMatch(parms, args, types, lastRP, paramArray, res, mi, ref bestMatch);
+    }
+
+    return DoCall(args, types, res, bestMatch);
+  }
+
+  public object Call(object[] positional, string[] names, object[] values)
+  { Match[] res   = new Match[sigs.Length];
+    int bestMatch = -1, numpos = positional==null ? 0 : positional.Length, numargs = numpos+values.Length;
+
+    Type[]  types = new Type[numargs], rtypes = new Type[numargs], btypes=null;
+    object[] args = new object[numargs], bargs=null;
+    int[]    done = new int[numargs];
+
+    for(int i=0; i<numpos; i++) types[i] = positional[i]==null ? null : positional[i].GetType();
+    for(int i=0; i<values.Length; i++) types[i+numpos] = values[i]==null ? null : values[i].GetType();
+
+    for(int mi=0; mi<sigs.Length; mi++) // TODO: cache the binding results somehow?
+    { if(instance==null && !sigs[mi].IsStatic) continue;
+      ParameterInfo[] parms = sigs[mi].GetParameters();
+      if(names.Length>parms.Length) continue;
+      for(int i=0; i<done.Length; i++) done[i] = -1;
+      for(int i=0; i<names.Length; i++) // check named args
+      { for(int j=0; j<parms.Length; j++)
+          if(names[i]==parms[j].Name)
+          { if(done[j]!=-1) throw Ops.TypeError("duplicate value for parameter '{0}'", names[i]);
+            done[j] = i+numpos;
+            args[j] = values[i];
+            goto nextName;
+          }
+        goto nextSig;
+        nextName:;
       }
 
-      if(paramArray) // TODO: allow tuples and possibly lists as well to be used here
-      { if(args.Length==parms.Length) // check if the last argument is an array already
-        { Conversion conv = Ops.ConvertTo(types[lastRP], parms[lastRP].ParameterType);
-          if(conv==Conversion.Identity || conv==Conversion.Reference)
-          { if(conv<res[mi].Conv) res[mi].Conv=conv;
-            alreadyPA = 2;
-            goto done;
-          }
-        }
-
-        // check that all remaining arguments can be converted to the member type of the parameter array
-        Type type = parms[lastRP].ParameterType.GetElementType();
-        if(args.Length==parms.Length && types[lastRP]==typeof(Tuple))
-        { if(type!=typeof(object))
-          { object[] items = ((Tuple)args[lastRP]).items;
-            for(int i=0; i<items.Length; i++)
-            { Conversion conv = Ops.ConvertTo(items[i].GetType(), type);
-              if(conv==Conversion.None) goto notCPA;
-            }
-          }
-          alreadyPA = 1;
-          goto done;
-        }
-
-        notCPA:
-        for(int i=lastRP; i<args.Length; i++)
-        { Conversion conv = Ops.ConvertTo(types[i], type);
-          if(conv==Conversion.None || conv<res[mi].Conv)
-          { res[mi].Conv=conv;
-            if(conv==Conversion.None) goto nextSig;
-          }
-        }
+      bool paramArray = parms.Length>0 && IsParamArray(parms[parms.Length-1]);
+      int lastRP      = paramArray ? parms.Length-1 : parms.Length;
+      for(int i=0, end=Math.Min(numpos, lastRP); i<end; i++)
+      { if(done[i]!=-1) throw Ops.TypeError("duplicate value for parameter '{0}'", parms[i].Name);
+        done[i] = i;
+        args[i] = positional[i];
       }
+      for(int i=0; i<done.Length; i++)
+        if(done[i]==-1) goto nextSig;
+        else rtypes[i] = types[done[i]];
 
-      done:
-      res[mi] = new Match(res[mi].Conv, parms, lastRP, alreadyPA, paramArray);
-      if(bestMatch==-1 || res[mi]>res[bestMatch]) bestMatch=mi;
+      if(TryMatch(parms, args, rtypes, lastRP, paramArray, res, mi, ref bestMatch))
+      { bargs  = (object[])args.Clone();
+        btypes = (Type[])rtypes.Clone();
+      }
 
       nextSig:;
     }
+    
+    return DoCall(bargs, btypes, res, bestMatch);
+  }
 
-    if(bestMatch==-1)
-      throw Ops.TypeError("unable to bind arguments to method '{0}' on {1}", __name__, sigs[0].DeclaringType.FullName);
+  internal void Add(MethodBase sig)
+  { if(__doc__==null)
+    { object[] docs = sig.GetCustomAttributes(typeof(DocStringAttribute), false);
+      if(docs.Length!=0) __doc__ = ((DocStringAttribute)docs[0]).Docs;
+    }
 
+    if(sig.IsStatic) hasStatic=true;
+    else allStatic=false;
+
+    MethodBase[] narr = new MethodBase[sigs.Length+1];
+    sigs.CopyTo(narr, 0);
+    narr[sigs.Length] = sig;
+    sigs = narr;
+  }
+
+  struct Match
+  { public Match(Conversion conv, ParameterInfo[] parms, int last, byte apa, bool pa)
+    { Conv=conv; Parms=parms; Last=last; APA=apa; PA=pa;;
+    }
+
+    public static bool operator<(Match a, Match b) { return a.Conv<b.Conv || a.APA<b.APA || a.PA && !b.PA; }
+    public static bool operator>(Match a, Match b) { return a.Conv>b.Conv || a.APA>b.APA || !a.PA && b.PA; }
+    public static bool operator==(Match a, Match b) { return a.Conv==b.Conv && a.APA==b.APA && a.PA==b.PA; }
+    public static bool operator!=(Match a, Match b) { return a.Conv!=b.Conv || a.APA!=b.APA || a.PA!=b.PA; }
+    
+    public override bool Equals(object obj) { return  obj is Match ? this==(Match)obj : false; }
+    public override int GetHashCode() { throw new NotSupportedException(); }
+
+    public Conversion Conv;
+    public ParameterInfo[] Parms;
+    public int Last;
+    public byte APA;
+    public bool PA;
+  }
+
+  object DoCall(object[] args, Type[] types, Match[] res, int bestMatch)
+  { if(bestMatch==-1) throw Ops.TypeError("unable to bind arguments to method '{0}' on {1}",
+                                          __name__, sigs[0].DeclaringType.FullName);
     Match best = res[bestMatch];
 
     // check for ambiguous bindings
     if(sigs.Length>1 && best.Conv!=Conversion.Identity)
-      for(int i=0; i<res.Length; i++)
-        if(i!=bestMatch && res[i]==best)
+      for(int i=bestMatch+1; i<res.Length; i++)
+        if(res[i]==best)
           throw Ops.TypeError("ambiguous argument types (multiple functions matched method '{0}' on {1})",
                               __name__, sigs[0].DeclaringType.FullName);
 
@@ -367,45 +408,66 @@ public abstract class ReflectedMethodBase : ReflectedMember, IFancyCallable
                                          : sigs[bestMatch].Invoke(instance, args);
   }
 
-  internal void Add(MethodBase sig)
-  { if(__doc__==null)
-    { object[] docs = sig.GetCustomAttributes(typeof(DocStringAttribute), false);
-      if(docs.Length!=0) __doc__ = ((DocStringAttribute)docs[0]).Docs;
+  bool TryMatch(ParameterInfo[] parms, object[] args, Type[] types, int lastRP, bool paramArray,
+                Match[] res, int mi, ref int bestMatch)
+  { byte alreadyPA = 0;
+    res[mi].Conv = Conversion.Identity;
+
+    // check types of all parameters except the parameter array if there is one
+    for(int i=0; i<lastRP; i++)
+    { Conversion conv = Ops.ConvertTo(types[i], parms[i].ParameterType);
+      if(conv==Conversion.None || conv<res[mi].Conv)
+      { res[mi].Conv=conv;
+        if(conv==Conversion.None) return false;
+      }
     }
 
-    if(!sig.IsStatic) allStatic=false;
+    if(paramArray) // TODO: allow tuples and possibly lists as well to be used here
+    { if(args.Length==parms.Length) // check if the last argument is an array already
+      { Conversion conv = Ops.ConvertTo(types[lastRP], parms[lastRP].ParameterType);
+        if(conv==Conversion.Identity || conv==Conversion.Reference)
+        { if(conv<res[mi].Conv) res[mi].Conv=conv;
+          alreadyPA = 2;
+          goto done;
+        }
+      }
 
-    MethodBase[] narr = new MethodBase[sigs.Length+1];
-    sigs.CopyTo(narr, 0);
-    narr[sigs.Length] = sig;
-    sigs = narr;
-  }
+      // check that all remaining arguments can be converted to the member type of the parameter array
+      Type type = parms[lastRP].ParameterType.GetElementType();
+      if(args.Length==parms.Length && types[lastRP]==typeof(Tuple))
+      { if(type!=typeof(object))
+        { object[] items = ((Tuple)args[lastRP]).items;
+          for(int i=0; i<items.Length; i++)
+          { Conversion conv = Ops.ConvertTo(items[i].GetType(), type);
+            if(conv==Conversion.None) goto notCPA;
+          }
+        }
+        alreadyPA = 1;
+        goto done;
+      }
 
-  struct Match
-  { public Match(Conversion conv, ParameterInfo[] parms, int last, byte apa, bool pa)
-    { Conv=conv; Parms=parms; Last=last; APA=apa; PA=pa;;
+      notCPA:
+      for(int i=lastRP; i<args.Length; i++)
+      { Conversion conv = Ops.ConvertTo(types[i], type);
+        if(conv==Conversion.None || conv<res[mi].Conv)
+        { res[mi].Conv=conv;
+          if(conv==Conversion.None) return false;
+        }
+      }
     }
 
-    public static bool operator<(Match a, Match b) { return a.Conv<b.Conv || a.APA<b.APA || a.PA && !b.PA; }
-    public static bool operator>(Match a, Match b) { return a.Conv>b.Conv || a.APA>b.APA || !a.PA && b.PA; }
-    public static bool operator==(Match a, Match b) { return a.Conv==b.Conv && a.APA==b.APA && a.PA==b.PA; }
-    public static bool operator!=(Match a, Match b) { return a.Conv!=b.Conv || a.APA!=b.APA || a.PA!=b.PA; }
-    
-    public override bool Equals(object obj) { return  obj is Match ? this==(Match)obj : false; }
-    public override int GetHashCode() { throw new NotSupportedException(); }
-
-    public Conversion Conv;
-    public ParameterInfo[] Parms;
-    public int Last;
-    public byte APA;
-    public bool PA;
+    done:
+    res[mi] = new Match(res[mi].Conv, parms, lastRP, alreadyPA, paramArray);
+    if(bestMatch==-1 || res[mi]>res[bestMatch]) { bestMatch=mi; return true; }
+    return false;
   }
 
   static bool IsParamArray(ParameterInfo pi) { return pi.IsDefined(typeof(ParamArrayAttribute), false); }
 
   internal MethodBase[] sigs;
+  internal bool hasStatic, allStatic;
+
   protected object instance;
-  protected bool   allStatic;
 }
 #endregion
 
@@ -471,7 +533,7 @@ public class ReflectedProperty : ReflectedMember, IDataDescriptor
 #endregion
 
 #region ReflectedType
-public class ReflectedType : BoaType, IRepresentable
+public class ReflectedType : BoaType
 { ReflectedType(Type type) : base(type) { }
 
   public override object Call(params object[] args)
@@ -502,6 +564,16 @@ public class ReflectedType : BoaType, IRepresentable
     return rt==null ? false : rt.type.IsAssignableFrom(type);
   }
 
+  public override string Repr(object self)
+  { ReflectedType rt = self as ReflectedType;
+    if(rt!=null)
+    { rt.Initialize();
+      ReflectedMethod rm = rt.dict["__repr__"] as ReflectedMethod;
+      if(rm!=null && rm.hasStatic) return Ops.ToString(rm.Call());
+    }
+    return self.ToString();
+  }
+
   public override void SetAttr(object self, string name, object value)
   { object slot = RawGetSlot(name);
     if(slot==null) throw Ops.AttributeError("no such slot '{0}'", name);
@@ -510,9 +582,7 @@ public class ReflectedType : BoaType, IRepresentable
 
   public override string ToString() { return __repr__(); }
 
-  #region IRepresentable Members
   public string __repr__() { return string.Format("<type {0}>", Ops.Repr(__name__)); }
-  #endregion
 
   public static ReflectedType FromType(Type type)
   { ReflectedType rt = (ReflectedType)types[type];
@@ -533,6 +603,7 @@ public class ReflectedType : BoaType, IRepresentable
     foreach(MethodInfo mi in type.GetMethods()) AddMethod(mi);
     foreach(PropertyInfo pi in type.GetProperties()) AddProperty(pi);
 
+    // iterator protocol
     if(typeof(IEnumerator).IsAssignableFrom(type))
     { if(!dict.Contains("next")) dict["next"] = SpecialAttr.NextMethod.Value;
       if(!dict.Contains("reset")) dict["reset"] = dict["Reset"];
@@ -542,43 +613,30 @@ public class ReflectedType : BoaType, IRepresentable
     { if(!dict.Contains("__iter__")) dict["__iter__"] = dict["GetEnumerator"];
     }
 
-    if(type.IsSubclassOf(typeof(Delegate)))
+    if(type.IsSubclassOf(typeof(Delegate))) // delegates
     { dict["__call__"] = SpecialAttr.DelegateCaller.Value;
     }
-    else if(type==typeof(string))
+    else if(type.IsSubclassOf(typeof(Array))) // arrays
+    { if(!dict.Contains("__getitem__")) dict["__getitem__"] = SpecialAttr.ArrayGetItem.Value;
+      if(!dict.Contains("__setitem__")) dict["__setitem__"] = SpecialAttr.ArraySetItem.Value;
+    }
+    else if(type==typeof(string)) // strings
     { dict["__repr__"] = new SpecialAttr.StringRepr();
       dict["__getitem__"] = new SpecialAttr.StringGetItem();
     }
 
-    if(!dict.Contains("__doc__"))
+    if(!dict.Contains("__doc__")) // add doc strings
     { object[] docs = type.GetCustomAttributes(typeof(DocStringAttribute), false);
       if(docs.Length!=0) __doc__ = ((DocStringAttribute)docs[0]).Docs;
     }
     
-    foreach(MemberInfo m in type.GetDefaultMembers())
+    foreach(MemberInfo m in type.GetDefaultMembers()) // add handler for default property
       if(m.MemberType==MemberTypes.Property)
       { ReflectedProperty prop = dict[m.Name] as ReflectedProperty;
         if(prop==null) continue;
-        if(prop.state.get!=null)
-        { if(!dict.Contains("__getitem__")) dict["__getitem__"] = prop.state.get;
-          else
-          { ReflectedMethod rm = dict["__getitem__"] as ReflectedMethod;
-            if(rm!=null) foreach(MethodInfo mi in prop.state.get.sigs) rm.Add(mi);
-          }
-        }
-        if(prop.state.set!=null && m.Name!="__setitem__")
-        { if(!dict.Contains("__setitem__")) dict["__setitem__"] = prop.state.set;
-          else
-          { ReflectedMethod rm = dict["__getitem__"] as ReflectedMethod;
-            if(rm!=null) foreach(MethodInfo mi in prop.state.set.sigs) rm.Add(mi);
-          }
-        }
+        if(prop.state.get!=null && !dict.Contains("__getitem__")) dict["__getitem__"] = prop.state.get;
+        if(prop.state.set!=null && !dict.Contains("__setitem__")) dict["__setitem__"] = prop.state.set;
       }
-
-    if(type.IsSubclassOf(typeof(Array)))
-    { if(!dict.Contains("__getitem__")) dict["__getitem__"] = SpecialAttr.ArrayGetItem.Value;
-      if(!dict.Contains("__setitem__")) dict["__setitem__"] = SpecialAttr.ArraySetItem.Value;
-    }
   }
 
   void AddConstructor(ConstructorInfo ci)

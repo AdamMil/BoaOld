@@ -6,8 +6,6 @@ using Boa.Runtime;
 namespace Boa.Modules
 {
 
-// TODO: finish this by adding 'regex' and 'match' objects
-
 [BoaType("module")]
 public sealed class re
 { re() { }
@@ -28,7 +26,7 @@ public sealed class re
       if(pos==-1) pos=0;
       match = regex.Match(str, pos);
       if(match==null || !match.Success) { pos=-2; return false; }
-      pos += match.Length;
+      pos = match.Index+match.Length;
       return true;
     }
 
@@ -38,6 +36,90 @@ public sealed class re
     string str;
     Match match;
     int pos;
+  }
+
+  public class regex : Regex, IRepresentable
+  { public regex(string pattern, RegexOptions options) : base(pattern, options) { }
+    
+    [DocString("flags -> int\nThe flags used to create this regex.")]
+    public int flags { get { return (int)Options; } }
+
+    [DocString("pattern -> str\nThe pattern used to create this regex.")]
+    public new string pattern { get { return base.pattern; } }
+
+    [DocString("groupindex -> dict\nA dictionary mapping group names to group numbers.")]
+    public Dict groupindex
+    { get
+      { if(groups==null)
+        { groups = new Dict();
+          string[] names = GetGroupNames();
+          for(int i=0; i<names.Length; i++) groups[names[i]] = GroupNumberFromName(names[i]);
+        }
+        return groups;
+      }
+    }
+
+    [DocString(@"findall(string) -> list\n\nSee documentation for re.findall()")]
+    public List findall(string str) { return Boa.Modules.re.findall(this, str); }
+    [DocString(@"finditer(string) -> iter\n\nSee documentation for re.finditer()")]
+    public IEnumerator finditer(string str) { return Boa.Modules.re.finditer(this, str); }
+
+    [DocString(@"match(string[, start[, end]]) -> Match
+
+  If zero or more characters at the beginning of 'string' match this regular
+  expression, return a corresponding Match instance. Return null if the string
+  does not match the pattern; note that this is different from a zero-length
+  match.
+
+  Note: If you want to locate a match anywhere in 'string', use search()
+  instead.
+
+  The optional second parameter pos gives an index in the string where the
+  search is to start; it defaults to 0.
+
+  The optional parameter endpos limits how far the string will be searched;
+  it will be as if the string is endpos characters long, so only the
+  characters from pos to endpos - 1 will be searched for a match. If endpos is
+  less than pos, no match will be found.")]
+    public Match match(string str) { return match(str, 0, str.Length); }
+    public Match match(string str, int start) { return match(str, start, str.Length); }
+    public Match match(string str, int start, int end)
+    { Match m = end==str.Length ? Match(str, start) : Match(str, start, end-start);
+      return m.Success && m.Index==start ? m : null;
+    }
+    
+    public Match search(string str)
+    { Match m = Match(str);
+      return m.Success ? m : null;
+    }
+    public Match search(string str, int start)
+    { Match m = Match(str, start);
+      return m.Success ? m : null;
+    }
+    public Match search(string str, int start, int end)
+    { Match m = Match(str, start, end-start);
+      return m.Success ? m : null;
+    }
+    
+    [DocString(@"split(string[, maxsplit=0]) -> list\n\nSee documentation for re.split()")]
+    public List split(string str) { return Boa.Modules.re.split(this, str, 0); }
+    public List split(string str, int maxsplit) { return Boa.Modules.re.split(this, str, maxsplit); }
+
+    [DocString(@"sub(repl, string [, maxreplace=0]) -> str\n\nSee documentation for re.sub()")]
+    public string sub(object repl, string str) { return Boa.Modules.re.sub(this, repl, str, 0); }
+    public string sub(object repl, string str, int maxreplace)
+    { return Boa.Modules.re.sub(this, repl, str, maxreplace);
+    }
+
+    [DocString(@"subn(repl, string [, maxreplace=0]) -> tuple\n\nSee documentation for re.subn()")]
+    public Tuple subn(object repl, string str) { return Boa.Modules.re.subn(this, repl, str, 0); }
+    public Tuple subn(object repl, string str, int maxreplace)
+    { return Boa.Modules.re.subn(this, repl, str, maxreplace);
+    }
+
+    public string __repr__() { return string.Format("re.compile({0})", Ops.Repr(base.pattern)); }
+
+    Dict groups;
   }
 
   [DocString(@"Exception raised when a string passed to one of the functions here is not a
@@ -52,15 +134,15 @@ It is never an error if a string contains no match for a pattern.")]
   public static string __repr__() { return __str__(); }
   public static string __str__() { return "<module 're' (built-in)>"; }
 
-  [DocString(@"compile(pattern[, flags])
+  [DocString(@"compile(pattern[, flags]) -> regex
 
 Compile a regular expression pattern, returning a Regex object.")]
-  public static Regex compile(string pattern) { return compile(pattern, (int)RegexOptions.Singleline); }
-  public static Regex compile(string pattern, int flags)
+  public static regex compile(string pattern) { return compile(pattern, (int)RegexOptions.Singleline); }
+  public static regex compile(string pattern, int flags)
   { return MakeRegex(pattern, (RegexOptions)flags | RegexOptions.Compiled);
   }
 
-  [DocString(@"escape(pattern)
+  [DocString(@"escape(pattern) -> str
 
 Escape characters in pattern that may be regex metacharacters.")]
   public static string escape(string str)
@@ -73,7 +155,7 @@ Escape characters in pattern that may be regex metacharacters.")]
     return sb.ToString();
   }
 
-  [DocString(@"findall(pattern, string)
+  [DocString(@"findall(pattern, string) -> list
 
 Return a list of all non-overlapping matches in the string.
 
@@ -87,7 +169,7 @@ Empty matches are included in the result.")]
     return ret;
   }
   
-  [DocString(@"finditer(pattern, string)
+  [DocString(@"finditer(pattern, string) -> iter
 
 Return an iterator over all non-overlapping matches in the string.
 For each match, the iterator returns a match object.
@@ -97,7 +179,7 @@ Empty matches are included in the result.")]
   { return new FindEnumerator(MakeRegex(pattern), str);
   }
 
-  [DocString(@"match(pattern, string[, flags])
+  [DocString(@"match(pattern, string[, flags]) -> Match
 
 Try to apply the pattern at the start of the string, returning a match
 object, or null if no match was found.")]
@@ -107,7 +189,7 @@ object, or null if no match was found.")]
     return m.Index==0 ? m : null;
   }
 
-  [DocString(@"search(pattern, string[, flags])
+  [DocString(@"search(pattern, string[, flags]) -> Match
 
 Scan through string looking for a match to the pattern, returning a match
 object, or null if no match was found.")]
@@ -117,7 +199,7 @@ object, or null if no match was found.")]
     return m!=null && m.Success ? m : null;
   }
 
-  [DocString(@"split(pattern, string[, maxsplit])
+  [DocString(@"split(pattern, string[, maxsplit=0]) -> list
 
 Split the source string by the occurrences of the pattern. If capturing
 parentheses are used in the pattern, then the text of all groups in the
@@ -142,7 +224,7 @@ is returned as the final element of the list.")]
     return ret;
   }
 
-  [DocString(@"sub(pattern, repl, string[, int maxreplace])
+  [DocString(@"sub(pattern, repl, string[, maxreplace=0]) -> str
 
 Return the string obtained by replacing the leftmost non-overlapping
 occurrences of the pattern in the source string by the replacement value.
@@ -162,7 +244,7 @@ return the replacement string.")]
     return sub(pattern, repl, str, maxreplace, out dummy);
   }
 
-  [DocString(@"subn(pattern, repl, string[, maxreplace])
+  [DocString(@"subn(pattern, repl, string[, maxreplace]) -> tuple
 
 Performs the same operation as sub(), but returns a tuple
 (new_string, number_of_subs_made).")]
@@ -199,13 +281,13 @@ ignored.")]
 
   public static readonly ReflectedType error = ReflectedType.FromType(typeof(RegexErrorException));
 
-  static Regex MakeRegex(object pattern) { return MakeRegex(pattern, RegexOptions.Singleline); }
-  static Regex MakeRegex(object pattern, RegexOptions flags)
-  { if(pattern is Regex) return (Regex)pattern;
+  static regex MakeRegex(object pattern) { return MakeRegex(pattern, RegexOptions.Singleline); }
+  static regex MakeRegex(object pattern, RegexOptions flags)
+  { if(pattern is regex) return (regex)pattern;
     if(pattern is string)
-      try { return new Regex((string)pattern, flags); }
+      try { return new regex((string)pattern, flags); }
       catch(ArgumentException e) { throw new RegexErrorException("regex parse error: " + e.Message); }
-    throw Ops.TypeError("re: expecting either a Regex object or a regex pattern string");
+    throw Ops.TypeError("re: expecting either a regex object or a regex pattern string");
   }
 
   static object MatchToFind(Match m)

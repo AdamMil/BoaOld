@@ -633,22 +633,25 @@ public class DefStatement : Statement
 
 #region DelStatement
 public class DelStatement : Statement
-{ public DelStatement(Expression expr) { Expression=expr; }
+{ public DelStatement(Expression[] exprs) { Expressions=exprs; }
 
-  public override void Emit(CodeGenerator cg) { Expression.EmitDel(cg); }
-  public override void Execute(Frame frame) { Expression.Delete(frame); }
+  public override void Emit(CodeGenerator cg) { foreach(Expression e in Expressions) e.EmitDel(cg); }
+  public override void Execute(Frame frame) { foreach(Expression e in Expressions) e.Delete(frame); }
 
   public override void ToCode(System.Text.StringBuilder sb, int indent)
   { sb.Append("del ");
-    Expression.ToCode(sb, 0);
+    for(int i=0; i<Expressions.Length; i++)
+    { if(i!=0) sb.Append(", ");
+      Expressions[i].ToCode(sb, 0);
+    }
   }
 
   public override void Walk(IWalker w)
-  { if(w.Walk(this)) Expression.Walk(w);
+  { if(w.Walk(this)) foreach(Expression e in Expressions) e.Walk(w);
     w.PostWalk(this);
   }
 
-  public Expression Expression;
+  public Expression[] Expressions;
 }
 #endregion
 
