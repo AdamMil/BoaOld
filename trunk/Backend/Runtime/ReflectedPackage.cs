@@ -58,7 +58,7 @@ public sealed class ReflectedPackage : IHasAttributes
 
     ns = bits[0];
     for(int i=1; i<bits.Length; i++)
-    { ns = ns+'.'+bits[i];
+    { ns = ns+"."+bits[i];
       ReflectedPackage tp = (ReflectedPackage)rns.__dict__[bits[i]];
       if(tp==null) rns.__dict__[bits[i]] = tp = new ReflectedPackage(ns);
       rns = tp;
