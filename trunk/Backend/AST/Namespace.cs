@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Specialized;
 using System.Reflection;
 using System.Reflection.Emit;
 using Boa.Runtime;
@@ -9,9 +10,15 @@ namespace Boa.AST
 
 #region Namespace
 public abstract class Namespace
-{ public Namespace(Namespace parent) { Parent=parent; }
+{ public Namespace(Namespace parent)
+  { Parent = parent;
+    Global = parent==null || parent.Parent==null ? parent : parent.Parent;
+  }
 
-  public Slot GetLocalSlot(Name name) { return (Slot)slots[name.String]; }
+  public Slot GetLocalSlot(Name name) { return (Slot)slots[name.String]; } // does NOT make the slot!
+  public Slot GetGlobalSlot(string name) { return GetGlobalSlot(new Name(name, Scope.Global)); }
+  public Slot GetGlobalSlot(Name name) { return Parent==null ? GetSlot(name) : Parent.GetGlobalSlot(name); }
+
   public Slot GetSlotForGet(Name name)
   { Slot s = (Slot)slots[name.String];
     return s==null ? GetGlobalSlot(name) : s;
@@ -22,19 +29,17 @@ public abstract class Namespace
   { throw new NotImplementedException("SetArgs: "+GetType());
   }
 
-  public Namespace Parent;
+  public Namespace Parent, Global;
   
   protected abstract Slot MakeSlot(Name name);
-  protected Hashtable slots = new Hashtable();
+  protected HybridDictionary slots = new HybridDictionary();
 
-  Slot GetGlobalSlot(Name name) { return Parent==null ? GetSlot(name) : Parent.GetGlobalSlot(name); }
   Slot GetSlot(Name name)
   { Slot ret = (Slot)slots[name.String];
     if(ret!=null) return ret;
     slots[name.String] = ret = MakeSlot(name);
     return ret;
   }
-  Slot MakeGlobalSlot(Name name) { return Parent==null ? MakeSlot(name) : Parent.MakeGlobalSlot(name); }
 }
 #endregion
 

@@ -1,4 +1,6 @@
 using System;
+using System.Collections;
+using System.Reflection;
 using System.Reflection.Emit;
 using Boa.Runtime;
 
@@ -37,6 +39,28 @@ public class AndExpression : BinaryExpression
   { object value = LHS.Evaluate(frame);
     return Ops.IsTrue(value) ? RHS.Evaluate(frame) : value;
   }
+}
+#endregion
+
+#region AttrExpression
+public class AttrExpression : Expression
+{ public AttrExpression(Expression obj, string attr) { Object=obj; Attribute=attr; }
+
+  public override void Assign(object value, Frame frame) { Ops.SetAttr(value, Object.Evaluate(frame), Attribute); }
+  public override void Emit(CodeGenerator cg)
+  { Object.Emit(cg);
+    cg.EmitString(Attribute);
+    cg.EmitCall(typeof(Ops), "GetAttr");
+  }
+  public override void EmitSet(CodeGenerator cg)
+  { Object.Emit(cg);
+    cg.EmitString(Attribute);
+    cg.EmitCall(typeof(Ops), "SetAttr");
+  }
+  public override object Evaluate(Frame frame) { return Ops.GetAttr(Object.Evaluate(frame), Attribute); }
+
+  public Expression Object;
+  public string Attribute;
 }
 #endregion
 
@@ -112,6 +136,60 @@ public class ConstantExpression : Expression
 }
 #endregion
 
+#region HashExpression
+// TODO: check for duplicate entries
+public class HashExpression : Expression
+{ public HashExpression() : this(new DictionaryEntry[0]) { }
+  public HashExpression(DictionaryEntry[] entries) { Entries=entries; }
+
+  public override void Emit(CodeGenerator cg)
+  { MethodInfo mi = typeof(Dict).GetMethod("set_Item");
+    cg.EmitNew(typeof(Dict));
+    foreach(DictionaryEntry e in Entries)
+    { cg.ILG.Emit(OpCodes.Dup);
+      ((Expression)e.Key).Emit(cg);
+      ((Expression)e.Value).Emit(cg);
+      cg.EmitCall(mi);
+    }
+  }
+
+  public override object Evaluate(Frame frame)
+  { Dict dict = new Dict();
+    foreach(DictionaryEntry e in Entries)
+      dict[((Expression)e.Key).Evaluate(frame)] = ((Expression)e.Value).Evaluate(frame);
+    return dict;
+  }
+
+  public DictionaryEntry[] Entries;
+}
+#endregion
+
+#region ListExpression
+public class ListExpression : Expression
+{ public ListExpression() : this(new Expression[0]) { }
+  public ListExpression(Expression[] expressions) { Expressions=expressions; }
+
+  public override void Emit(CodeGenerator cg)
+  { MethodInfo mi = typeof(List).GetMethod("append");
+    cg.EmitInt(Expressions.Length);
+    cg.EmitNew(typeof(List), new Type[] { typeof(int) });
+    foreach(Expression e in Expressions)
+    { cg.ILG.Emit(OpCodes.Dup);
+      e.Emit(cg);
+      cg.EmitCall(mi);
+    }
+  }
+  
+  public override object Evaluate(Frame frame)
+  { List list = new List(Expressions.Length);
+    foreach(Expression e in Expressions) list.append(e);
+    return list;
+  }
+
+  public Expression[] Expressions;
+}
+#endregion
+
 #region NameExpression
 public class NameExpression : Expression
 { public NameExpression(Name name) { Name=name; }
@@ -179,6 +257,25 @@ public class TernaryExpression : Expression
   }
 
   public Expression Test, IfTrue, IfFalse;
+}
+#endregion
+
+#region TupleExpression
+public class TupleExpression : Expression
+{ public TupleExpression() : this(new Expression[0]) { }
+  public TupleExpression(Expression[] expressions) { Expressions=expressions; }
+
+  public override void Emit(CodeGenerator cg)
+  { cg.EmitObjectArray(Expressions);
+    cg.EmitNew(typeof(Tuple), new Type[] { typeof(object[]) });
+  }
+  public override object Evaluate(Frame frame)
+  { object[] arr = new object[Expressions.Length];
+    for(int i=0; i<arr.Length; i++) arr[i] = Expressions[i].Evaluate(frame);
+    return new Tuple(arr);
+  }
+
+  public Expression[] Expressions;
 }
 #endregion
 

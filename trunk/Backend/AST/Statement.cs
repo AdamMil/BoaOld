@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Specialized;
 using System.Reflection;
 using System.Reflection.Emit;
 using Boa.Runtime;
@@ -7,10 +8,23 @@ using Boa.Runtime;
 namespace Boa.AST
 {
 
+#region Exceptions (used to aid implementation)
+public class BreakException : Exception
+{ public static BreakException Value = new BreakException();
+}
+public class ContinueException : Exception
+{ public static ContinueException Value = new ContinueException();
+}
+public class ReturnException : Exception
+{ public ReturnException(object value) { Value=value; }
+  public object Value;
+}
+#endregion
+
 #region Statement
 public abstract class Statement : Node
 { public abstract void Emit(CodeGenerator cg);
-  public abstract object Execute(Frame frame);
+  public abstract void Execute(Frame frame);
   
   public void PostProcessForCompile()
   { PostProcess();
@@ -31,20 +45,22 @@ public abstract class Statement : Node
         foreach(DefStatement def in innerFuncs)
         { NameDecorator dec = new NameDecorator();
           def.Walk(dec);
-          foreach(Name dname in dec.localNames.Values)
+          foreach(Name dname in dec.names.Values)
             if(dname.Scope==Scope.Free)
-            { Name name = (Name)localNames[dname.String];
-              if(name!=null)
-              { if(name.Scope==Scope.Local) name.Scope=Scope.Closed;
-                inherit.Add(name);
-              }
-              else
-              { localNames[dname.String] = dname;
+            { Name name = (Name)names[dname.String];
+              if(name==null)
+              { names[dname.String] = dname;
                 inherit.Add(dname);
               }
+              else if(name.Scope==Scope.Local)
+              { name.Scope=Scope.Closed;
+                inherit.Add(name);
+              }
             }
-          def.Inherit = (Name[])inherit.ToArray(typeof(Name));
-          inherit.Clear();
+          if(inherit.Count>0)
+          { def.Inherit = (Name[])inherit.ToArray(typeof(Name));
+            inherit.Clear();
+          }
         }
       }
     }
@@ -54,51 +70,53 @@ public abstract class Statement : Node
       { if(node is DefStatement)
         { DefStatement de = (DefStatement)node;
           innerFuncs.Add(node);
-          de.Name = AddLocal(de.Name);
+          de.Name = AddName(de.Name);
           de.Name.Scope = Scope.Local;
           return false;
         }
         else if(node is NameExpression)
         { NameExpression ne = (NameExpression)node;
-          ne.Name = AddLocal(ne.Name);
+          ne.Name = AddName(ne.Name);
         }
         else if(node is AssignStatement)
         { AssignStatement ass = (AssignStatement)node;
           if(ass.LHS is NameExpression)
           { NameExpression ne = (NameExpression)ass.LHS;
-            ne.Name = AddLocal(ne.Name);
+            ne.Name = AddName(ne.Name);
             ne.Name.Scope = Scope.Local;
           }
           else throw Ops.NotImplemented("Unhandled type '{0}' in NameDecorator", node.GetType());
           Walk(ass.RHS);
           return false;
         }
-        return true;
       }
-      else if(node is Suite) return true;
       else if(node is DefStatement)
       { if(innerFuncs==null)
         { innerFuncs = new ArrayList();
-          localNames = new SortedList();
+          names = new SortedList();
         }
-        inDef=true; current=node;
 
         DefStatement def = (DefStatement)node;
-        foreach(Parameter p in def.Parameters) localNames[p.Name.String] = p.Name;
-        return true;
+        foreach(Parameter p in def.Parameters)
+        { if(def.Globals!=null)
+            for(int i=0; i<def.Globals.Length; i++) if(def.Globals[i].String==p.Name.String)
+              throw Ops.SyntaxError("'{0}' is both local and global", p.Name.String);
+          names[p.Name.String] = p.Name;
+        }
+        current=def; inDef=true;
       }
-      return false;
+      return true;
     }
     
-    Name AddLocal(Name name)
-    { Name lname = (Name)localNames[name.String];
-      if(lname==null) localNames[name.String] = lname = name;
+    Name AddName(Name name)
+    { Name lname = (Name)names[name.String];
+      if(lname==null) names[name.String] = lname = name;
       return lname;
     }
 
-    Node       current;
+    DefStatement current;
     ArrayList  innerFuncs;
-    SortedList localNames;
+    SortedList names;
     bool inDef;
   }
   #endregion
@@ -116,11 +134,7 @@ public class Suite : Statement
     }
   }
 
-  public override object Execute(Frame frame)
-  { object ret = null;
-    foreach(Statement stmt in Statements) ret = stmt.Execute(frame);
-    return ret;
-  }
+  public override void Execute(Frame frame) { foreach(Statement stmt in Statements) stmt.Execute(frame); }
 
   public override void Walk(IWalker w)
   { if(w.Walk(this)) foreach(Statement stmt in Statements) stmt.Walk(w);
@@ -140,11 +154,7 @@ public class AssignStatement : Statement
     LHS.EmitSet(cg);
   }
 
-  public override object Execute(Frame frame)
-  { object value = RHS.Evaluate(frame);
-    LHS.Assign(value, frame);
-    return value;
-  }
+  public override void Execute(Frame frame) { LHS.Assign(RHS.Evaluate(frame), frame); }
 
   public override void Walk(IWalker w)
   { if(w.Walk(this))
@@ -158,10 +168,31 @@ public class AssignStatement : Statement
 }
 #endregion
 
+#region BreakStatement
+public class BreakStatement : Statement
+{ public override void Emit(CodeGenerator cg) { cg.ILG.Emit(OpCodes.Br, Label); }
+  public override void Execute(Frame frame) { throw BreakException.Value; }
+
+  public Label Label;
+}
+#endregion
+
+#region ContinueStatement
+public class ContinueStatement : Statement
+{ public override void Emit(CodeGenerator cg) { cg.ILG.Emit(OpCodes.Br, Label); }
+  public override void Execute(Frame frame) { throw ContinueException.Value; }
+
+  public Label Label;
+}
+#endregion
+
 #region DefStatement
 public class DefStatement : Statement
 { public DefStatement(string name, Parameter[] parms, Statement body)
   { Name=new Name(name); Parameters=parms; Body=body;
+    GlobalFinder gf = new GlobalFinder();
+    Body.Walk(gf);
+    Globals = gf.Globals==null || gf.Globals.Count==0 ? null : (Name[])gf.Globals.ToArray(typeof(Name));
   }
 
   public override void Emit(CodeGenerator cg)
@@ -169,6 +200,7 @@ public class DefStatement : Statement
 
     Type targetType = Inherit==null ? typeof(CallTargetN) : typeof(CallTargetFN);
     Type funcType   = Inherit==null ? typeof(CompiledFunctionN) : typeof(CompiledFunctionFN);
+    Slot funcSlot   = cg.Namespace.GetSlotForSet(Name);
 
     cg.EmitString(Name.String);
     GetParmsSlot(cg).EmitGet(cg);
@@ -177,24 +209,49 @@ public class DefStatement : Statement
     cg.ILG.Emit(OpCodes.Ldftn, impl.MethodBuilder);
     cg.EmitNew((ConstructorInfo)targetType.GetMember(".ctor")[0]);
     cg.EmitNew(funcType, new Type[] { typeof(string), typeof(Parameter[]), typeof(ClosedVar[]), targetType });
-    cg.EmitSet(Name);
+    funcSlot.EmitSet(cg);
     index++;
   }
 
-  public override object Execute(Frame frame)
-  { object func = MakeFunction(frame);
-    frame.Set(Name.String, func);
-    return func;
-  }
+  public override void Execute(Frame frame) { frame.Set(Name.String, MakeFunction(frame)); }
   
   public override void Walk(IWalker w)
   { if(w.Walk(this)) Body.Walk(w);
     w.PostWalk(this);
   }
 
-  public Name Name;
+  public Name[] Inherit, Globals;
   public Parameter[] Parameters;
+  public Name Name;
   public Statement Body;
+
+  class GlobalFinder : IWalker
+  { public void PostWalk(Node node) { }
+
+    public bool Walk(Node node)
+    { if(node is DefStatement) return false;
+      else if(node is GlobalStatement)
+      { if(Globals==null) Globals = new ArrayList();
+        foreach(Name n in ((GlobalStatement)node).Names)
+          if(assigned!=null && assigned.Contains(n.String))
+            throw Ops.SyntaxError("'{0}' assigned to before associated 'global' statement", n.String);
+          else Globals.Add(n);
+        return false;
+      }
+      else if(node is AssignStatement)
+      { AssignStatement ass = (AssignStatement)node;
+        if(ass.LHS is NameExpression)
+        { if(assigned==null) assigned=new HybridDictionary();
+          assigned[((NameExpression)ass.LHS).Name.String] = null;
+        }
+        return false;
+      }
+      return true;
+    }
+    
+    public ArrayList Globals;
+    HybridDictionary assigned;
+  }
 
   void EmitClosedGet(CodeGenerator cg)
   { if(Inherit==null) cg.ILG.Emit(OpCodes.Ldnull);
@@ -272,10 +329,8 @@ public class DefStatement : Statement
     return icg;
   }
 
-  public object MakeFunction(Frame frame) { return new InterpretedFunction(frame, Name.String, Parameters, Body); }
+  object MakeFunction(Frame frame) { return new InterpretedFunction(frame, Name.String, Parameters, Globals, Body); }
   
-  public Name[] Inherit;
-
   Slot namesSlot;
   static int index;
 }
@@ -287,9 +342,13 @@ public class ExpressionStatement : Statement
 
   public override void Emit(CodeGenerator cg)
   { Expression.Emit(cg);
-    cg.ILG.Emit(OpCodes.Pop);
+    if(Options.Interactive) cg.Namespace.GetGlobalSlot("_").EmitSet(cg);
+    else cg.ILG.Emit(OpCodes.Pop);
   }
-  public override object Execute(Frame frame) { return Expression.Evaluate(frame); }
+  public override void Execute(Frame frame)
+  { object ret = Expression.Evaluate(frame);
+    if(Options.Interactive) frame.SetGlobal("_", ret);
+  }
 
   public override void Walk(IWalker w)
   { if(w.Walk(this)) Expression.Walk(w);
@@ -302,7 +361,7 @@ public class ExpressionStatement : Statement
 
 #region IfStatement
 public class IfStatement : Statement
-{ public IfStatement(Expression test, Statement body, Statement else_) { Test=test; Body=body; Else=else_; }
+{ public IfStatement(Expression test, Statement body, Statement elze) { Test=test; Body=body; Else=elze; }
 
   public override void Emit(CodeGenerator cg)
   { Label endLab = cg.ILG.DefineLabel(), elseLab = Else==null ? new Label() : cg.ILG.DefineLabel();
@@ -317,10 +376,9 @@ public class IfStatement : Statement
     cg.ILG.MarkLabel(endLab);
   }
 
-  public override object Execute(Frame frame)
-  { if(Ops.IsTrue(Test.Evaluate(frame))) return Body.Execute(frame);
-    if(Else!=null) return Else.Execute(frame);
-    return null;
+  public override void Execute(Frame frame)
+  { if(Ops.IsTrue(Test.Evaluate(frame))) Body.Execute(frame);
+    else if(Else!=null) Else.Execute(frame);
   }
 
   public override void Walk(IWalker w)
@@ -334,6 +392,27 @@ public class IfStatement : Statement
 
   public Expression Test;
   public Statement Body, Else;
+}
+#endregion
+
+#region GlobalStatement
+public class GlobalStatement : Statement
+{ public GlobalStatement(string[] names)
+  { Names = new Name[names.Length];
+    for(int i=0; i<names.Length; i++) Names[i] = new Name(names[i], Scope.Global);
+  }
+
+  public override void Emit(CodeGenerator cg) { }
+  public override void Execute(Frame frame) { foreach(Name name in Names) frame.MarkGlobal(name.String); }
+
+  public Name[] Names;
+}
+#endregion
+
+#region PassStatement
+public class PassStatement : Statement
+{ public override void Emit(CodeGenerator cg) { }
+  public override void Execute(Frame frame) { }
 }
 #endregion
 
@@ -353,10 +432,9 @@ public class PrintStatement : Statement
     if(TrailingNewline || Expressions.Length==0) cg.EmitCall(typeof(Ops), "PrintNewline");
   }
 
-  public override object Execute(Frame frame)
+  public override void Execute(Frame frame)
   { if(Expressions!=null) foreach(Expression e in Expressions) Ops.Print(e.Evaluate(frame));
     if(TrailingNewline || Expressions.Length==0) Ops.PrintNewline();
-    return null;
   }
 
   public override void Walk(IWalker w)
@@ -375,7 +453,9 @@ public class ReturnStatement : Statement
   public ReturnStatement(Expression expression) { Expression=expression; }
 
   public override void Emit(CodeGenerator cg) { cg.EmitReturn(Expression); }
-  public override object Execute(Frame frame) { return Expression==null ? null : Expression.Evaluate(frame); }
+  public override void Execute(Frame frame)
+  { throw new ReturnException(Expression==null ? null : Expression.Evaluate(frame));
+  }
 
   public override void Walk(IWalker w)
   { if(w.Walk(this) && Expression!=null) Expression.Walk(w);
@@ -383,6 +463,57 @@ public class ReturnStatement : Statement
   }
 
   public Expression Expression;
+}
+#endregion
+
+#region WhileStatement
+public class WhileStatement : Statement
+{ public WhileStatement(Expression test, Statement body) { Test=test; Body=body; }
+
+  public override void Emit(CodeGenerator cg)
+  { Label start=cg.ILG.DefineLabel(), end=cg.ILG.DefineLabel();
+    Walk(new JumpFinder(start, end));
+    cg.ILG.MarkLabel(start);
+    Test.Emit(cg);
+    cg.EmitCall(typeof(Ops), "IsTrue");
+    cg.ILG.Emit(OpCodes.Brfalse, end);
+    Body.Emit(cg);
+    cg.ILG.Emit(OpCodes.Br, start);
+    cg.ILG.MarkLabel(end);
+  }
+
+  public override void Execute(Frame frame)
+  { while(Ops.IsTrue(Test.Evaluate(frame)))
+      try { Body.Execute(frame); }
+      catch(BreakException) { break; }
+      catch(ContinueException) { }
+  }
+
+  public override void Walk(IWalker w)
+  { if(w.Walk(this))
+    { Test.Walk(w);
+      Body.Walk(w);
+    }
+    w.PostWalk(this);
+  }
+
+  public Expression Test;
+  public Statement  Body;
+
+  class JumpFinder : IWalker
+  { public JumpFinder(Label start, Label end) { this.start=start; this.end=end; }
+
+    public void PostWalk(Node node) { }
+
+    public bool Walk(Node node)
+    { if(node is BreakStatement) ((BreakStatement)node).Label = end;
+      else if(node is ContinueStatement) ((ContinueStatement)node).Label = start;
+      else if(node is WhileStatement) return false;
+      return true;
+    }
+
+    Label start, end;
+  }
 }
 #endregion
 

@@ -21,7 +21,7 @@ enum Token
   BitAnd, BitOr, BitNot, BitXor, LogAnd, LogOr, LogNot,
   
   // keywords
-  Def, Print, Return, And, Or, Not,
+  Def, Print, Return, And, Or, Not, While, If, Elif, Else, Pass, Break, Continue, Global,
   
   // abstract
   Identifier, Literal, Assign, Compare, Call, Member, Index, Slice, Hash, List, Tuple, Suite,
@@ -40,7 +40,10 @@ public class Parser
 
   static Parser()
   { stringTokens = new Hashtable();
-    Token[] tokens = { Token.Def, Token.Print, Token.Return, Token.And, Token.Or, Token.Not };
+    Token[] tokens =
+    { Token.Def, Token.Print, Token.Return, Token.And, Token.Or, Token.Not, Token.While,
+      Token.If,  Token.Elif, Token.Else, Token.Pass, Token.Break, Token.Continue, Token.Global,
+    };
     foreach(Token token in tokens) stringTokens.Add(Enum.GetName(typeof(Token), token).ToLower(), token);
   }
 
@@ -67,13 +70,19 @@ public class Parser
     while(TryEat(Token.Or)) expr = new OrExpression(expr, ParseLowLogAnd());
     return expr;
   }
-
-  // statement := <stmt_line> | <compound_stmt>
-  // compount_stmt := <funcdef>
+  // statement     := <stmt_line> | <compound_stmt>
+  // compount_stmt := <if_stmt> | <while_stmt> | <funcdef> | <global_stmt>
   public Statement ParseStatement()
-  { if(token==Token.Def) return ParseDef();
-    return ParseStmtLine();
+  { switch(token)
+    { case Token.If:     return ParseIf();
+      case Token.While:  return ParseWhile();
+      case Token.Def:    return ParseDef();
+      case Token.Global: return ParseGlobal();
+      default: return ParseStmtLine();
+    }
   }
+
+  bool InLoop { get { return loopDepth>0; } }
 
   #region GetEscapeChar
   /*
@@ -231,6 +240,30 @@ public class Parser
     }
   }
 
+  // global_stmt := 'global' <identifier> (',' <identifier>)* EOL
+  Statement ParseGlobal()
+  { Eat(Token.Global);
+    ArrayList names = new ArrayList();
+    do
+    { Expect(Token.Identifier);
+      names.Add((string)value);
+      NextToken();
+    } while(TryEat(Token.Comma));
+    Eat(Token.EOL);
+    return new GlobalStatement((string[])names.ToArray(typeof(string)));
+  }
+
+  // if_stmt := 'if' <expression> <suite> ('elif' <expression> <suite>)* ('else' <suite>)?
+  Statement ParseIf()
+  { if(token!=Token.If && token!=Token.Elif) Unexpected(token);
+    NextToken();
+    Expression test = ParseExpression();
+    Statement  body = ParseSuite(), elze=null;
+    if(token==Token.Elif) elze = ParseIf();
+    else if(TryEat(Token.Else)) elze = ParseSuite();
+    return new IfStatement(test, body, elze);
+  }
+
   // logand := <compare> ('&&' <compare>)*
   Expression ParseLogAnd()
   { Expression expr = ParseCompare();
@@ -263,7 +296,12 @@ public class Parser
   Expression ParseMember()
   { Expression expr = ParsePrimary();
     while(true)
-    { if(TryEat(Token.Period)) throw new NotImplementedException();
+    { if(TryEat(Token.Period))
+      { Expect(Token.Identifier);
+        string attr = (string)value;
+        NextToken();
+        return new AttrExpression(expr, attr);
+      }
       else if(TryEat(Token.LParen))
       { expr = new CallExpression(expr, ParseArguments());
         Eat(Token.RParen);
@@ -283,11 +321,43 @@ public class Parser
       case Token.Identifier: expr = new NameExpression(new Name((string)value)); break;
       case Token.LParen:
         NextToken();
-        expr = ParseExpression();
-        if(TryEat(Token.Comma))
-        { throw new NotImplementedException("tuples");
+        if(token==Token.RParen) expr = new TupleExpression();
+        else
+        { expr = ParseExpression();
+          if(token==Token.Comma)
+          { NextToken();
+            ArrayList list = new ArrayList();
+            list.Add(expr);
+            while(token!=Token.RParen) { list.Add(ParseExpression()); if(!TryEat(Token.Comma)) break; }
+            expr = new TupleExpression((Expression[])list.ToArray(typeof(Expression)));
+          }
         }
         Expect(Token.RParen);
+        break;
+      case Token.LBracket:
+        NextToken();
+        if(token==Token.RBracket) expr = new ListExpression();
+        else
+        { ArrayList list = new ArrayList();
+          while(token!=Token.RBracket) { list.Add(ParseExpression()); if(!TryEat(Token.Comma)) break; }
+          expr = new ListExpression((Expression[])list.ToArray(typeof(Expression)));
+        }
+        Expect(Token.RBracket);
+        break;
+      case Token.LBrace:
+        NextToken();
+        if(token==Token.RBrace) expr = new HashExpression();
+        else
+        { ArrayList list = new ArrayList();
+          while(token!=Token.RBrace)
+          { Expression e = ParseExpression();
+            Eat(Token.Colon);
+            list.Add(new DictionaryEntry(e, ParseExpression()));
+            if(!TryEat(Token.Comma)) break;
+          }
+          expr = new HashExpression((DictionaryEntry[])list.ToArray(typeof(DictionaryEntry)));
+        }
+        Expect(Token.RBrace);
         break;
       default: Unexpected(token); return null;
     }
@@ -346,31 +416,53 @@ public class Parser
     }
   }
 
-  // simple_stmt := <expr_stmt> | <print_stmt> | <return_stmt>
-  // return_stmt := return <expression>?
+  // simple_stmt := <expr_stmt> | <print_stmt>
   Statement ParseSimpleStmt()
   { if(token==Token.Print) return ParsePrintStmt();
-    if(TryEat(Token.Return))
-    { if(token==Token.EOL || token==Token.Semicolon) return new ReturnStatement();
-      return new ReturnStatement(ParseExpression());
-    }
     return ParseExprStmt();
   }
 
-  // stmt_line := <simple_stmt> (';' <simple_stmt>)* [';'] (NEWLINE | EOF)
+  // stmt_line := <break_stmt> | <continue_stmt> | <pass_stmt>  | <return_stmt> |
+  //              <simple_stmt> (';' <simple_stmt>)* [';'] (NEWLINE | EOF)
+  // break_stmt    := 'break' EOL
+  // continue_stmt := 'continue' EOL
+  // pass_stmt     := 'pass' EOL
+  // return_stmt := return <expression>?
   Statement ParseStmtLine()
-  { Statement stmt = ParseSimpleStmt();
-    if(TryEat(Token.Semicolon))
-    { ArrayList stmts = new ArrayList();
-      stmts.Add(stmt);
-      while(true)
-      { if(TryEat(Token.EOL)) break;
-        stmts.Add(ParseSimpleStmt());
-        if(!TryEat(Token.Semicolon)) break;
-      }
-      stmt = new Suite((Statement[])stmts.ToArray(typeof(Statement)));
+  { Statement stmt;
+    switch(token)
+    { case Token.Break:
+        if(!InLoop) throw Ops.SyntaxError("'break' encountered outside loop");
+        NextToken();
+        stmt = new BreakStatement();
+        break;
+      case Token.Continue:
+        if(!InLoop) throw Ops.SyntaxError("'break' encountered outside loop");
+        NextToken();
+        stmt = new ContinueStatement();
+        break;
+      case Token.Pass:
+        NextToken();
+        stmt = new PassStatement();
+        break;
+      case Token.Return:
+        NextToken();
+        stmt = token==Token.EOL ? new ReturnStatement() : new ReturnStatement(ParseExpression());
+        break;
+      default:
+        stmt = ParseSimpleStmt();
+        if(TryEat(Token.Semicolon))
+        { ArrayList stmts = new ArrayList();
+          stmts.Add(stmt);
+          while(token!=Token.EOL)
+          { stmts.Add(ParseSimpleStmt());
+            if(!TryEat(Token.Semicolon)) break;
+          }
+          stmt = new Suite((Statement[])stmts.ToArray(typeof(Statement)));
+        }
+        break;
     }
-    TryEat(Token.EOL);
+    Eat(Token.EOL);
     return stmt;
   }
 
@@ -436,6 +528,16 @@ public class Parser
     return ParseMember();
   }
 
+  // while_stmt := 'while' <expression> <suite>
+  Statement ParseWhile()
+  { Eat(Token.While);
+    Expression expr = ParseExpression();
+    loopDepth++;
+    Statement body = ParseSuite();
+    loopDepth--;
+    return new WhileStatement(expr, body);
+  }
+
   Token PeekToken()
   { if(nextToken!=Token.None) return nextToken;
     return nextToken = ReadToken(ref nextValue);
@@ -444,18 +546,14 @@ public class Parser
   char ReadChar()
   { char c;
     if(lastChar!=0) { c=lastChar; lastChar=(char)0; return c; }
-    if(pos>=data.Length) { indent=-1; return (char)0; }
+    else if(pos>=data.Length) { indent=-1; return (char)0; }
     c = data[pos++]; column++;
-    if(c=='\n') { line++; column=1; indent=0; pastIndent=false; }
+    if(c=='\n') { line++; column=1; }
     else if(c=='\r')
     { if(pos<data.Length && data[pos]=='\n') pos++;
-      c='\n'; line++; column=1; indent=0; pastIndent=false;
+      c='\n'; line++; column=1;
     }
     else if(c==0) c = ' ';
-    else if(!pastIndent)
-    { if(char.IsWhiteSpace(c)) indent++;
-      else pastIndent=true;
-    }
     return c;
   }
 
@@ -464,7 +562,12 @@ public class Parser
   Token ReadToken(ref object value)
   { char c;
     while(true)
-    { do c=ReadChar(); while(c!='\n' && c!=0 && char.IsWhiteSpace(c));
+    { if(token==Token.EOL)
+      { indent=0;
+        do { c=ReadChar(); indent++; } while(c!='\n' && c!=0 && char.IsWhiteSpace(c));
+        if(c=='\n') indent--;
+      }
+      else do c=ReadChar(); while(c!='\n' && c!=0 && char.IsWhiteSpace(c));
 
       if(char.IsDigit(c))
       { string s = string.Empty;
@@ -618,9 +721,8 @@ public class Parser
   string     sourceFile, data;
   Token      token=Token.None, nextToken=Token.None;
   object     value, nextValue;
-  int        line=1, column=1, pos, indent;
+  int        line=1, column=1, pos, indent, loopDepth;
   char       lastChar;
-  bool       pastIndent;
   
   static Hashtable stringTokens;
 }

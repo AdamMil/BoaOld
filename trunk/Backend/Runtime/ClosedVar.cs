@@ -3,7 +3,7 @@ using System;
 namespace Boa.Runtime
 {
 
-public class ClosedVar
+public sealed class ClosedVar
 { public ClosedVar(string name) { Name=name; }
   public string Name;
   public object Value;

@@ -134,7 +134,22 @@
                     BuildAction = "Compile"
                 />
                 <File
+                    RelPath = "Runtime\BoaType.cs"
+                    SubType = "Code"
+                    BuildAction = "Compile"
+                />
+                <File
                     RelPath = "Runtime\ClosedVar.cs"
+                    SubType = "Code"
+                    BuildAction = "Compile"
+                />
+                <File
+                    RelPath = "Runtime\Dict.cs"
+                    SubType = "Code"
+                    BuildAction = "Compile"
+                />
+                <File
+                    RelPath = "Runtime\DynamicType.cs"
                     SubType = "Code"
                     BuildAction = "Compile"
                 />
@@ -159,12 +174,27 @@
                     BuildAction = "Compile"
                 />
                 <File
+                    RelPath = "Runtime\List.cs"
+                    SubType = "Code"
+                    BuildAction = "Compile"
+                />
+                <File
                     RelPath = "Runtime\Module.cs"
                     SubType = "Code"
                     BuildAction = "Compile"
                 />
                 <File
                     RelPath = "Runtime\Ops.cs"
+                    SubType = "Code"
+                    BuildAction = "Compile"
+                />
+                <File
+                    RelPath = "Runtime\Reflection.cs"
+                    SubType = "Code"
+                    BuildAction = "Compile"
+                />
+                <File
+                    RelPath = "Runtime\Tuple.cs"
                     SubType = "Code"
                     BuildAction = "Compile"
                 />
