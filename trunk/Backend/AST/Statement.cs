@@ -8,10 +8,8 @@ using Boa.Runtime;
 namespace Boa.AST
 {
 
+// TODO: using exceptions is extremely slow! stop it!
 #region Exceptions (used to aid implementation)
-public class BreakException : Exception
-{ public static BreakException Value = new BreakException();
-}
 public class ContinueException : Exception
 { public static ContinueException Value = new ContinueException();
 }
@@ -171,7 +169,7 @@ public class AssignStatement : Statement
 #region BreakStatement
 public class BreakStatement : Statement
 { public override void Emit(CodeGenerator cg) { cg.ILG.Emit(OpCodes.Br, Label); }
-  public override void Execute(Frame frame) { throw BreakException.Value; }
+  public override void Execute(Frame frame) { throw new StopIterationException(); }
 
   public Label Label;
 }
@@ -395,6 +393,60 @@ public class IfStatement : Statement
 }
 #endregion
 
+#region ImportFromStatement
+public class ImportFromStatement : Statement
+{ public ImportFromStatement(string module, params ImportName[] names) { Module=module; Names=names; }
+
+  public override void Emit(CodeGenerator cg)
+  { cg.TypeGenerator.ModuleField.EmitGet(cg);
+    cg.EmitString(Module);
+    if(Names[0].Name=="*") cg.EmitCall(typeof(Ops), "ImportStar");
+    else
+    { string[] names=new string[Names.Length], asNames=new string[Names.Length];
+      for(int i=0; i<Names.Length; i++) { names[i]=Names[i].Name; asNames[i]=Names[i].AsName; }
+      cg.EmitStringArray(names);
+      cg.EmitStringArray(asNames);
+      cg.EmitCall(typeof(Ops), "ImportFrom");
+    }
+  }
+
+  public override void Execute(Frame frame)
+  { if(Names[0].Name=="*") Ops.ImportStar(frame.Module, Module);
+    else
+    { string[] names=new string[Names.Length], asNames=new string[Names.Length];
+      for(int i=0; i<Names.Length; i++) { names[i]=Names[i].Name; asNames[i]=Names[i].AsName; }
+      Ops.ImportFrom(frame.Module, Module, names, asNames);
+    }
+  }
+
+  public ImportName[] Names;
+  public string Module;
+}
+#endregion
+
+#region ImportStatement
+public class ImportStatement : Statement
+{ public ImportStatement(params ImportName[] names) { Names=names; }
+
+  public override void Emit(CodeGenerator cg)
+  { string[] names=new string[Names.Length], asNames=new string[Names.Length];
+    for(int i=0; i<Names.Length; i++) { names[i]=Names[i].Name; asNames[i]=Names[i].AsName; }
+    cg.TypeGenerator.ModuleField.EmitGet(cg);
+    cg.EmitStringArray(names);
+    cg.EmitStringArray(asNames);
+    cg.EmitCall(typeof(Ops), "Import");
+  }
+
+  public override void Execute(Frame frame)
+  { string[] names=new string[Names.Length], asNames=new string[Names.Length];
+    for(int i=0; i<Names.Length; i++) { names[i]=Names[i].Name; asNames[i]=Names[i].AsName; }
+    Ops.Import(frame.Module, names, asNames);
+  }
+
+  public ImportName[] Names;
+}
+#endregion
+
 #region GlobalStatement
 public class GlobalStatement : Statement
 { public GlobalStatement(string[] names)
@@ -485,7 +537,7 @@ public class WhileStatement : Statement
   public override void Execute(Frame frame)
   { while(Ops.IsTrue(Test.Evaluate(frame)))
       try { Body.Execute(frame); }
-      catch(BreakException) { break; }
+      catch(StopIterationException) { break; }
       catch(ContinueException) { }
   }
 

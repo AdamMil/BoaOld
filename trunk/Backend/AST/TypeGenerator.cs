@@ -12,6 +12,13 @@ public class TypeGenerator
   { Assembly=assembly; TypeBuilder=typeBuilder;
   }
 
+  public Slot ModuleField
+  { get
+    { if(moduleField==null) moduleField = AddStaticSlot(Boa.Runtime.Module.FieldName, typeof(Boa.Runtime.Module));
+      return moduleField;
+    }
+  }
+
   public Slot AddStaticSlot(string name, Type type)
   { return new StaticSlot(TypeBuilder.DefineField(name, type, FieldAttributes.Public|FieldAttributes.Static));
   }
@@ -68,6 +75,7 @@ public class TypeGenerator
 
   HybridDictionary constants = new HybridDictionary();
   CodeGenerator initGen;
+  Slot moduleField;
 }
 
 } // namespace Boa.AST

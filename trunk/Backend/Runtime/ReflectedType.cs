@@ -5,6 +5,33 @@ using System.Reflection;
 namespace Boa.Runtime
 {
 
+#region NextMethod
+// simulates next() method on IEnumerator objects
+public class NextMethod : IDescriptor, ICallable
+{ NextMethod() { }
+  NextMethod(object instance) { this.instance = instance; }
+  static NextMethod()
+  { current = (ReflectedProperty)ReflectedType.FromType(typeof(IEnumerator)).LookupSlot("Current");
+    Value = new NextMethod();
+  }
+
+  public object __get__(object instance)
+  { return instance==null ? this : new NextMethod(instance);
+  }
+  
+  public object Call(params object[] args)
+  { ReflectedMethod moveNext = (ReflectedMethod)Ops.GetAttr(instance, "MoveNext");
+    if(Ops.IsTrue(moveNext.Call())) return current.__get__(instance);
+    throw new StopIterationException();
+  }
+
+  object instance;
+
+  public static readonly NextMethod Value;
+  static ReflectedProperty current;
+}
+#endregion
+
 #region ReflectedConstructor
 public class ReflectedConstructor : ReflectedMethodBase
 { public ReflectedConstructor(ConstructorInfo ci) : base(ci) { }
@@ -95,8 +122,14 @@ public abstract class ReflectedMethodBase : ICallable
 
   public string __name__ { get { return sigs[0].Name; } }
 
-  public object Call(params object[] args)
-  { throw new NotImplementedException();
+  public object Call(params object[] args) // TODO: do better binding than this
+  { foreach(MethodBase sig in sigs)
+    { ParameterInfo[] parms = sig.GetParameters();
+      if(parms.Length!=args.Length) continue;
+      for(int i=0; i<parms.Length; i++) args[i] = Ops.ConvertTo(args[i], parms[i].ParameterType);
+      return sig.IsConstructor ? ((ConstructorInfo)sig).Invoke(args) : sig.Invoke(instance, args);
+    }
+    throw Ops.TypeError("unable to bind arguments to method {0} on {1}", __name__, sigs[0].DeclaringType.FullName);
   }
 
   internal void Add(MethodBase sig)
@@ -179,7 +212,10 @@ public class ReflectedType : BoaType
 
   public static ReflectedType FromType(Type type)
   { ReflectedType rt = (ReflectedType)types[type];
-    if(rt==null) types[type] = rt = new ReflectedType(type);
+    if(rt==null)
+    { types[type] = rt = new ReflectedType(type);
+      rt.Initialize();
+    }
     return rt;
   }
 
@@ -200,10 +236,15 @@ public class ReflectedType : BoaType
 
   void AddProperty(PropertyInfo pi) { dict[pi.Name] = new ReflectedProperty(pi); }
 
+  void Initialize()
+  { // add "next" method to enumerators
+    if(!dict.Contains("next") && typeof(IEnumerator).IsAssignableFrom(type)) dict["next"] = NextMethod.Value;
+  }
+
   ReflectedConstructor cons;
 
+  static Hashtable types = new Hashtable(); // assumes these fields are initialized in order
   static readonly DynamicType MyDynamicType = ReflectedType.FromType(typeof(ReflectedType));
-  static Hashtable types = new Hashtable();
 }
 #endregion
 

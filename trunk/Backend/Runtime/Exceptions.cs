@@ -16,6 +16,14 @@ public abstract class CompileTimeException : BoaException
 { public CompileTimeException(string message) : base(message) { }
 }
 
+public class EOFErrorException : RuntimeException
+{ public EOFErrorException(string message) : base(message) { }
+}
+
+public class ImportErrorException : RuntimeException
+{ public ImportErrorException(string message) : base(message) { }
+}
+
 public class IndexErrorException : RuntimeException
 { public IndexErrorException(string message) : base(message) { }
 }

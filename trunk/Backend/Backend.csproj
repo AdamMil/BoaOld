@@ -139,6 +139,11 @@
                     BuildAction = "Compile"
                 />
                 <File
+                    RelPath = "Modules\sys.cs"
+                    SubType = "Code"
+                    BuildAction = "Compile"
+                />
+                <File
                     RelPath = "Runtime\ArrayOps.cs"
                     SubType = "Code"
                     BuildAction = "Compile"
@@ -184,6 +189,11 @@
                     BuildAction = "Compile"
                 />
                 <File
+                    RelPath = "Runtime\Importer.cs"
+                    SubType = "Code"
+                    BuildAction = "Compile"
+                />
+                <File
                     RelPath = "Runtime\Interfaces.cs"
                     SubType = "Code"
                     BuildAction = "Compile"
@@ -204,7 +214,7 @@
                     BuildAction = "Compile"
                 />
                 <File
-                    RelPath = "Runtime\Reflection.cs"
+                    RelPath = "Runtime\ReflectedType.cs"
                     SubType = "Code"
                     BuildAction = "Compile"
                 />

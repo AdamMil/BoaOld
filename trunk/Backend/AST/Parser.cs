@@ -21,7 +21,7 @@ enum Token
   BitAnd, BitOr, BitNot, BitXor, LogAnd, LogOr, LogNot,
   
   // keywords
-  Def, Print, Return, And, Or, Not, While, If, Elif, Else, Pass, Break, Continue, Global,
+  Def, Print, Return, And, Or, Not, While, If, Elif, Else, Pass, Break, Continue, Global, Import, From,
   
   // abstract
   Identifier, Literal, Assign, Compare, Call, Member, Index, Slice, Hash, List, Tuple, Suite,
@@ -41,7 +41,7 @@ public class Parser
   static Parser()
   { stringTokens = new Hashtable();
     Token[] tokens =
-    { Token.Def, Token.Print, Token.Return, Token.And, Token.Or, Token.Not, Token.While,
+    { Token.Def, Token.Print, Token.Return, Token.And, Token.Or, Token.Not, Token.While, Token.Import, Token.From,
       Token.If,  Token.Elif, Token.Else, Token.Pass, Token.Break, Token.Continue, Token.Global,
     };
     foreach(Token token in tokens) stringTokens.Add(Enum.GetName(typeof(Token), token).ToLower(), token);
@@ -71,13 +71,14 @@ public class Parser
     return expr;
   }
   // statement     := <stmt_line> | <compound_stmt>
-  // compount_stmt := <if_stmt> | <while_stmt> | <funcdef> | <global_stmt>
+  // compount_stmt := <if_stmt> | <while_stmt> | <funcdef> | <global_stmt> | <import_stmt>
   public Statement ParseStatement()
   { switch(token)
     { case Token.If:     return ParseIf();
       case Token.While:  return ParseWhile();
       case Token.Def:    return ParseDef();
       case Token.Global: return ParseGlobal();
+      case Token.Import: case Token.From: return ParseImport();
       default: return ParseStmtLine();
     }
   }
@@ -186,6 +187,19 @@ public class Parser
     }
   }
   
+  // <member> '(' <argument_list> ')' | '[' <index> ']'
+  Expression ParseCallIndex()
+  { Expression expr = ParseMember();
+    while(true)
+    { if(TryEat(Token.LParen))
+      { expr = new CallExpression(expr, ParseArguments());
+        Eat(Token.RParen);
+      }
+      else if(TryEat(Token.LBracket)) throw new NotImplementedException();
+      else return expr;
+    }
+  }
+
   // compare    := <bitwise> (<compare_op> <bitwise>)*
   // compare_op := '==' | '!=' | '<' | '>' | '<=' | '>=' | '===' | '!=='
   Expression ParseCompare()
@@ -201,9 +215,7 @@ public class Parser
   // def := 'def' <identifier> '(' <param_list> ')' ':' <suite>
   Statement ParseDef()
   { Eat(Token.Def);
-    Expect(Token.Identifier);
-    string name = (string)value;
-    NextToken();
+    string name = ParseIdentifier();
     Eat(Token.LParen);
     Parameter[] parms = ParseParamList(Token.RParen);
     Eat(Token.RParen);
@@ -244,13 +256,16 @@ public class Parser
   Statement ParseGlobal()
   { Eat(Token.Global);
     ArrayList names = new ArrayList();
-    do
-    { Expect(Token.Identifier);
-      names.Add((string)value);
-      NextToken();
-    } while(TryEat(Token.Comma));
+    do names.Add(ParseIdentifier()); while(TryEat(Token.Comma));
     Eat(Token.EOL);
     return new GlobalStatement((string[])names.ToArray(typeof(string)));
+  }
+
+  string ParseIdentifier()
+  { Expect(Token.Identifier);
+    string ret = (string)value;
+    NextToken();
+    return ret;
   }
 
   // if_stmt := 'if' <expression> <suite> ('elif' <expression> <suite>)* ('else' <suite>)?
@@ -262,6 +277,48 @@ public class Parser
     if(token==Token.Elif) elze = ParseIf();
     else if(TryEat(Token.Else)) elze = ParseSuite();
     return new IfStatement(test, body, elze);
+  }
+
+  // import_stmt := 'import' <import_package> (',' <import_package>)* EOL |
+  //                'from' <module> 'import' <import_ident> (',' <import_ident>)* EOL |
+  //                'from' <module> 'import' '*' EOL
+  // import_package := <module> ('as' <identifier>)?
+  // import_ident   := <identifier> ('as' <identifier>)?
+  Statement ParseImport()
+  { Statement stmt;
+    if(TryEat(Token.From))
+    { string module = ParseModule();
+      Eat(Token.Import);
+      if(TryEat(Token.Asterisk)) stmt = new ImportFromStatement(module, new ImportName("*"));
+      else
+      { Expect(Token.Identifier);
+        ArrayList list = new ArrayList();
+        do
+        { string ident = ParseIdentifier();
+          if(token==Token.Identifier && (string)value=="as")
+          { NextToken();
+            list.Add(new ImportName(ident, ParseIdentifier()));
+          }
+          else list.Add(new ImportName(ident));
+        } while(token!=Token.EOL && !TryEat(Token.Comma));
+        stmt = new ImportFromStatement(module, (ImportName[])list.ToArray(typeof(ImportName)));
+      }
+    }
+    else
+    { Eat(Token.Import);
+      ArrayList list = new ArrayList();
+      do
+      { string module = ParseModule();
+        if(token==Token.Identifier && (string)value=="as")
+        { NextToken();
+          list.Add(new ImportName(module, ParseIdentifier()));
+        }
+        else list.Add(new ImportName(module));
+      } while(token!=Token.EOL && !TryEat(Token.Comma));
+      stmt = new ImportStatement((ImportName[])list.ToArray(typeof(ImportName)));
+    }
+    Eat(Token.EOL);
+    return stmt;
   }
 
   // logand := <compare> ('&&' <compare>)*
@@ -292,23 +349,18 @@ public class Parser
   }
   
   // member := <primary> <member_access>*
-  // member_access ::= '.' LITERAL | '(' <argument_list> ')' | '[' <index> ']'
+  // member_access ::= '.' LITERAL
   Expression ParseMember()
   { Expression expr = ParsePrimary();
-    while(true)
-    { if(TryEat(Token.Period))
-      { Expect(Token.Identifier);
-        string attr = (string)value;
-        NextToken();
-        return new AttrExpression(expr, attr);
-      }
-      else if(TryEat(Token.LParen))
-      { expr = new CallExpression(expr, ParseArguments());
-        Eat(Token.RParen);
-      }
-      else if(TryEat(Token.LBracket)) throw new NotImplementedException();
-      else return expr;
-    }
+    while(TryEat(Token.Period)) expr = new AttrExpression(expr, ParseIdentifier());
+    return expr;
+  }
+
+  // module := <identifier> ('.' <identifier>)*
+  string ParseModule()
+  { string ret = ParseIdentifier();
+    while(TryEat(Token.Period)) ret += '.' + ParseIdentifier();
+    return ret;
   }
 
   // primary := LITERAL | <ident> | '(' <expression> ')' | '[' <array_list> ']' | '{' <hash_list> '}' |
@@ -386,9 +438,8 @@ public class Parser
   { if(token==end) return new Parameter[0];
     ArrayList parms = new ArrayList();
     while(true)
-    { Expect(Token.Identifier);
-      parms.Add(new Parameter((string)value));
-      if(NextToken()==end) break;
+    { parms.Add(new Parameter(ParseIdentifier()));
+      if(token==end) break;
       Eat(Token.Comma);
     }
     return (Parameter[])parms.ToArray(typeof(Parameter));
@@ -525,7 +576,7 @@ public class Parser
     { NextToken();
       return new UnaryExpression(ParseUnary(), op);
     }
-    return ParseMember();
+    return ParseCallIndex();
   }
 
   // while_stmt := 'while' <expression> <suite>

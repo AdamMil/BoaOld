@@ -58,7 +58,7 @@ public class LogicalNotOperator : UnaryOperator
   { cg.EmitIsFalse();
     cg.EmitCall(typeof(Ops), "BoolToObject");
   }
-  public override object Evaluate(object value) { return Ops.FromBool(Ops.IsTrue(value)); }
+  public override object Evaluate(object value) { return Ops.FromBool(!Ops.IsTrue(value)); }
 }
 
 public class UnaryMinusOperator : UnaryOperator

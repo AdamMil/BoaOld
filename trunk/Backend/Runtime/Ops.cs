@@ -10,9 +10,33 @@ public sealed class Ops
   public static readonly object Missing = "<missing>"; // relies on .NET interning strings
   public static readonly DefaultBoaComparer DefaultComparer = new DefaultBoaComparer();
 
-  #region BoaEnumerator
-  public class BoaEnumerator : IEnumerator
-  { public BoaEnumerator(object o)
+  #region ISeqEnumerator
+  public class ISeqEnumerator : IEnumerator
+  { public ISeqEnumerator(ISequence seq) { this.seq=seq; index=-1; length=seq.__len__(); }
+
+    public object Current
+    { get
+      { if(index<0 || index>=length) throw new InvalidOperationException();
+        return seq.__getitem__(index);
+      }
+    }
+    
+    public bool MoveNext()
+    { if(index>=length-1) return false;
+      index++;
+      return true;
+    }
+    
+    public void Reset() { index=-1; }
+
+    ISequence seq;
+    int index, length;
+  }
+  #endregion
+
+  #region IterEnumerator
+  public class IterEnumerator : IEnumerator
+  { public IterEnumerator(object o)
     { iter = o;
       next = Ops.GetAttr(o, "next");
       Ops.GetAttr(o, "reset", out reset);
@@ -34,11 +58,40 @@ public sealed class Ops
     public void Reset()
     { if(reset==null) throw new NotImplementedException("this iterator does not implement reset()");
       Ops.Call(reset);
+      state = State.BOF;
     }
 
     enum State : byte { BOF, IN, EOF }
     object iter, current, next, reset;
     State state;
+  }
+  #endregion
+  
+  #region SeqEnumerator
+  public class SeqEnumerator : IEnumerator
+  { public SeqEnumerator(object seq)
+    { length  = Ops.ToInt(Ops.Invoke(seq, "__length__"));
+      getitem = Ops.GetAttr(seq, "__getitem__");
+      index   = -1;
+    }
+
+    public object Current
+    { get
+      { if(index<0 || index>=length) throw new InvalidOperationException();
+        return current;
+      }
+    }
+    
+    public bool MoveNext()
+    { if(index>=length-1) return false;
+      current = Ops.Call(getitem, ++index);
+      return true;
+    }
+    
+    public void Reset() { index=-1; }
+
+    object getitem, current;
+    int index, length;
   }
   #endregion
 
@@ -112,7 +165,7 @@ public sealed class Ops
   }
 
   public static object ConvertTo(object o, Type type)
-  { if(o==null) return null;
+  { if(o==null || type.IsInstanceOfType(o)) return o;
     if(type==typeof(bool)) return FromBool(IsTrue(o));
     try { return Convert.ChangeType(o, type); }
     catch(OverflowException) { throw Ops.ValueError("large value caused overflow"); }
@@ -128,13 +181,17 @@ public sealed class Ops
   { IDataDescriptor dd = desc as IDataDescriptor;
     if(dd != null) { dd.__delete__(instance); return true; }
     object dummy;
-    return TryToInvoke(desc, "__delete__", out dummy, instance);
+    return TryInvoke(desc, "__delete__", out dummy, instance);
   }
 
   public static object Divide(object a, object b)
   { if(a is int && b is int) return (int)a/(int)b;
     if(a is double && b is double) return (double)a/(double)b;
     throw TypeError("unsupported operand type(s) for /: '{0}' and '{1}'", a.GetType(), b.GetType());
+  }
+
+  public static EOFErrorException EOFError(string format, params object[] args)
+  { return new EOFErrorException(string.Format(format, args));
   }
 
   public static object Equal(object a, object b) { return a==b ? TRUE : FromBool(Compare(a,b)==0); }
@@ -183,7 +240,7 @@ public sealed class Ops
   { IDescriptor d = desc as IDescriptor;
     if(d!=null) return d.__get__(instance);
     object ret;
-    if(TryToInvoke(desc, "__get__", out ret, instance)) return ret; // TODO: this is expensive.. optimize it.
+    if(TryInvoke(desc, "__get__", out ret, instance)) return ret; // TODO: this is expensive.. optimize it.
     return desc;
   }
 
@@ -196,25 +253,66 @@ public sealed class Ops
   }
 
   public static IEnumerator GetEnumerator(object o)
-  { if(o is string) return StringOps.GetEnumerator((string)o);
-    if(o is IEnumerator) return (IEnumerator)o;
-    if(o is IEnumerable) return ((IEnumerable)o).GetEnumerator();
-    return new BoaEnumerator(Invoke(o, "__iter__"));
+  { IEnumerator e;
+    if(GetEnumerator(o, out e)) return e;
+    throw TypeError("object is not enumerable");
   }
 
   public static bool GetEnumerator(object o, out IEnumerator e)
   { if(o is string) e=StringOps.GetEnumerator((string)o);
     else if(o is IEnumerator) e=(IEnumerator)o;
     else if(o is IEnumerable) e=((IEnumerable)o).GetEnumerator();
+    else if(o is ISequence) e=new ISeqEnumerator((ISequence)o);
     else
     { object iter;
-      if(TryToInvoke(o, "__iter__", out iter)) e = new BoaEnumerator(iter);
-      else { e=null; return false; }
+      if(TryInvoke(o, "__iter__", out iter)) e = new IterEnumerator(iter);
+      else
+      { object len, getitem;
+        if(GetAttr(o, "__len__", out len) && GetAttr(o, "__getitem__", out getitem)) e = new SeqEnumerator(o);
+        else e=null;
+      }
     }
-    return true;
+    return e!=null;
+  }
+
+  public static Module GetExecutingModule()
+  { if(Frames.Count>0) return ((Frame)Frames.Peek()).Module;
+    System.Diagnostics.StackTrace trace = new System.Diagnostics.StackTrace();
+    for(int i=trace.FrameCount-1; i>=0; i--)
+    { Type type = trace.GetFrame(i).GetMethod().DeclaringType;
+      System.Reflection.FieldInfo fi = type.GetField(Module.FieldName);
+      if(fi!=null) return (Module)fi.GetValue(null);
+    }
+    throw new InvalidOperationException("No executing module");
   }
 
   public static object Identical(object a, object b) { return a==b ? TRUE : FALSE; }
+
+  public static void Import(Module module, string[] names, string[] asNames)
+  { for(int i=0; i<names.Length; i++)
+      module.__setattr__(asNames[i]==null ? names[i] : asNames[i], Importer.Import(names[i]));
+  }
+
+  public static ImportErrorException ImportError(string format, params object[] args)
+  { return new ImportErrorException(string.Format(format, args));
+  }
+
+  public static void ImportFrom(Module module, string moduleName, string[] names, string[] asNames)
+  { if(names.Length==0) return;
+    if(names[0]=="*") ImportStar(module, moduleName);
+    else
+    { object imod = Importer.Import(moduleName);
+      DynamicType dt = Ops.GetDynamicType(imod);
+      for(int i=0; i<names.Length; i++)
+        module.__setattr__(asNames[i]==null ? names[i] : asNames[i], dt.GetAttr(imod, names[i]));
+    }
+  }
+
+  public static void ImportStar(Module module, string moduleName)
+  { object imod = Importer.Import(moduleName);
+    DynamicType dt = Ops.GetDynamicType(imod);
+    foreach(string name in dt.GetAttrNames(imod)) module.__setattr__(name, dt.GetAttr(imod, name));
+  }
 
   public static IndexErrorException IndexError(string format, params object[] args)
   { return new IndexErrorException(string.Format(format, args));
@@ -232,7 +330,7 @@ public sealed class Ops
       case TypeCode.String: return ((string)o).Length != 0;
     }
     if(o is System.Collections.ICollection) return ((System.Collections.ICollection)o).Count != 0;
-    if(TryToInvoke(o, "__nonzero__", out o)) return IsTrue(o);
+    if(TryInvoke(o, "__nonzero__", out o)) return IsTrue(o);
     return true;
   }
 
@@ -299,7 +397,7 @@ public sealed class Ops
     if(s!=null) return StringOps.Quote(s);
     
     IRepresentable ir = o as IRepresentable;
-    if(ir!=null) return ir.ToReprString();
+    if(ir!=null) return ir.__repr__();
 
     Array a = o as Array;
     if(a!=null) return ArrayOps.Repr(a);
@@ -324,7 +422,13 @@ public sealed class Ops
   { IDataDescriptor dd = desc as IDataDescriptor;
     if(dd!=null) { dd.__set__(instance, value); return true; }
     object dummy;
-    return TryToInvoke(desc, "__set__", out dummy, instance, value);
+    return TryInvoke(desc, "__set__", out dummy, instance, value);
+  }
+
+  public static string Str(object o)
+  { object ret;
+    if(TryInvoke(o, "__str__", out ret)) return Ops.ToString(ret);
+    return o.ToString();
   }
 
   public static object Subtract(object a, object b)
@@ -339,18 +443,30 @@ public sealed class Ops
 
   public static object ToBoa(object o) { return o is char ? new string((char)o, 1) : o; }
 
+  public static double ToFloat(object o)
+  { if(o is double) return (double)o;
+    try { return Convert.ToDouble(o); }
+    catch(OverflowException) { throw Ops.ValueError("too big for float"); }
+    catch(InvalidCastException) { throw Ops.TypeError("expected float, found {0}", GetDynamicType(o).__name__); }
+  }
+
   public static int ToInt(object o)
   { if(o is int) return (int)o;
     try { return Convert.ToInt32(o); }
     catch(OverflowException) { throw Ops.ValueError("too big for int"); } // TODO: allow conversion to long integer?
     catch(InvalidCastException) { throw Ops.TypeError("expected int, found {0}", GetDynamicType(o).__name__); }
   }
-  
+
+  public static string ToString(object o)
+  { if(o is string) return (string)o;
+    return o.ToString();
+  }
+
   public static TypeErrorException TooFewArgs(string name, int expected, int got)
   { return TypeError("{0} requires at least {1} ({2} given)", name, expected, got);
   }
 
-  public static bool TryToInvoke(object target, string name, out object retValue, params object[] args)
+  public static bool TryInvoke(object target, string name, out object retValue, params object[] args)
   { object method;
     if(GetAttr(target, name, out method)) { retValue = Call(method, args); return true; }
     else { retValue = null; return false; }
@@ -363,6 +479,8 @@ public sealed class Ops
   public static ValueErrorException ValueError(string format, params object[] args)
   { return new ValueErrorException(string.Format(format, args));
   }
+
+  public static Stack Frames = new Stack();
 
   public static readonly object FALSE=false, TRUE=true;
   

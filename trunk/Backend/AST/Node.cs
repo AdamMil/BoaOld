@@ -15,6 +15,12 @@ public struct Argument
   public Expression Expression;
 }
 
+public struct ImportName
+{ public ImportName(string name) { Name=name; AsName=null; }
+  public ImportName(string name, string asName) { Name=name; AsName=asName; }
+  public string Name, AsName;
+}
+
 public class Name
 { public Name(string name) { String=name; Scope=Scope.Free; }
   public Name(string name, Scope scope) { String=name; Scope=scope; }

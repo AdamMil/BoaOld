@@ -50,12 +50,12 @@ public class AttrExpression : Expression
   public override void Emit(CodeGenerator cg)
   { Object.Emit(cg);
     cg.EmitString(Attribute);
-    cg.EmitCall(typeof(Ops), "GetAttr");
+    cg.EmitCall(typeof(Ops), "GetAttr", new Type[] { typeof(object), typeof(string) });
   }
   public override void EmitSet(CodeGenerator cg)
   { Object.Emit(cg);
     cg.EmitString(Attribute);
-    cg.EmitCall(typeof(Ops), "SetAttr");
+    cg.EmitCall(typeof(Ops), "SetAttr", new Type[] { typeof(object), typeof(object), typeof(string) });
   }
   public override object Evaluate(Frame frame) { return Ops.GetAttr(Object.Evaluate(frame), Attribute); }
 

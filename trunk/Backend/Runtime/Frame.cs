@@ -6,13 +6,13 @@ namespace Boa.Runtime
 {
 
 public class Frame
-{ public Frame(IDictionary locals, IDictionary globals) { Locals=locals; Globals=globals; }
-  public Frame(Module module) { Locals=Globals=module.Names; }
+{ public Frame(IDictionary locals, IDictionary globals) { Locals=locals; Module=new Module(globals); }
+  public Frame(Module module) { Locals=module.__dict__; Module=module; }
   public Frame(Frame parent) : this(parent, new HybridDictionary()) { }
   public Frame(Frame parent, IDictionary locals)
   { Locals=locals;
-    if(parent!=null) { Parent=parent; Globals=Parent.Globals; }
-    else Globals = Locals;
+    if(parent!=null) { Parent=parent; Module=parent.Module; }
+    else { Module=new Module(Locals); }
   }
 
   public object Get(string name) // TODO: eliminate double lookup
@@ -22,24 +22,22 @@ public class Frame
   }
 
   public void Set(string name, object value)
-  { if(globalNames!=null && globalNames.Contains(name)) Globals[name] = value;
+  { if(globalNames!=null && globalNames.Contains(name)) Module.__setattr__(name, value);
     else Locals[name] = value;
   }
 
-  public object GetGlobal(string name)
-  { if(Globals.Contains(name)) return Globals[name]; // TODO: eliminate double lookup
-    throw Ops.NameError("name '{0}' is not defined", name);
-  }
+  public object GetGlobal(string name) { return Module.__getattr__(name); }
 
   public void MarkGlobal(string name)
   { if(globalNames==null) globalNames = new HybridDictionary();
     globalNames[name] = name;
   }
 
-  public void SetGlobal(string name, object value) { Globals[name] = value; }
+  public void SetGlobal(string name, object value) { Ops.SetAttr(value, Module, name); }
 
   public Frame Parent;
-  public IDictionary Locals, Globals;
+  public IDictionary Locals;
+  public Module Module;
   
   HybridDictionary globalNames;
 }

@@ -24,8 +24,14 @@ public class SnippetMaker
                                        typeof(object), new Type[] { typeof(Frame) });
     FrameNamespace fns = new FrameNamespace(tg, cg);
     cg.Namespace = fns;
+
     cg.EmitArgGet(0);
     fns.FrameSlot.FieldSlot.EmitSet(cg);
+
+    cg.EmitArgGet(0);
+    cg.EmitFieldGet(typeof(Frame), "Module");
+    tg.ModuleField.EmitSet(cg);
+
     body.Emit(cg);
     if(!(body is ReturnStatement)) cg.EmitReturn(null);
     return (FrameCode)tg.FinishType().GetConstructor(Type.EmptyTypes).Invoke(null);

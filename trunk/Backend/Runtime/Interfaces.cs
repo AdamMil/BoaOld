@@ -13,7 +13,7 @@ public interface IContainer
 }
 
 public interface IRepresentable
-{ string ToReprString();
+{ string __repr__();
 }
 
 public interface IDescriptor
