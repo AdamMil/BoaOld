@@ -339,6 +339,7 @@ public class AssignStatement : Statement
           }
           else
           { // TODO: maybe reduce this to a single case that uses an enumerator (after checking lengths)?
+            // TODO: consider removing the string case by converting it to an ISequence with SequenceWrapper
             #region lots of MSIL code here
             Label notseq = cg.ILG.DefineLabel(), notstr = cg.ILG.DefineLabel(), badlen = cg.ILG.DefineLabel(),
                   end = cg.ILG.DefineLabel();

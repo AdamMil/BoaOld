@@ -54,7 +54,7 @@ public class Parser
   public static Parser FromStream(Stream stream) { return new Parser("<stream>", new StreamReader(stream)); }
   public static Parser FromString(string text) { return new Parser("<string>", new StringReader(text)); }
 
-  public Suite Parse()
+  public Statement Parse()
   { ArrayList stmts = new ArrayList();
     while(true)
     { if(TryEat(Token.EOL)) continue;
@@ -64,9 +64,9 @@ public class Parser
       stmt.SetLocation(sourceFile, line, column);
       stmts.Add(stmt);
     }
-    return new Suite((Statement[])stmts.ToArray(typeof(Statement)));
+    return stmts.Count==0 ? new PassStatement() : (Statement)new Suite((Statement[])stmts.ToArray(typeof(Statement)));
   }
-  
+
   // expression := <lowlogand> ('or' <lowlogand>)* | <lambda>
   public Expression ParseExpression()
   { if(token==Token.Lambda) return ParseLambda();
@@ -208,9 +208,9 @@ public class Parser
         Eat(Token.RParen);
       }
       else if(TryEat(Token.LBracket))
-      { Expression start = token==Token.Colon ? new ConstantExpression(0) : ParseExpression();
+      { Expression start = token==Token.Colon ? new ConstantExpression(null) : ParseExpression();
         if(TryEat(Token.Colon))
-        { Expression stop = token==Token.Colon || token==Token.RBracket ? new ConstantExpression(int.MaxValue)
+        { Expression stop = token==Token.Colon || token==Token.RBracket ? new ConstantExpression(null)
                                                                         : ParseExpression();
           Expression step = null;
           if(TryEat(Token.Colon)) step=ParseExpression();

@@ -30,8 +30,33 @@ public sealed class StringOps
     int index;
   }
   #endregion
+  
+  #region SequenceWrapper
+  public class SequenceWrapper : ISequence
+  { public SequenceWrapper(string str) { this.str = str; }
+
+    #region ISequence Members
+    public object __add__(object o) { throw Ops.TypeError("strings are immutable"); }
+    public object __getitem__(int index) { return new string(str[index], 1); }
+    object Boa.Runtime.ISequence.__getitem__(Slice slice) { return StringOps.Slice(str, slice); }
+    public int __len__() { return str.Length; }
+    public bool __contains__(object value)
+    { if(value is string)
+      { string needle = (string)value;
+        return (needle.Length==0 ? str.IndexOf(needle[0]) : str.IndexOf(needle)) != -1;
+      }
+      if(value is char) return str.IndexOf((char)value)!=-1;
+      return false;
+    }
+    #endregion
+    
+    string str;
+  }
+
+  #endregion
 
   public static IEnumerator GetEnumerator(string s) { return new BoaCharEnumerator(s); }
+
   public static string Quote(string s)
   { System.Text.StringBuilder sb = new System.Text.StringBuilder(s.Length+10);
     char quote = '\'';
@@ -57,6 +82,19 @@ public sealed class StringOps
     }
     sb.Append(quote);
     return sb.ToString();
+  }
+  
+  public static string Slice(string s, Slice slice)
+  { Tuple tup = slice.indices(s.Length);
+    int start=(int)tup.items[0], stop=(int)tup.items[1], step=(int)tup.items[2], sign=Math.Sign(step);
+    if(step<0 && start<=stop || step>0 && start>=stop) return string.Empty;
+    if(step==1) return s.Substring(start, stop-start);
+    else
+    { System.Text.StringBuilder sb = new System.Text.StringBuilder((stop-start+step-sign)/step);
+      if(step<0) for(; start>stop; start+=step) sb.Append(s[start]);
+      else for(; start<stop; start+=step) sb.Append(s[start]);
+      return sb.ToString();
+    }
   }
 }
 

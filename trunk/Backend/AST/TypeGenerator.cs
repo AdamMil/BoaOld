@@ -84,10 +84,10 @@ public class TypeGenerator
     }
     else if(value is Slice)
     { Slice slice = (Slice)value;
-      cg.EmitInt(slice.start);
-      cg.EmitInt(slice.stop);
-      cg.EmitInt(slice.step);
-      cg.EmitNew(typeof(Slice), new Type[] { typeof(int), typeof(int), typeof(int) });
+      cg.EmitConstant(slice.start);
+      cg.EmitConstant(slice.stop);
+      cg.EmitConstant(slice.step);
+      cg.EmitNew(typeof(Slice), new Type[] { typeof(object), typeof(object), typeof(object) });
     }
     else switch(Convert.GetTypeCode(value)) // TODO: see if this is faster than using 'is'
     { case TypeCode.Int32:

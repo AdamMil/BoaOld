@@ -512,7 +512,8 @@ public sealed class Ops
     return SequenceSlice(seq, (int)tup.items[0], (int)tup.items[1], (int)tup.items[2]);
   }
   public static List SequenceSlice(ISequence seq, int start, int stop, int step)
-  { int sign = Math.Sign(step);
+  { if(step<0 && start<=stop || step>0 && start>=stop) return new List();
+    int sign = Math.Sign(step);
     List ret = new List((stop-start+step-sign)/step);
     if(step<0) for(; start>stop; start+=step) ret.append(seq.__getitem__(start));
     else for(; start<stop; start+=step) ret.append(seq.__getitem__(start));
@@ -587,7 +588,7 @@ public sealed class Ops
   }
 
   public static TypeErrorException TooFewArgs(string name, int expected, int got)
-  { return TypeError("{0} requires at least {1} ({2} given)", name, expected, got);
+  { return TypeError("{0} requires at least {1} arguments ({2} given)", name, expected, got);
   }
 
   public static bool TryInvoke(object target, string name, out object retValue, params object[] args)
@@ -612,6 +613,10 @@ public sealed class Ops
   { ValueErrorException e = new ValueErrorException(string.Format(format, args));
     e.SetPosition(node);
     return e;
+  }
+
+  public static TypeErrorException WrongNumArgs(string name, int expected, int got)
+  { return TypeError("{0} requires {1} arguments ({2} given)", name, expected, got);
   }
 
   public static Stack Frames = new Stack();

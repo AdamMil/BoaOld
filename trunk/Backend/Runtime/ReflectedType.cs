@@ -42,13 +42,33 @@ public class NextMethod : IDescriptor, ICallable
 }
 #endregion
 
-#region StringReprMethod
-public class StringReprMethod : IDescriptor, ICallable
-{ public StringReprMethod() { }
-  StringReprMethod(string instance) { this.instance=instance; }
+#region StringGetItem
+public class StringGetItem : IDescriptor, ICallable
+{ public StringGetItem() { }
+  StringGetItem(string instance) { this.instance=instance; }
 
-  public object __get__(object instance) { return instance==null ? this : new StringReprMethod((string)instance); }
-  public object Call(params object[] args) { return StringOps.Quote(instance); }
+  public object __get__(object instance) { return instance==null ? this : new StringGetItem((string)instance); }
+
+  public object Call(params object[] args)
+  { if(args.Length!=1) throw Ops.WrongNumArgs("__getitem__", args.Length, 1);
+    Slice slice = args[0] as Slice;
+    return slice==null ? new string(instance[Ops.ToInt(args[0])], 1) : StringOps.Slice(instance, slice);
+  }
+
+  string instance;
+}
+#endregion
+
+#region StringRepr
+public class StringRepr : IDescriptor, ICallable
+{ public StringRepr() { }
+  StringRepr(string instance) { this.instance=instance; }
+
+  public object __get__(object instance) { return instance==null ? this : new StringRepr((string)instance); }
+  public object Call(params object[] args)
+  { if(args.Length!=0) throw Ops.WrongNumArgs("__repr__", args.Length, 0);
+    return StringOps.Quote(instance);
+  }
 
   string instance;
 }
@@ -374,9 +394,12 @@ public class ReflectedType : BoaType
       if(!dict.Contains("value")) dict["value"] = dict["Current"];
     }
     else if(type.IsSubclassOf(typeof(Delegate)))
-    { if(!dict.Contains("__call__")) dict["__call__"] = SpecialAttr.DelegateCaller.Value;
+    { dict["__call__"] = SpecialAttr.DelegateCaller.Value;
     }
-    else if(type==typeof(string)) dict["__repr__"] = new SpecialAttr.StringReprMethod();
+    else if(type==typeof(string))
+    { dict["__repr__"] = new SpecialAttr.StringRepr();
+      dict["__getitem__"] = new SpecialAttr.StringGetItem();
+    }
   }
 
   void AddConstructor(ConstructorInfo ci)
