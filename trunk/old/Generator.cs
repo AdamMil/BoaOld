@@ -677,3 +677,4 @@ internal class Generator : ICodeGenerator
 }
 
 } // namespace AdamMil.Boa
+

@@ -1662,3 +1662,4 @@ internal class Parser
 }
 
 } // namespace AdamMil.Boa
+

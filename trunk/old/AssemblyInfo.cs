@@ -12,3 +12,4 @@ using System.Runtime.CompilerServices;
 #endif
 
 [assembly: AssemblyVersion("0.1.*")]
+
