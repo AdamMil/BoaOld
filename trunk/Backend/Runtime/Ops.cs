@@ -1192,7 +1192,7 @@ public sealed class Ops
 
   public static int ToInt(object o)
   { if(o is int) return (int)o;
-    try { return Convert.ToInt32(o); }
+    try { return (int)Convert.ToDouble(o); } // TODO: this may not be efficient, but it truncates rather than rounds, which is what we want
     catch(OverflowException) { throw ValueError("too big for int"); } // TODO: allow conversion to long integer?
     catch(InvalidCastException) { throw TypeError("expected int, but got {0}", TypeName(o)); }
   }
@@ -1205,14 +1205,14 @@ public sealed class Ops
       if(lv<0 || lv>uint.MaxValue) throw ValueError("too big for uint");
       return (uint)lv;
     }
-    try { return Convert.ToUInt32(o); }
+    try { return (uint)Convert.ToDouble(o); }
     catch(OverflowException) { throw ValueError("too big for uint"); } // TODO: allow conversion to long integer?
     catch(InvalidCastException) { throw TypeError("expected uint, but got {0}", TypeName(o)); }
   }
 
   public static long ToLong(object o)
   { if(o is long) return (long)o;
-    try { return Convert.ToInt64(o); }
+    try { return (long)Convert.ToDouble(o); }
     catch(OverflowException) { throw ValueError("too big for long"); } // TODO: allow conversion to long integer?
     catch(InvalidCastException) { throw TypeError("expected long, but got {0}", TypeName(o)); }
   }
@@ -1220,7 +1220,7 @@ public sealed class Ops
   public static ulong ToULong(object o)
   { if(o is long) return (ulong)(long)o;
     if(o is ulong) return (ulong)o;
-    try { return Convert.ToUInt64(o); }
+    try { return (ulong)Convert.ToDouble(o); }
     catch(OverflowException) { throw ValueError("too big for ulong"); } // TODO: allow conversion to long integer?
     catch(InvalidCastException) { throw TypeError("expected ulong, but got {0}", TypeName(o)); }
   }

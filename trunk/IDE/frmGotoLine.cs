@@ -88,7 +88,7 @@ public class GotoLineForm : Form
   }
 
   void textBox_KeyPress(object sender, System.Windows.Forms.KeyPressEventArgs e)
-  { if(!char.IsDigit(e.KeyChar)) e.Handled=true;
+  { if(!char.IsDigit(e.KeyChar) && !char.IsControl(e.KeyChar)) e.Handled=true;
   }
 }
 

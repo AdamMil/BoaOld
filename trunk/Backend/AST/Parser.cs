@@ -864,7 +864,7 @@ public class Parser
       case Token.Exec:
       { NextToken();
         Expression e = ParseExpression(), globals=null, locals=null;
-        if(TryEat(Token.In))
+        if(TryEat(Token.In)) // FIXME: "x in y" is gobbled up by ParseExpression()
         { bool old = bareTuples;
           bareTuples = false;
           globals = ParseExpression();

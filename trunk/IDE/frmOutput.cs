@@ -22,7 +22,17 @@ public class OutputForm : System.Windows.Forms.Form
     }
 
     public override void Write(char value)
-    { bool end = box.SelectionStart==box.TextLength;
+    { if(App.MainForm.RedirectStdout)
+      { if(value=='\r') return; // avoid a bug in ICSharpCode.TextEditor that causes two newlines to be added
+        EditForm form = App.MainForm.ActiveMdiChild as EditForm;
+        if(form!=null)
+        { ICSharpCode.TextEditor.Document.IDocument doc = form.immediate.Document;
+          doc.Insert(doc.TextLength, value.ToString());
+          return;
+        }
+      }
+
+      bool end = box.SelectionStart==box.TextLength;
       if(box.TextLength==box.MaxLength) box.Text = box.Text.Substring(box.TextLength/2);
       box.Text += value;
       if(end)
@@ -32,7 +42,16 @@ public class OutputForm : System.Windows.Forms.Form
     }
     
     public override void Write(string value)
-    { bool end = box.SelectionStart==box.TextLength;
+    { if(App.MainForm.RedirectStdout)
+      { EditForm form = App.MainForm.ActiveMdiChild as EditForm;
+        if(form!=null)
+        { ICSharpCode.TextEditor.Document.IDocument doc = form.immediate.Document;
+          doc.Insert(doc.TextLength, value);
+          return;
+        }
+      }
+
+      bool end = box.SelectionStart==box.TextLength;
       if(value.Length>box.MaxLength) value = value.Substring(0, box.MaxLength);
       int remove = box.TextLength+value.Length - box.MaxLength;
       if(remove>0) box.Text = box.Text.Substring(Math.Max(box.TextLength/2, remove));

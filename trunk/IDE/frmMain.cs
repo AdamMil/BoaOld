@@ -36,6 +36,7 @@ namespace Boa.IDE
     System.Windows.Forms.MenuItem menuSep4;
     System.Windows.Forms.MenuItem menuSep3;
     System.Windows.Forms.MenuItem menuAutoChdir;
+    private System.Windows.Forms.MenuItem menuRedirectStdout;
     OutputForm outputForm;
   
 		public MainForm()
@@ -44,6 +45,7 @@ namespace Boa.IDE
 		}
 
     public bool AutoChdir { get { return menuAutoChdir.Checked; } }
+    public bool RedirectStdout { get { return menuRedirectStdout.Checked; } }
 
 		#region Windows Form Designer generated code
 		void InitializeComponent()
@@ -77,7 +79,7 @@ namespace Boa.IDE
       this.menuCascade = new System.Windows.Forms.MenuItem();
       this.menuHorz = new System.Windows.Forms.MenuItem();
       this.menuVert = new System.Windows.Forms.MenuItem();
-      this.SuspendLayout();
+      this.menuRedirectStdout = new System.Windows.Forms.MenuItem();
       // 
       // menuBar
       // 
@@ -209,7 +211,8 @@ namespace Boa.IDE
                                                                               this.menuExamine,
                                                                               this.menuRun,
                                                                               this.menuSep3,
-                                                                              this.menuAutoChdir});
+                                                                              this.menuAutoChdir,
+                                                                              this.menuRedirectStdout});
       this.menuDebug.MergeOrder = 1;
       this.menuDebug.MergeType = System.Windows.Forms.MenuMerge.MergeItems;
       this.menuDebug.Text = "&Debug";
@@ -236,7 +239,7 @@ namespace Boa.IDE
       // 
       this.menuAutoChdir.Checked = true;
       this.menuAutoChdir.Index = 3;
-      this.menuAutoChdir.Text = "Auto chdir on Run";
+      this.menuAutoChdir.Text = "Auto chdir to file directory on Run";
       this.menuAutoChdir.Click += new System.EventHandler(this.menuToggleCheck_Click);
       // 
       // menuWindow
@@ -282,6 +285,12 @@ namespace Boa.IDE
       this.menuVert.Text = "Tile Vertically";
       this.menuVert.Click += new System.EventHandler(this.menuVert_Click);
       // 
+      // menuRedirectStdout
+      // 
+      this.menuRedirectStdout.Index = 4;
+      this.menuRedirectStdout.Text = "Redirect stdout to immediate";
+      this.menuRedirectStdout.Click += new System.EventHandler(this.menuToggleCheck_Click);
+      // 
       // MainForm
       // 
       this.AutoScaleBaseSize = new System.Drawing.Size(5, 13);
@@ -292,7 +301,6 @@ namespace Boa.IDE
       this.Name = "MainForm";
       this.Text = "Boa IDE";
       this.WindowState = System.Windows.Forms.FormWindowState.Maximized;
-      this.ResumeLayout(false);
 
     }
 		#endregion
@@ -366,7 +374,7 @@ namespace Boa.IDE
 
       menuRedo.Enabled = rich!=null && rich.Document.UndoStack.CanRedo;
       menuUndo.Enabled = rich!=null && rich.Document.UndoStack.CanUndo || text!=null && text.CanUndo;
-      menuGotoLine.Enabled = menuFind.Enabled = text!=null;
+      menuGotoLine.Enabled = menuFind.Enabled = rich!=null || text!=null;
       
       menuFindNext.Enabled = false;
     }
@@ -393,7 +401,11 @@ namespace Boa.IDE
         { int line = gl.Line;
           if(line<0) return;
 
-          if(ctl is TextBoxBase)
+          if(ctl is BoaBox)
+          { BoaBox box = (BoaBox)ctl;
+            box.ActiveTextAreaControl.Caret.Line = Math.Max(1, Math.Min(line, box.Document.TotalNumberOfLines))-1;
+          }
+          else if(ctl is TextBoxBase)
           { TextBoxBase box = (TextBoxBase)ctl;
             string[] lines = App.GetRawLines(box);
             int pos=0;

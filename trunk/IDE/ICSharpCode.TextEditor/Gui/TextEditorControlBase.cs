@@ -553,6 +553,7 @@ namespace ICSharpCode.TextEditor
 			editactions[Keys.PageDown | Keys.Shift] = new ShiftMovePageDown();
 			
 			editactions[Keys.Return] = new Return();
+			editactions[Keys.Return | Keys.Alt] = new Return();
 			editactions[Keys.Tab] = new Tab();
 			editactions[Keys.Tab | Keys.Shift] = new ShiftTab();
 			editactions[Keys.Back] = new Backspace();

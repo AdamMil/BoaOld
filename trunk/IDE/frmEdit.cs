@@ -16,6 +16,7 @@ public class EditForm : System.Windows.Forms.Form
 	  boaFrame = new Frame(module);
 
     module.__setattr__("__builtins__", Importer.Import("__builtin__"));
+    module.__setattr__("__name__", "__boaide__");
 
 	  InitializeComponent();
 	  edit.Focus();
@@ -36,19 +37,7 @@ public class EditForm : System.Windows.Forms.Form
     modified = false;
   }
 
-  public void Run()
-  { Run(edit.Text, false);
-    Options.Interactive = false;
-
-    if(edit.Text.Trim()=="") return;
-    try
-    { Statement stmt = Parser.FromString(edit.Text).Parse();
-      stmt.PostProcessForCompile();
-      SnippetMaker.Generate(stmt).Run(boaFrame);
-    }
-    catch(Exception ex) { immediate.AppendLine("Error {0}: {1}", ex.GetType().Name, ex.Message); }
-  }
-
+  public void Run() { Run(edit.Text, false); }
   public void Run(string code, bool interactive)
   { if(code.Trim().Length==0) return;
 
@@ -92,7 +81,6 @@ public class EditForm : System.Windows.Forms.Form
     this.immediate = new Boa.IDE.ImmediateBox();
     this.edit = new Boa.IDE.BoaBox();
     this.acbox = new Boa.IDE.AutoCompleteBox();
-    this.lblCode = new System.Windows.Forms.Label();
     this.lblImmediate = new System.Windows.Forms.Label();
     this.pnlCode = new System.Windows.Forms.Panel();
     this.pnlImmediate = new System.Windows.Forms.Panel();
@@ -127,11 +115,11 @@ public class EditForm : System.Windows.Forms.Form
     this.edit.ConvertTabsToSpaces = true;
     this.edit.EnableFolding = false;
     this.edit.Encoding = ((System.Text.Encoding)(resources.GetObject("edit.Encoding")));
-    this.edit.Location = new System.Drawing.Point(0, 16);
+    this.edit.Location = new System.Drawing.Point(0, 0);
     this.edit.Name = "edit";
     this.edit.ShowInvalidLines = false;
     this.edit.ShowLineNumbers = false;
-    this.edit.Size = new System.Drawing.Size(656, 272);
+    this.edit.Size = new System.Drawing.Size(656, 288);
     this.edit.TabIndent = 2;
     this.edit.TabIndex = 0;
     // 
@@ -143,16 +131,6 @@ public class EditForm : System.Windows.Forms.Form
     this.acbox.Size = new System.Drawing.Size(208, 106);
     this.acbox.TabIndex = 4;
     this.acbox.Visible = false;
-    // 
-    // lblCode
-    // 
-    this.lblCode.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
-      | System.Windows.Forms.AnchorStyles.Right)));
-    this.lblCode.Location = new System.Drawing.Point(0, 0);
-    this.lblCode.Name = "lblCode";
-    this.lblCode.Size = new System.Drawing.Size(656, 16);
-    this.lblCode.TabIndex = 2;
-    this.lblCode.Text = "Source code";
     // 
     // lblImmediate
     // 
@@ -166,7 +144,6 @@ public class EditForm : System.Windows.Forms.Form
     // 
     // pnlCode
     // 
-    this.pnlCode.Controls.Add(this.lblCode);
     this.pnlCode.Controls.Add(this.edit);
     this.pnlCode.Dock = System.Windows.Forms.DockStyle.Fill;
     this.pnlCode.Location = new System.Drawing.Point(0, 0);
@@ -258,12 +235,11 @@ public class EditForm : System.Windows.Forms.Form
   internal Frame boaFrame;
   internal AutoCompleteBox acbox;
   BoaBox edit;
-  ImmediateBox immediate;
+  internal ImmediateBox immediate;
   string filename;
   bool modified;
 
   System.Windows.Forms.Label lblImmediate;
-  System.Windows.Forms.Label lblCode;
   System.Windows.Forms.Panel pnlCode;
   System.Windows.Forms.Panel pnlImmediate;
   System.Windows.Forms.Splitter splitter;
