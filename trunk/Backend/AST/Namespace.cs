@@ -61,13 +61,17 @@ public class FrameNamespace : Namespace
 #region LocalNamespace
 public class LocalNamespace : Namespace
 { public LocalNamespace(Namespace parent, CodeGenerator cg) : base(parent) { codeGen=cg; }
-  
+
   public override void SetArgs(Name[] names, MethodBuilder mb)
-  { for(int i=0; i<names.Length; i++) slots[names[i].String] = new ArgSlot(mb, i, names[i].String);
+  { for(int i=0; i<names.Length; i++)
+    { Slot arg = new ArgSlot(mb, i, names[i].String);
+      slots[names[i].String] = names[i].Type==Name.Scope.Closed ? new ClosedSlot(names[i], codeGen, arg) : arg;
+    }
   }
 
   protected override Slot MakeSlot(Name name)
-  { LocalBuilder b = codeGen.ILG.DeclareLocal(typeof(object));
+  { if(name.Type==Name.Scope.Closed) return new ClosedSlot(name, codeGen);
+    LocalBuilder b = codeGen.ILG.DeclareLocal(typeof(object));
     // TODO: reenable this
     //b.SetLocalSymInfo(name);
     return new LocalSlot(b);

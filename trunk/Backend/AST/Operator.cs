@@ -14,8 +14,6 @@ public abstract class UnaryOperator : Operator
 { public abstract object Evaluate(object value);
 
   public static readonly BitwiseNotOperator BitwiseNot = new BitwiseNotOperator();
-  public static readonly DecrementOperator  Decrement  = new DecrementOperator();
-  public static readonly IncrementOperator  Increment  = new IncrementOperator();
   public static readonly LogicalNotOperator LogicalNot = new LogicalNotOperator();
   public static readonly UnaryMinusOperator UnaryMinus = new UnaryMinusOperator();
 }
@@ -53,16 +51,6 @@ public abstract class BinaryOperator : Operator
 public class BitwiseNotOperator : UnaryOperator
 { public override void Emit(CodeGenerator cg) { cg.EmitCall(typeof(Ops), "BitwiseNegate"); }
   public override object Evaluate(object value) { return Ops.BitwiseNegate(value); }
-}
-
-public class DecrementOperator : UnaryOperator
-{ public override void Emit(CodeGenerator cg) { cg.EmitCall(typeof(Ops), "Decrement"); }
-  public override object Evaluate(object value) { return Ops.Decrement(value); }
-}
-
-public class IncrementOperator : UnaryOperator
-{ public override void Emit(CodeGenerator cg) { cg.EmitCall(typeof(Ops), "Increment"); }
-  public override object Evaluate(object value) { return Ops.Increment(value); }
 }
 
 public class LogicalNotOperator : UnaryOperator

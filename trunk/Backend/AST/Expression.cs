@@ -44,8 +44,8 @@ public class AndExpression : BinaryExpression
 public abstract class BinaryExpression : Expression
 { public override void Walk(IWalker w)
   { if(w.Walk(this))
-    { w.Walk(LHS);
-      w.Walk(RHS);
+    { LHS.Walk(w);
+      RHS.Walk(w);
     }
     w.PostWalk(this);
   }
@@ -92,7 +92,7 @@ public class CallExpression : Expression
   }
 
   public override void Walk(IWalker w)
-  { if(w.Walk(this)) w.Walk(Target);
+  { if(w.Walk(this)) Target.Walk(w);
     w.PostWalk(this);
   }
 
@@ -171,9 +171,9 @@ public class TernaryExpression : Expression
   
   public override void Walk(IWalker w)
   { if(w.Walk(this))
-    { w.Walk(Test);
-      w.Walk(IfTrue);
-      w.Walk(IfFalse);
+    { Test.Walk(w);
+      IfTrue.Walk(w);
+      IfFalse.Walk(w);
     }
     w.PostWalk(this);
   }
@@ -193,7 +193,7 @@ public class UnaryExpression : Expression
   }
 
   public override void Walk(IWalker w)
-  { if(w.Walk(this)) w.Walk(Expression);
+  { if(w.Walk(this)) Expression.Walk(w);
     w.PostWalk(this);
   }
 

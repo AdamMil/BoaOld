@@ -43,6 +43,19 @@ public class ArgSlot : Slot
 }
 #endregion
 
+#region ClosedSlot
+public class ClosedSlot : Slot
+{ public ClosedSlot(Name name, CodeGenerator cg) { throw Ops.NotImplemented("ClosedSlot"); }
+  public ClosedSlot(Name name, CodeGenerator cg, Slot source) { throw Ops.NotImplemented("ClosedSlot"); }
+  
+  public override Type Type { get { throw Ops.NotImplemented("ClosedSlot"); } }
+
+  public override void EmitGet(CodeGenerator cg) { throw Ops.NotImplemented("ClosedSlot"); }
+  public override void EmitGetAddr(CodeGenerator cg) { throw Ops.NotImplemented("ClosedSlot"); }
+  public override void EmitSet(CodeGenerator cg) { throw Ops.NotImplemented("ClosedSlot"); }
+}
+#endregion
+
 #region LocalSlot
 public class LocalSlot : Slot
 { public LocalSlot(LocalBuilder lb) { builder = lb; }

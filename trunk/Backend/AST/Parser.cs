@@ -16,8 +16,8 @@ enum Token
   Period, Comma, BackQuote, LParen, RParen, LBrace, RBrace, LBracket, RBracket, Question, Colon,
   Semicolon, Percent, Plus, Minus, Asterisk, Slash,
   
-  // punctionation operators
-  Power, FloorDivide, Increment, Decrement, LeftShift, RightShift,
+  // punctuation operators
+  Power, FloorDivide, LeftShift, RightShift,
   BitAnd, BitOr, BitNot, BitXor, LogAnd, LogOr, LogNot,
   
   // keywords
@@ -26,38 +26,6 @@ enum Token
   // abstract
   Identifier, Literal, Assign, Compare, Call, Member, Index, Slice, Hash, List, Tuple, Suite,
   Module, Assembly, EOL, EOF
-}
-#endregion
-
-// TODO: move these to Node.cs (and then rename Node.cs ?)
-#region Support types
-public struct Argument
-{ public Argument(Expression expr) { Expression=expr; }
-  public Expression Expression;
-}
-
-public struct Name
-{ [Flags] public enum Flag : byte { Local=0, Free=1, Global=2, TypeMask=3, Closed=4 }
-
-  public Name(string name) { String=name; Flags=Flag.Local; }
-  public Name(string name, Flag flags) { String=name; Flags=flags; }
-
-  public bool IsFree   { get { return (Flags&Flag.TypeMask)==Flag.Free; } }
-  public bool IsGlobal { get { return (Flags&Flag.TypeMask)==Flag.Global; } }
-  public bool IsLocal  { get { return (Flags&Flag.TypeMask)==Flag.Local; } }
-  public Flag Type     { get { return Flags&Flag.TypeMask; } }
-
-  public override int GetHashCode() { return String.GetHashCode(); }
-
-  public string String;
-  public Flag Flags;
-}
-
-public struct Parameter
-{ public Parameter(Name name) { Name=name; }
-  public Parameter(string name) { Name=new Name(name); }
-  public override int GetHashCode() { return Name.GetHashCode(); }
-  public Name Name;
 }
 #endregion
 
@@ -233,10 +201,15 @@ public class Parser
     return new DefStatement(name, parms, ParseSuite());
   }
 
-  // expr_stmt := <expression> ('=' | <expression>)?
+  // expr_stmt  := <lvalue> '=' (<expression> | <tuple>)
+  // assignable := <name> | <index> | <slice>
+  // lvalue     := <assignable> | <tuple of <assignable>>
   Statement ParseExprStmt()
   { Expression lhs = ParseExpression();
-    if(TryEat(Token.Assign)) return new AssignStatement(lhs, ParseExpression());
+    if(TryEat(Token.Assign))
+    { if(!(lhs is NameExpression)) throw Ops.SyntaxError("can't assign to {0}", lhs.GetType());
+      return new AssignStatement(lhs, ParseExpression());
+    }
     else return new ExpressionStatement(lhs);
   }
 
@@ -300,8 +273,9 @@ public class Parser
     }
   }
 
-  // primary := LITERAL | <ident> | '(' <expression> ')' | '[' <array_list> ']' | '{' <hash_list> '}' | <tuple>
-  // tuple := '(' <expression> ',' ')' | '(' <expression> (',' <expression>)* ',' ')'
+  // primary := LITERAL | <ident> | '(' <expression> ')' | '[' <array_list> ']' | '{' <hash_list> '}' |
+  //            <tuple of <expression>>
+  // tuple of T := '(' (<T> ',')+ <T>? ')'
   Expression ParsePrimary()
   { Expression expr;
     switch(token)
@@ -311,7 +285,7 @@ public class Parser
         NextToken();
         expr = ParseExpression();
         if(TryEat(Token.Comma))
-        { throw new NotImplementedException();
+        { throw new NotImplementedException("tuples");
         }
         Expect(Token.RParen);
         break;
@@ -445,29 +419,21 @@ public class Parser
   { return ParseTernary();
   }
 
-  // unary     := <unary_op> <unary> | <member> <incdec_op>
-  // unary_op  := '!' | '~' | '-' | '+' | <incdec_op>
-  // incdec_op := '++' | '--'
+  // unary     := <unary_op> <unary>
+  // unary_op  := '!' | '~' | '-' | '+'
   Expression ParseUnary()
   { UnaryOperator op=null;
     switch(token)
     { case Token.LogNot: op = UnaryOperator.LogicalNot; break;
       case Token.Minus:  op = UnaryOperator.UnaryMinus; break;
       case Token.BitNot: op = UnaryOperator.BitwiseNot; break;
-      case Token.Increment: op = UnaryOperator.Increment; break;
-      case Token.Decrement: op = UnaryOperator.Decrement; break;
+      case Token.Plus:   NextToken(); return ParseUnary();
     }
     if(op!=null)
     { NextToken();
       return new UnaryExpression(ParseUnary(), op);
     }
-    Expression expr = ParseMember();
-    if(token==Token.Increment || token==Token.Decrement)
-    { expr = new UnaryExpression(expr, token==Token.Increment ? (UnaryOperator)UnaryOperator.Increment
-                                                              : (UnaryOperator)UnaryOperator.Decrement);
-      NextToken();
-    }
-    return expr;
+    return ParseMember();
   }
 
   Token PeekToken()
@@ -598,14 +564,8 @@ public class Parser
           c = ReadChar();
           if(c=='|') return Token.LogOr;
           lastChar = c; return Token.BitOr;
-        case '+':
-          c = ReadChar();
-          if(c=='+') return Token.Increment;
-          lastChar = c; return Token.Plus;
-        case '-':
-          c = ReadChar();
-          if(c=='-') return Token.Decrement;
-          lastChar = c; return Token.Minus;
+        case '+': return Token.Plus;
+        case '-': return Token.Minus;
         case '*':
           c = ReadChar();
           if(c=='*') return Token.Power;

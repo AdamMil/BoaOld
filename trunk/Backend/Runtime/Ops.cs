@@ -45,11 +45,6 @@ public class Ops
     return ic==null ? Invoke(func, "__call__") : ic.Call(args);
   }
 
-  public static object Decrement(object o)
-  { if(o is int) return (int)o-1;
-    throw Ops.TypeError("unsupported operand type for --: '{0}'", o.GetType());
-  }
-  
   public static object Divide(object a, object b)
   { if(a is int && b is int) return (int)a/(int)b;
     if(a is double && b is double) return (double)a/(double)b;
@@ -75,11 +70,6 @@ public class Ops
 
   public static object Identical(object a, object b) { return a==b ? TRUE : FALSE; }
 
-  public static object Increment(object o)
-  { if(o is int) return (int)o+1;
-    throw Ops.TypeError("unsupported operand type for ++: '{0}'", o.GetType());
-  }
-  
   public static object Invoke(object target, string name, params object[] args)
   { return Call(GetAttr(target, name), args);
   }
@@ -136,6 +126,10 @@ public class Ops
   { if(o is int) return -(int)o;
     if(o is double) return -(double)o;
     throw Ops.TypeError("unsupported operand type for -: '{0}'", o.GetType());
+  }
+
+  public static NotImplementedException NotImplemented(string format, params object[] args)
+  { return new NotImplementedException(string.Format(format, args));
   }
 
   public static object Power(object a, object b)

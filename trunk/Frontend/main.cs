@@ -1,10 +1,10 @@
-//#define COMPILED
+#define COMPILED
 
 using System;
-using Language.AST;
-using Language.Runtime;
+using Boa.AST;
+using Boa.Runtime;
 
-namespace Language.Frontend
+namespace Boa.Frontend
 {
 
 public class Text
@@ -16,12 +16,24 @@ public class Text
     while(true)
     { try
       { Console.Write(">>> ");
-        Statement stmt = Parser.FromStream(stdin).ParseStatement();
+string source = 
+@"
+def makeAdder(base):
+    def add(n): return base+n
+    return add
+a = makeAdder(4)
+b = makeAdder(6)
+print a(3), b(3)
+";
+//        Statement stmt = Parser.FromStream(stdin).ParseStatement();
+        Statement stmt = Parser.FromString(source).Parse();
         #if COMPILED
+        stmt.PostProcessForCompile();
         FrameCode code = SnippetMaker.Generate(stmt);
-break;
+        SnippetMaker.DumpAssembly();
         code.Run(topFrame);
         #else
+        stmt.PostProcessForInterpret();
         object ret = stmt.Execute(topFrame);
         if(ret!=null) Console.WriteLine(ret);
         #endif
