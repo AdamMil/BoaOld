@@ -18,10 +18,6 @@ public interface IContainer
   bool __contains__(object value);
 }
 
-public interface IRepresentable
-{ string __repr__();
-}
-
 public interface IDescriptor
 { object __get__(object instance);
 }
@@ -35,11 +31,44 @@ public interface IDynamicObject
 { DynamicType GetDynamicType();
 }
 
+public interface IFile
+{ bool canread { get; }
+  bool canseek { get; }
+  bool canwrite { get; }
+  bool closed { get; }
+  System.Text.Encoding encoding { get; set; }
+  int  length { get; }
+  void close();
+  void flush();
+  bool isatty();
+  string next();
+  byte[] read();
+  byte[] read(int bytes);
+  int readbyte();
+  string readline();
+  string readline(int size);
+  List readlines();
+  List readlines(int sizehint);
+  int seek(int offset);
+  int seek(int offset, int whence);
+  int tell();
+  void truncate();
+  void truncate(int size);
+  void write(byte[] bytes);
+  void write(string str);
+  void writebyte(int value);
+  void writelines(object sequence);
+}
+
 public interface IHasAttributes
 { List __attrs__();
   object __getattr__(string key);
   void __setattr__(string key, object value);
   void __delattr__(string key);
+}
+
+public interface IRepresentable
+{ string __repr__();
 }
 
 public interface ISequence : IContainer

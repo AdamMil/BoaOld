@@ -30,7 +30,7 @@ public abstract class CompileTimeException : BoaException
 { public CompileTimeException(string message) : base(message) { }
 }
 
-public class EOFErrorException : RuntimeException
+public class EOFErrorException : IOErrorException
 { public EOFErrorException(string message) : base(message) { }
 }
 
@@ -42,8 +42,16 @@ public class IndexErrorException : RuntimeException
 { public IndexErrorException(string message) : base(message) { }
 }
 
+public class IOErrorException : RuntimeException
+{ public IOErrorException(string message) : base(message) { }
+}
+
 public class KeyErrorException : RuntimeException
 { public KeyErrorException(string message) : base(message) { }
+}
+
+public class LookupErrorException : RuntimeException
+{ public LookupErrorException(string message) : base(message) { }
 }
 
 public class NameErrorException : RuntimeException
