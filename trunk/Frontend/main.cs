@@ -32,7 +32,7 @@ namespace Boa.Frontend
 public class Text
 { static void DoInteractive()
   { Options.Interactive = true;
-Options.Debug = false;
+Options.Debug = true;
 sys.path[1] = "c:/code/Boa/Backend/lib";
 
     Module top = new Module();

@@ -6,3 +6,5 @@ for _f in ('capitalize', 'capwords', 'center', 'count', 'expandtabs', 'find', 'i
            'swapcase', 'tobytes', 'translate', 'zfill'):
   setattr(string, _f, _method(getattr(_string, _f))) # 'string' should change to 'str'
 del _f, _string
+
+__all__ = filter(lambda n: n[0]!='_' && n[0]==n[0].lower(), dir())

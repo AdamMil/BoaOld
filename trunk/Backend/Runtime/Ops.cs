@@ -635,7 +635,7 @@ public sealed class Ops
 
   public static Module GetExecutingModule()
   { System.Diagnostics.StackTrace trace = new System.Diagnostics.StackTrace();
-    for(int i=trace.FrameCount-1; i>=0; i--)
+    for(int i=1; i<trace.FrameCount; i++)
     { Type type = trace.GetFrame(i).GetMethod().DeclaringType;
       System.Reflection.FieldInfo fi = type.GetField(Module.FieldName);
       if(fi!=null && type.IsSubclassOf(typeof(Boa.AST.Snippet))) return (Module)fi.GetValue(null);
@@ -662,42 +662,44 @@ public sealed class Ops
     if(names[0]=="*") ImportStar(module, moduleName);
     else
     { IHasAttributes mod = (IHasAttributes)Importer.Import(moduleName);
-      ISequence exports = mod.__getattr__("__all__") as ISequence;
-      if(exports==null && mod is Module) return;
 
       if(mod is ReflectedType)
       { ReflectedType rmod = (ReflectedType)mod;
         for(int i=0; i<names.Length; i++)
-          if(exports==null || exports.__contains__(names[i]))
-            module.__setattr__(asNames[i]==null ? names[i] : asNames[i], rmod.GetRawAttr(names[i]));
+          module.__setattr__(asNames[i]==null ? names[i] : asNames[i], rmod.GetRawAttr(names[i]));
       }
       else
         for(int i=0; i<names.Length; i++)
-          if(exports==null || exports.__contains__(names[i]))
-            module.__setattr__(asNames[i]==null ? names[i] : asNames[i], mod.__getattr__(names[i]));
+          module.__setattr__(asNames[i]==null ? names[i] : asNames[i], mod.__getattr__(names[i]));
     }
   }
 
   public static void ImportStar(Module module, string moduleName)
   { IHasAttributes mod = (IHasAttributes)Importer.Import(moduleName);
     ISequence exports = mod.__getattr__("__all__") as ISequence;
-    if(exports==null && mod is Module) return;
 
     if(mod is ReflectedType)
     { ReflectedType rmod = (ReflectedType)mod;
-      if(exports==null) foreach(string name in mod.__attrs__()) module.__setattr__(name, rmod.GetRawAttr(name));
+      if(exports==null)
+      { foreach(string name in mod.__attrs__()) if(name[0]!='_') module.__setattr__(name, rmod.GetRawAttr(name));
+      }
       else
         for(int i=0,len=exports.__len__(); i<len; i++)
         { string name = (string)exports.__getitem__(i);
           module.__setattr__(name, rmod.GetRawAttr(name));
         }
     }
-    else if(exports==null) foreach(string name in mod.__attrs__()) module.__setattr__(name, mod.__getattr__(name));
     else
-      for(int i=0,len=exports.__len__(); i<len; i++)
-      { string name = (string)exports.__getitem__(i);
-        module.__setattr__(name, mod.__getattr__(name));
+    { Module m = (Module)mod;
+      if(exports==null)
+      { foreach(string name in m.__dict__.Keys) if(name[0]!='_') module.__setattr__(name, mod.__getattr__(name));
       }
+      else
+        for(int i=0,len=exports.__len__(); i<len; i++)
+        { string name = (string)exports.__getitem__(i);
+          module.__setattr__(name, mod.__getattr__(name));
+        }
+    }
   }
 
   public static IndexErrorException IndexError(string format, params object[] args)

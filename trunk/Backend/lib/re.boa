@@ -4,3 +4,5 @@ import re_internal
 for _f in ('expand', 'group', 'groups', 'start', 'end', 'span'):
   setattr(MatchObject, _f, _method(getattr(re_internal.match, _f)))
 del _f, re_internal
+
+__all__ = filter(lambda n: n[0]!='_' && n[0]==n[0].lower(), dir())
