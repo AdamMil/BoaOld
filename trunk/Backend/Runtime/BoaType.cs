@@ -34,9 +34,7 @@ public abstract class BoaType : DynamicType, IDynamicObject, ICallable, IHasAttr
   #region IHasAttributes
   public List __attrs__()
   { Initialize();
-    List ret = dict.keys();
-    ret.sort();
-    return ret;
+    return dict.keys();
   }
 
   public void __delattr__(string name)

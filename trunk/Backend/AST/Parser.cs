@@ -3,9 +3,8 @@ using System.Collections;
 using System.IO;
 using Boa.Runtime;
 
-// TODO: improve diagnostics
 // TODO: allow nonparenthesized tuples
-
+// TODO: change === and !== to 'is' and 'is not'
 namespace Boa.AST
 {
 

@@ -144,6 +144,16 @@
                     BuildAction = "Compile"
                 />
                 <File
+                    RelPath = "Modules\operator.cs"
+                    SubType = "Code"
+                    BuildAction = "Compile"
+                />
+                <File
+                    RelPath = "Modules\string.cs"
+                    SubType = "Code"
+                    BuildAction = "Compile"
+                />
+                <File
                     RelPath = "Modules\sys.cs"
                     SubType = "Code"
                     BuildAction = "Compile"

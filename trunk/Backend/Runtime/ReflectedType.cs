@@ -5,33 +5,39 @@ using System.Reflection;
 namespace Boa.Runtime
 {
 
+#region Specialized attributes
+public class SpecialAttr
+{
 #region NextMethod
 // simulates next() method on IEnumerator objects
 public class NextMethod : IDescriptor, ICallable
-{ NextMethod() { }
-  NextMethod(object instance) { this.instance = instance; }
-  static NextMethod()
-  { current = (ReflectedProperty)ReflectedType.FromType(typeof(IEnumerator)).LookupSlot("Current");
-    Value = new NextMethod();
-  }
+{ public NextMethod() { }
+  NextMethod(IEnumerator instance) { this.instance = instance; }
 
-  public object __get__(object instance)
-  { return instance==null ? this : new NextMethod(instance);
-  }
+  public object __get__(object instance) { return instance==null ? this : new NextMethod((IEnumerator)instance); }
   
   public object Call(params object[] args)
-  { ReflectedMethod moveNext = (ReflectedMethod)Ops.GetAttr(instance, "MoveNext");
-    if(Ops.IsTrue(moveNext.Call())) return current.__get__(instance);
+  { if(instance.MoveNext()) return instance.Current;
     throw new StopIterationException();
   }
 
-  object instance;
-
-  public static readonly NextMethod Value;
-  static ReflectedProperty current;
+  IEnumerator instance;
 }
 #endregion
 
+#region StringReprMethod
+public class StringReprMethod : IDescriptor, ICallable
+{ public StringReprMethod() { }
+  StringReprMethod(string instance) { this.instance=instance; }
+
+  public object __get__(object instance) { return instance==null ? this : new StringReprMethod((string)instance); }
+  public object Call(params object[] args) { return StringOps.Quote(instance); }
+
+  string instance;
+}
+#endregion
+}
+#endregion
 #region ReflectedConstructor
 public class ReflectedConstructor : ReflectedMethodBase
 { public ReflectedConstructor(ConstructorInfo ci) : base(ci) { }
@@ -222,8 +228,12 @@ public class ReflectedType : BoaType
     foreach(MethodInfo mi in type.GetMethods()) AddMethod(mi);
     foreach(PropertyInfo pi in type.GetProperties()) AddProperty(pi);
 
-    if(!dict.Contains("next") && typeof(IEnumerator).IsAssignableFrom(type)) dict["next"] = NextMethod.Value;
-    // TODO: add __repr__ to string?
+    if(typeof(IEnumerator).IsAssignableFrom(type))
+    { if(!dict.Contains("next")) dict["next"] = new SpecialAttr.NextMethod();
+      if(!dict.Contains("reset")) dict["reset"] = dict["Reset"];
+      if(!dict.Contains("value")) dict["value"] = dict["Current"];
+    }
+    else if(type==typeof(string)) dict["__repr__"] = new SpecialAttr.StringReprMethod();
   }
 
   void AddConstructor(ConstructorInfo ci)
