@@ -14,7 +14,7 @@ namespace Boa.Runtime
 public class FunctionWrapper : IHasAttributes
 { public FunctionWrapper(IFancyCallable func) { this.func = func; }
 
-  protected IFancyCallable func;
+  protected internal IFancyCallable func;
 
   public List __attrs__() { return Ops.GetAttrNames(func); }
   public object __getattr__(string key) { return key=="__call__" ? this : Ops.GetAttr(func, key); }

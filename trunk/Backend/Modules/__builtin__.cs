@@ -28,7 +28,6 @@ using Boa.Runtime;
 // TODO: allow functions to return 'longint' if they'd overflow an 'int'
 // TODO: docstrings on fields and simple properties don't work because evaluating the attribute retrieves the value
 // TODO: implement reversed(): http://python.org/peps/pep-0322.html
-// TODO: add help() for functions created in boa
 // TODO: make range() and xrange() work on arbitrary integers, not only int32s
 namespace Boa.Modules
 {
@@ -551,7 +550,38 @@ of object, a help page on the object is generated.")]
   public static void help() { throw new NotImplementedException(); }
   public static void help(object o)
   { object doc;
-    if(Ops.GetAttr(o, "__doc__", out doc) && doc!=null && Ops.Str(doc)!="") Console.WriteLine(doc);
+    if(o is FunctionWrapper) o = ((FunctionWrapper)o).func;
+    if(o is Function)
+    { Function f = (Function)o;
+      Console.Write("def ");
+      Console.Write(f.Name);
+      Console.Write('(');
+      int i=0;
+      for(; i<f.NumRequired; i++)
+      { if(i!=0) Console.Write(", ");
+        Console.Write(f.ParamNames[i]);
+      }
+      for(int j=0, end=f.ParamNames.Length-(f.HasDict?1:0)-(f.HasList?1:0); i<end; i++,j++)
+      { if(i!=0) Console.Write(", ");
+        Console.Write(f.ParamNames[i]);
+        Console.Write('=');
+        Console.Write(Ops.Repr(f.Defaults[j]));
+      }
+
+      if(f.HasList)
+      { if(i++!=0) Console.Write(", ");
+        Console.Write('*');
+        Console.Write(f.ParamNames[f.ParamNames.Length-(f.HasDict?2:1)]);
+      }
+      if(f.HasDict)
+      { if(i!=0) Console.Write(", ");
+        Console.Write("**");
+        Console.Write(f.ParamNames[f.ParamNames.Length-1]);
+      }
+      Console.WriteLine("):");
+      if(Ops.GetAttr(o, "__doc__", out doc) && doc!=null && Ops.Str(doc)!="") Console.WriteLine(doc);
+    }
+    else if(Ops.GetAttr(o, "__doc__", out doc) && doc!=null && Ops.Str(doc)!="") Console.WriteLine(doc);
     else if(o is ReflectedEvent)
     { ReflectedEvent re = (ReflectedEvent)o;
       Console.WriteLine("'{0}' is an event that takes a '{1}' object",

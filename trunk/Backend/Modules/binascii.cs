@@ -384,20 +384,65 @@ public sealed class binascii
   #endregion
 
   #region qp (quoted printable)
-  public static byte[] a2b_qp(string data) { return a2b_qp(data, false); }
-  public static byte[] a2b_qp(string data, bool header){ throw new NotImplementedException(); }
   public static byte[] a2b_qp(byte[] data) { return a2b_qp(Encoding.ASCII.GetString(data), false); }
   public static byte[] a2b_qp(byte[] data, bool header) { return a2b_qp(Encoding.ASCII.GetString(data), header); }
+  public static byte[] a2b_qp(string data) { return a2b_qp(data, false); }
+  public static unsafe byte[] a2b_qp(string data, bool header)
+  { if(data.Length==0) return new byte[0];
+    byte[] output = new byte[data.Length];
 
-  public static string b2a_qp(string data) { return b2a_qp(Encoding.ASCII.GetBytes(data), false, false, false); }
-  public static string b2a_qp(string data, bool quotetabs)
-  { return b2a_qp(Encoding.ASCII.GetBytes(data), quotetabs, false, false);
+    fixed(char* dp=data)
+    fixed(byte* op=output)
+    { byte* o=op;
+      int   pos=0, lf, len, n;
+      
+      while(pos<data.Length)
+      { lf = data.IndexOf('\n', pos);
+        if(lf==-1) lf=data.Length-1;
+        len = lf-pos;
+
+        char* p=dp+pos, e=p+len;
+        char  c;
+
+        while(char.IsWhiteSpace(*e)) e--;
+        e++;
+
+        while(p<e)
+        { c=*p++;
+
+          if(c=='=')
+          { if(p+1<e)
+            { c = char.ToUpper(*p++);
+              n = c>='0' && c<='9' ? c-'0' : c>='A' && c<='F' ? c-'A'+10 : -1;
+              if(n==-1) continue;
+              c = char.ToUpper(*p++);
+              n = n = c>='0' && c<='9' ? (n<<4)+(c-'0') : c>='A' && c<='F' ? (n<<4)+(c-'A'+10) : -1;
+              if(n==-1) continue;
+              *o++ = (byte)n;
+            }
+          }
+          else if(header && c=='_') *o++ = 32;
+          else *o++ = (byte)c;
+        }
+
+        pos = lf+1;
+      }
+
+      len = (int)(o-op);
+      if(len==output.Length) return output;
+      byte[] ret = new byte[len];
+      Array.Copy(output, ret, len);
+      return ret;
+    }
   }
+
+  public static string b2a_qp(string data) { return b2a_qp(data, false, false, false); }
+  public static string b2a_qp(string data, bool quotetabs) { return b2a_qp(data, quotetabs, false, false); }
   public static string b2a_qp(string data, bool quotetabs, bool istext)
-  { return b2a_qp(Encoding.ASCII.GetBytes(data), quotetabs, istext, false);
+  { return b2a_qp(data, quotetabs, istext, false);
   }
   public static string b2a_qp(string data, bool quotetabs, bool istext, bool header)
-  { return b2a_qp(Encoding.ASCII.GetBytes(data), quotetabs, istext, header);
+  { return b2a_qp(System.Text.Encoding.ASCII.GetBytes(data), quotetabs, istext, header);
   }
 
   public static string b2a_qp(byte[] data) { return b2a_qp(data, false, false, false); }
@@ -405,7 +450,83 @@ public sealed class binascii
   public static string b2a_qp(byte[] data, bool quotetabs, bool istext)
   { return b2a_qp(data, quotetabs, istext, false);
   }
-  public static string b2a_qp(byte[] data, bool quotetabs, bool istext, bool header) { throw new NotImplementedException(); }
+  public static unsafe string b2a_qp(byte[] data, bool quotetabs, bool istext, bool header)
+  { if(data.Length==0) return string.Empty;
+
+    StringBuilder sb = new StringBuilder(data.Length*11/10);
+    int pos=0, lf, len, outlen=0, ll;
+    char[] output=null;
+    bool needLF=false;
+
+    fixed(bool* cp=qpe)
+    fixed(char* hp=hexe)
+    fixed(byte* dp=data)
+      while(pos<data.Length)
+      { lf = Array.IndexOf(data, (byte)'\n', pos);
+        if(lf==-1) { lf=data.Length-1; len=lf-pos+1; }
+        else { len=lf-pos+(istext ? 0 : 1); }
+        ll  = len*3;
+        ll += (ll/76)*2 + 6;
+        if(outlen<ll) output = new char[outlen=ll];
+
+        fixed(char* op=output)
+        { byte* p=dp+pos, e=p+len;
+          char* o=op;
+          byte  c;
+
+          while(p<e) // calculate a single QP line, without limiting to 76 characters
+          { c = *p++;
+            if(header && c==' ') *o++ = '_';
+            else if(c>125 || cp[c] || (quotetabs && (c==32 || c==9)) || ((c==10 || c==13) && !istext) ||
+                   (header && c=='_'))
+            { *o++ = '=';
+              *o++ = hp[c>>4];
+              *o++ = hp[c&15];
+            }
+            else *o++ = (char)c;
+          }
+
+          // now break it into lines no longer than 76 characters per line
+          if(needLF) sb.Append("\r\n");
+
+          len=(int)(o-op); o=op;
+          while(len>76)
+          { ll = o[75]=='=' || o[74]=='=' || o[73]=='=' ? 73 : 75;
+            sb.Append(output, (int)(o-op), ll);
+            sb.Append("=\r\n");
+            o += ll; len -= ll;
+          }
+
+          if(len==1 && o[0]=='.') sb.Append("=2E"); // some broken MTAs fail if a line contains a period by itself
+          else if(len>0)
+          { c = (byte)o[len-1];
+            if(c==32 || c==9)
+            { sb.Append(output, (int)(o-op), len-1);
+              if(len>74) sb.Append("=\r\n");
+              sb.Append(c==32 ? "=20" : "=09");
+            }
+            else sb.Append(output, (int)(o-op), len);
+          }
+
+          needLF = true;
+        }
+        
+        pos=lf+1;
+      }
+
+    return sb.ToString();
+  }
+
+  static readonly bool[] qpe = new bool[128]
+  { true,  true,  true,  true,  true,  true,  true,  true,  true,  false, true,  true,  true,  true,  true,  true,
+    true,  true,  true,  true,  true,  true,  true,  true,  true,  true,  true,  true,  true,  true,  true,  true,
+    false, true,  true,  true,  true,  false, false, false, false, false, false, false, false, false, false, false,
+    false, false, false, false, false, false, false, false, false, false, false, false, false, true,  false, false,
+    true,  false, false, false, false, false, false, false, false, false, false, false, false, false, false, false,
+    false, false, false, false, false, false, false, false, false, false, false, true,  true,  true,  true,  false,
+    true,  false, false, false, false, false, false, false, false, false, false, false, false, false, false, false,
+    false, false, false, false, false, false, false, false, false, false, false, true,  true,  true,  true,  false,
+  };
   #endregion
 
   #region uu (unix to unix)
