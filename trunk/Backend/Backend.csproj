@@ -178,6 +178,11 @@
                     BuildAction = "Compile"
                 />
                 <File
+                    RelPath = "Modules\socket.cs"
+                    SubType = "Code"
+                    BuildAction = "Compile"
+                />
+                <File
                     RelPath = "Modules\string.cs"
                     SubType = "Code"
                     BuildAction = "Compile"
