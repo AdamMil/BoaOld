@@ -23,3 +23,4 @@ public class BoaCodeProvider : CodeDomProvider
 }
 
 } // namespace AdamMil.Boa
+
