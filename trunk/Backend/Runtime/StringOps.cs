@@ -9,30 +9,6 @@ namespace Boa.Runtime
 public sealed class StringOps
 { StringOps() { }
 
-  #region BoaCharEnumerator
-  public class BoaCharEnumerator : IEnumerator
-  { public BoaCharEnumerator(string s) { str=s; index=-1; }
-
-    public object Current
-    { get
-      { if(index<0 || index>=str.Length) throw new InvalidOperationException();
-        return new string(str[index], 1);
-      }
-    }
-
-    public bool MoveNext()
-    { if(index>=str.Length-1) return false;
-      index++;
-      return true;
-    }
-
-    public void Reset() { index=-1; }
-    
-    string str;
-    int index;
-  }
-  #endregion
-  
   #region SequenceWrapper
   public class SequenceWrapper : ISequence
   { public SequenceWrapper(string str) { this.str = str; }
@@ -204,8 +180,6 @@ public sealed class StringOps
     object args, getitem;
   }
   #endregion
-
-  public static IEnumerator GetEnumerator(string s) { return new BoaCharEnumerator(s); }
 
   public static string Escape(string s)
   { StringBuilder sb = new StringBuilder(s.Length+10);
