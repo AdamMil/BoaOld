@@ -8,10 +8,23 @@ namespace Boa.Runtime
 #region Specialized attributes
 public class SpecialAttr
 {
+#region DelegateCaller
+public class DelegateCaller : IDescriptor
+{ DelegateCaller() { }
+
+  public object __get__(object instance)
+  { Delegate d = (Delegate)instance;
+    return d==null ? (object)this : new ReflectedMethod(new MethodBase[] { d.Method }, d.Target);
+  }
+  
+  public static DelegateCaller Value = new DelegateCaller();
+}
+#endregion
+
 #region NextMethod
 // simulates next() method on IEnumerator objects
 public class NextMethod : IDescriptor, ICallable
-{ public NextMethod() { }
+{ NextMethod() { }
   NextMethod(IEnumerator instance) { this.instance = instance; }
 
   public object __get__(object instance) { return instance==null ? this : new NextMethod((IEnumerator)instance); }
@@ -20,6 +33,8 @@ public class NextMethod : IDescriptor, ICallable
   { if(instance.MoveNext()) return instance.Current;
     throw new StopIterationException();
   }
+
+  public static NextMethod Value = new NextMethod();
 
   IEnumerator instance;
 }
@@ -38,6 +53,7 @@ public class StringReprMethod : IDescriptor, ICallable
 #endregion
 }
 #endregion
+
 #region ReflectedConstructor
 public class ReflectedConstructor : ReflectedMethodBase
 { public ReflectedConstructor(ConstructorInfo ci) : base(ci) { }
@@ -128,14 +144,85 @@ public abstract class ReflectedMethodBase : ICallable
 
   public string __name__ { get { return sigs[0].Name; } }
 
-  public object Call(params object[] args) // TODO: do better binding than this
-  { foreach(MethodBase sig in sigs)
-    { ParameterInfo[] parms = sig.GetParameters();
-      if(parms.Length!=args.Length) continue;
-      for(int i=0; i<parms.Length; i++) args[i] = Ops.ConvertTo(args[i], parms[i].ParameterType);
-      return sig.IsConstructor ? ((ConstructorInfo)sig).Invoke(args) : sig.Invoke(instance, args);
+  public object Call(params object[] args)
+  { Type[] types  = new Type[args.Length];
+    Match[] res   = new Match[sigs.Length];
+    int bestMatch = -1;
+
+    for(int i=0; i<args.Length; i++) types[i] = args[i]==null ? null : args[i].GetType();
+
+    for(int mi=0; mi<sigs.Length; mi++) // TODO: cache this somehow?
+    { ParameterInfo[] parms = sigs[mi].GetParameters();
+      bool paramArray = parms.Length>0 && IsParamArray(parms[parms.Length-1]), alreadyPA=false;
+      int lastRP = paramArray ? parms.Length-1 : parms.Length;
+      if(args.Length<lastRP || !paramArray && args.Length!=parms.Length) continue;
+
+      res[mi].Conv = Conversion.Identity;
+      // check types of all parameters except the parameter array if there is one
+      for(int i=0; i<lastRP; i++)
+      { Conversion conv = Ops.ConvertTo(types[i], parms[i].ParameterType);
+        if(conv<res[mi].Conv)
+        { res[mi].Conv=conv;
+          if(conv==Conversion.None) goto nextSig;
+        }
+      }
+
+      if(paramArray)
+      { if(args.Length==parms.Length) // check if the last argument is an array already
+        { Conversion conv = Ops.ConvertTo(types[lastRP], parms[lastRP].ParameterType);
+          if(conv==Conversion.Identity || conv==Conversion.Reference)
+          { if(conv<res[mi].Conv) res[mi].Conv=conv;
+            alreadyPA = true;
+            goto done;
+          }
+        }
+
+        // check that all remaining arguments can be converted to the member type of the parameter array
+        Type type = parms[lastRP].ParameterType.GetElementType();
+        for(int i=lastRP; i<args.Length; i++)
+        { Conversion conv = Ops.ConvertTo(types[i], type);
+          if(conv<res[mi].Conv)
+          { res[mi].Conv=conv;
+            if(conv==Conversion.None) goto nextSig;
+          }
+        }
+      }
+
+      done:
+      res[mi] = new Match(res[mi].Conv, parms, lastRP, alreadyPA, paramArray);
+      if(bestMatch==-1 || res[mi]>res[bestMatch]) bestMatch=mi;
+
+      nextSig:;
     }
-    throw Ops.TypeError("unable to bind arguments to method {0} on {1}", __name__, sigs[0].DeclaringType.FullName);
+
+    if(bestMatch==-1)
+      throw Ops.TypeError("unable to bind arguments to method '{0}' on {1}", __name__, sigs[0].DeclaringType.FullName);
+
+    Match best = res[bestMatch];
+
+    // check for ambiguous bindings
+    if(sigs.Length>1 && best.Conv!=Conversion.Identity)
+      for(int i=0; i<res.Length; i++)
+        if(i!=bestMatch && res[i]==best)
+          throw Ops.TypeError("ambiguous argument types (multiple functions matched method '{0}' on {1})",
+                              __name__, sigs[0].DeclaringType.FullName);
+
+    // do the actual conversion
+    for(int i=0, end=best.APA ? args.Length : best.Last; i<end; i++)
+      args[i] = Ops.ConvertTo(args[i], best.Parms[i].ParameterType);
+
+    if(best.Last!=best.Parms.Length && !best.APA)
+    { object[] narr = new object[best.Parms.Length];
+      Array.Copy(args, 0, narr, 0, best.Last);
+
+      Type type = best.Parms[best.Last].ParameterType.GetElementType();
+      Array pa = Array.CreateInstance(type, args.Length-best.Last);
+      for(int i=0; i<pa.Length; i++) pa.SetValue(Ops.ConvertTo(args[i+best.Last], type), i);
+      args=narr; args[best.Last]=pa;
+    }
+
+    return sigs[bestMatch].IsConstructor ? ((ConstructorInfo)sigs[bestMatch]).Invoke(args)
+                                         : sigs[bestMatch].Invoke(instance, args);
   }
 
   internal void Add(MethodBase sig)
@@ -144,6 +231,27 @@ public abstract class ReflectedMethodBase : ICallable
     narr[sigs.Length] = sig;
     sigs = narr;
   }
+
+  struct Match
+  { public Match(Conversion conv, ParameterInfo[] parms, int last, bool apa, bool pa)
+    { Conv=conv; Parms=parms; Last=last; APA=apa; PA=pa; Exact=!pa || apa;
+    }
+
+    public static bool operator<(Match a, Match b) { return a.Conv<b.Conv || !a.Exact && b.Exact; }
+    public static bool operator>(Match a, Match b) { return a.Conv>b.Conv || a.Exact && !b.Exact; }
+    public static bool operator==(Match a, Match b) { return a.Conv==b.Conv && a.Exact==b.Exact; }
+    public static bool operator!=(Match a, Match b) { return a.Conv!=b.Conv || a.Exact!=b.Exact; }
+    
+    public override bool Equals(object obj) { return  obj is Match ? this==(Match)obj : false; }
+    public override int GetHashCode() { throw new NotImplementedException(); }
+
+    public Conversion Conv;
+    public ParameterInfo[] Parms;
+    public int Last;
+    public bool APA, Exact, PA;
+  }
+
+  static bool IsParamArray(ParameterInfo pi) { return pi.IsDefined(typeof(ParamArrayAttribute), false); }
 
   protected MethodBase[] sigs;
   protected object instance;
@@ -229,9 +337,12 @@ public class ReflectedType : BoaType
     foreach(PropertyInfo pi in type.GetProperties()) AddProperty(pi);
 
     if(typeof(IEnumerator).IsAssignableFrom(type))
-    { if(!dict.Contains("next")) dict["next"] = new SpecialAttr.NextMethod();
+    { if(!dict.Contains("next")) dict["next"] = SpecialAttr.NextMethod.Value;
       if(!dict.Contains("reset")) dict["reset"] = dict["Reset"];
       if(!dict.Contains("value")) dict["value"] = dict["Current"];
+    }
+    else if(type.IsSubclassOf(typeof(Delegate)))
+    { if(!dict.Contains("__call__")) dict["__call__"] = SpecialAttr.DelegateCaller.Value;
     }
     else if(type==typeof(string)) dict["__repr__"] = new SpecialAttr.StringReprMethod();
   }

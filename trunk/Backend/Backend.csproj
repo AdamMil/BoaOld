@@ -84,6 +84,11 @@
                     BuildAction = "Compile"
                 />
                 <File
+                    RelPath = "AST\BoaFunction.cs"
+                    SubType = "Code"
+                    BuildAction = "Compile"
+                />
+                <File
                     RelPath = "AST\CodeGenerator.cs"
                     SubType = "Code"
                     BuildAction = "Compile"

@@ -6,6 +6,11 @@ using System.Collections;
 namespace Boa.Runtime
 {
 
+[Flags] public enum Conversion
+{ Unsafe=1, Safe=3, Reference=5, Identity=7, None=8, Overflow=10, 
+  Failure=8, Success=1
+}
+
 public sealed class Ops
 { Ops() { }
 
@@ -138,7 +143,7 @@ public sealed class Ops
 
   public static object Call(object func, params object[] args)
   { ICallable ic = func as ICallable;
-    return ic==null ? Invoke(func, "__call__") : ic.Call(args);
+    return ic==null ? Invoke(func, "__call__", args) : ic.Call(args);
   }
   
   public static object Call0(object func) { return Call(func); }
@@ -174,10 +179,39 @@ public sealed class Ops
   }
 
   public static object ConvertTo(object o, Type type)
-  { if(o==null || type.IsInstanceOfType(o)) return o;
-    if(type==typeof(bool)) return FromBool(IsTrue(o));
-    try { return Convert.ChangeType(o, type); }
-    catch(OverflowException) { throw Ops.ValueError("large value caused overflow"); }
+  { switch(ConvertTo(o==null ? null : o.GetType(), type))
+    { case Conversion.Identity: case Conversion.Reference: return o;
+      case Conversion.None: throw Ops.TypeError("object cannot be converted to '{0}'", type);
+      default:
+        if(type==typeof(bool)) return FromBool(IsTrue(o));
+        try { return Convert.ChangeType(o, type); }
+        catch(OverflowException) { throw Ops.ValueError("large value caused overflow"); }
+    }
+  }
+  
+  public static Conversion ConvertTo(Type from, Type to)
+  { if(from==null)
+      return !to.IsValueType ? Conversion.Reference : to==typeof(bool) ? Conversion.Safe : Conversion.None;
+    else if(to==from) return Conversion.Identity;
+    else if(to.IsAssignableFrom(from)) return Conversion.Reference;
+
+    if(from.IsPrimitive && to.IsPrimitive) // TODO: check whether it's faster to use IndexOf() or our own loop
+    { if(from==typeof(int))    return IsIn(typeConv[4], to)   ? Conversion.Unsafe : Conversion.Safe;
+      if(to  ==typeof(bool))   return IsIn(typeConv[9], from) ? Conversion.None : Conversion.Safe;
+      if(from==typeof(double)) return Conversion.None;
+      if(from==typeof(long))   return IsIn(typeConv[6], to) ? Conversion.Unsafe : Conversion.Safe;
+      if(from==typeof(char))   return IsIn(typeConv[8], to) ? Conversion.Unsafe : Conversion.Safe;
+      if(from==typeof(byte))   return IsIn(typeConv[1], to) ? Conversion.Unsafe : Conversion.Safe;
+      if(from==typeof(uint))   return IsIn(typeConv[5], to) ? Conversion.Unsafe : Conversion.Safe;
+      if(from==typeof(float))  return to==typeof(double) ? Conversion.Safe : Conversion.None;
+      if(from==typeof(short))  return IsIn(typeConv[2], to) ? Conversion.Unsafe : Conversion.Safe;
+      if(from==typeof(ushort)) return IsIn(typeConv[3], to) ? Conversion.Unsafe : Conversion.Safe;
+      if(from==typeof(sbyte))  return IsIn(typeConv[0], to) ? Conversion.Unsafe : Conversion.Safe;
+      if(from==typeof(ulong))  return IsIn(typeConv[7], to) ? Conversion.Unsafe : Conversion.Safe;
+    }
+    if(from.IsArray && to.IsArray && to.GetElementType().IsAssignableFrom(from.GetElementType()))
+      return Conversion.Reference;
+    return Conversion.None;
   }
 
   public static void DelAttr(object o, string name)
@@ -499,8 +533,35 @@ public sealed class Ops
   public static Stack Frames = new Stack();
 
   public static readonly object FALSE=false, TRUE=true;
-  
+
+  static bool IsIn(Type[] typeArr, Type type)
+  { for(int i=0; i<typeArr.Length; i++) if(typeArr[i]==type) return true;
+    return false;
+  }
+
   static readonly ReflectedType StringType = ReflectedType.FromType(typeof(string));
+  static readonly Type[][] typeConv = 
+  { // FROM
+    new Type[] { typeof(int), typeof(double), typeof(short), typeof(long), typeof(float) }, // sbyte
+    new Type[] // byte
+    { typeof(int), typeof(double), typeof(short), typeof(ushort), typeof(long), typeof(ulong), typeof(float)
+    },
+    new Type[] { typeof(int), typeof(double), typeof(long), typeof(float) }, // short
+    new Type[] { typeof(int), typeof(double), typeof(uint), typeof(long), typeof(ulong), typeof(float) }, // ushort
+    new Type[] { typeof(double), typeof(long), typeof(float) }, // int
+    new Type[] { typeof(double), typeof(long), typeof(ulong), typeof(float) }, // uint
+    new Type[] { typeof(double), typeof(float) }, // long
+    new Type[] { typeof(double), typeof(float) }, // ulong
+    new Type[] // char
+    { typeof(int), typeof(double), typeof(ushort), typeof(uint), typeof(long), typeof(ulong), typeof(float)
+    },
+
+    // TO
+    new Type[] // bool
+    { typeof(int), typeof(byte), typeof(char), typeof(sbyte), typeof(short), typeof(ushort), typeof(uint),
+      typeof(long), typeof(ulong)
+    }
+  };
 }
 
 } // namespace Boa.Runtime

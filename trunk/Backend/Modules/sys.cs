@@ -34,9 +34,9 @@ public sealed class sys
   public static readonly Tuple builtin_module_names = new Tuple("__builtin__", "operator", "string", "sys");
 
   #if BIGENDIAN
-  public static readonly string byteorder = "big";
+  public static string byteorder = "big";
   #else
-  public static readonly string byteorder = "little";
+  public static string byteorder = "little";
   #endif
   
   public static string copyright = "Boa, Copyright 2004 Adam Milazzo";
@@ -62,13 +62,13 @@ public sealed class sys
   
   public static int recursionlimit = 1000; // TODO: make this take effect
   public static int tracebacklimit = 1000; // TODO: make this take effect
-  
+
   public static string version = "0.1.0";
   public static Tuple version_info = new Tuple(0, 1, 0, "devel");
 
   static object display(params object[] values) // TODO: optimize this and use CallTarget1 or something
   { if(values[0]!=null)
-    { Console.WriteLine(Ops.Str(values[0]));
+    { Console.WriteLine(Ops.Repr(values[0]));
       __builtin__._ = values[0];
     }
     return null;
