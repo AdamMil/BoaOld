@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 
 // TODO: respect this: http://rgruet.free.fr/PQR2.3.html
 
@@ -57,6 +58,14 @@ public interface IMutableSequence : ISequence
 public interface IMapping : IContainer
 { object get(object key);
   object get(object key, object defaultValue);
+
+  List items();
+  List keys();
+  List values();
+
+  IEnumerator iteritems();
+  IEnumerator iterkeys();
+  IEnumerator itervalues();
 
   void __delitem__(object key);
   object __getitem__(object key);

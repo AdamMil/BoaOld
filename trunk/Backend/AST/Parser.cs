@@ -178,11 +178,21 @@ public class Parser
     return token;
   }
 
-  // argument_list := <expression> (',' <expression>)*
+  // argument_list := <argument> (',' <argument>)*
+  // argument := ('*' | '**')? <expression> | <identifier> '=' <expression>
   Argument[] ParseArguments()
   { if(token==Token.RParen) return new Argument[0];
     ArrayList args = new ArrayList();
-    do args.Add(new Argument(ParseExpression())); while(TryEat(Token.Comma));
+    do
+    { if(TryEat(Token.Asterisk)) args.Add(new Argument(ParseExpression(), ArgType.List));
+      else if(TryEat(Token.Power)) args.Add(new Argument(ParseExpression(), ArgType.Dict));
+      else if(token!=Token.Identifier) args.Add(new Argument(ParseExpression()));
+      else
+      { string ident = ParseIdentifier();
+        if(TryEat(Token.Assign)) args.Add(new Argument(ident, ParseExpression()));
+        else args.Add(new Argument(new NameExpression(ident)));
+      }
+    } while(TryEat(Token.Comma));
     return (Argument[])args.ToArray(typeof(Argument));
   }
 
@@ -564,24 +574,27 @@ public class Parser
     ArrayList parms = new ArrayList();
     string ident;
     while(true) // required identifiers
-    { ident = ParseIdentifier();
+    { if(TryEat(Token.Asterisk)) goto list;
+      if(token==Token.Power) goto dict;
+      ident = ParseIdentifier();
       if(TryEat(Token.Assign)) break;
       parms.Add(new Parameter(ident));
+      if(token==end) goto done;
       Eat(Token.Comma);
     }
     while(true) // positional parameters
     { parms.Add(new Parameter(ident, ParseExpression()));
-      if(TryEat(Token.Asterisk)) break;
       if(token==end) goto done;
       Eat(Token.Comma);
+      if(TryEat(Token.Asterisk)) break;
+      if(token==Token.Power) goto dict;
       ident = ParseIdentifier();
       Eat(Token.Assign);
     }
-    if(token==Token.Identifier) parms.Add(new Parameter(ParseIdentifier(), ParamType.List));
+    list: if(token==Token.Identifier) parms.Add(new Parameter(ParseIdentifier(), ParamType.List));
     if(token==end) goto done;
     Eat(Token.Comma);
-    Eat(Token.Asterisk);
-    Eat(Token.Asterisk);
+    dict: Eat(Token.Power);
     parms.Add(new Parameter(ParseIdentifier(), ParamType.Dict));
     done: return (Parameter[])parms.ToArray(typeof(Parameter));
   }

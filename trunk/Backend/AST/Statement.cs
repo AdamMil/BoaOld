@@ -56,6 +56,13 @@ class JumpFinder : IWalker
   int inTry;
 }
 #endregion
+
+#region Optimizer
+public class Optimizer : IWalker
+{ public void PostWalk(Node n) { n.Optimize(); }
+  public bool Walk(Node n) { return true; }
+}
+#endregion
 #endregion
 
 #region Statement
@@ -177,13 +184,6 @@ public abstract class Statement : Node
     ArrayList  innerFuncs;
     SortedList names;
     bool inDef;
-  }
-  #endregion
-  
-  #region Optimizer
-  public class Optimizer : IWalker
-  { public void PostWalk(Node n) { n.Optimize(); }
-    public bool Walk(Node n) { return true; }
   }
   #endregion
   

@@ -141,20 +141,167 @@ public class CallExpression : Expression
 { public CallExpression(Expression target, Argument[] args) { Arguments=args; Target=target; }
 
   public override void Emit(CodeGenerator cg)
-  { Target.Emit(cg);
-    Expression[] exprs = new Expression[Arguments.Length];
-    for(int i=0; i<Arguments.Length; i++) exprs[i] = Arguments[i].Expression;
-    cg.EmitObjectArray(exprs);
-    cg.EmitCall(typeof(Ops), "Call", new Type[] { typeof(object), typeof(object[]) });
+  { int numlist=0, numdict=0, numruns=0, numnamed=0, runlen=0;
+    for(int i=0; i<Arguments.Length; i++)
+      switch(Arguments[i].Type)
+      { case ArgType.Normal:
+          if(Arguments[i].Name==null) runlen++;
+          else numnamed++;
+          break;
+        case ArgType.List: 
+          if(runlen>0) { numruns++; runlen=0; }
+          numlist++;
+          break;
+        case ArgType.Dict: numdict++; break;
+      }
+    if(runlen>0) { numruns++; runlen=0; }
+    if(numnamed>0) numruns++;
+    numruns += numlist + numdict;
+
+    Target.Emit(cg);
+    if(numlist==0 && numdict==0)
+    { if(numnamed==0)
+      { EmitRun(cg, Arguments.Length, 0, Arguments.Length);
+        cg.EmitCall(typeof(Ops), "Call", new Type[] { typeof(object), typeof(object[]) });
+      }
+      else
+      { EmitRun(cg, Arguments.Length-numnamed, 0, Arguments.Length);
+        EmitNamed(cg, numnamed);
+        cg.EmitCall(typeof(Ops), "Call",
+                    new Type[] { typeof(object), typeof(object[]), typeof(string[]), typeof(object[]) });
+      }
+    }
+    else // TODO: is it worth optimizing constant list args?
+    { ConstructorInfo ci = typeof(CallArg).GetConstructor(new Type[] { typeof(object), typeof(int) });
+      int ri=0, rsi=0;
+
+      cg.EmitNewArray(typeof(CallArg), numruns);
+      
+      for(int i=0; i<Arguments.Length; i++) // first we'll do positional arguments
+      { if(Arguments[i].Name!=null || Arguments[i].Type==ArgType.Dict) continue;
+        if(Arguments[i].Type==ArgType.Normal) runlen++;
+        else
+        { if(runlen>1)
+          { cg.ILG.Emit(OpCodes.Dup);
+            cg.EmitInt(ri++);
+            cg.ILG.Emit(OpCodes.Ldelema, typeof(CallArg));
+            EmitRun(cg, runlen, rsi, i);
+            cg.EmitInt(runlen);
+            cg.ILG.Emit(OpCodes.Box, typeof(int));
+            cg.EmitNew(ci);
+            cg.ILG.Emit(OpCodes.Stobj, typeof(CallArg));
+          }
+          else if(runlen==1)
+          { cg.ILG.Emit(OpCodes.Dup);
+            cg.EmitInt(ri++);
+            cg.ILG.Emit(OpCodes.Ldelema, typeof(CallArg));
+            for(; rsi<i; rsi++) if(Arguments[rsi].Name==null) { Arguments[rsi].Expression.Emit(cg); break; }
+            cg.ILG.Emit(OpCodes.Ldnull);
+            cg.EmitNew(ci);
+            cg.ILG.Emit(OpCodes.Stobj, typeof(CallArg));
+          }
+
+          cg.ILG.Emit(OpCodes.Dup);
+          cg.EmitInt(ri++);
+          cg.ILG.Emit(OpCodes.Ldelema, typeof(CallArg));
+          Arguments[i].Expression.Emit(cg);
+          cg.EmitFieldGet(typeof(CallArg), "ListType");
+          cg.EmitNew(ci);
+          cg.ILG.Emit(OpCodes.Stobj, typeof(CallArg));
+
+          runlen=0; rsi=i;
+        }
+      }
+      
+      if(numnamed>0) // then named arguments
+      { cg.ILG.Emit(OpCodes.Dup);
+        cg.EmitInt(ri++);
+        cg.ILG.Emit(OpCodes.Ldelema, typeof(CallArg));
+        EmitNamed(cg, numnamed);
+        cg.EmitNew(ci);
+        cg.ILG.Emit(OpCodes.Stobj, typeof(CallArg));
+      }
+      
+      for(int i=0; i<Arguments.Length; i++)
+        if(Arguments[i].Type==ArgType.Dict)
+        { cg.ILG.Emit(OpCodes.Dup);
+          cg.EmitInt(ri++);
+          cg.ILG.Emit(OpCodes.Ldelema, typeof(CallArg));
+          Arguments[i].Expression.Emit(cg);
+          cg.EmitFieldGet(typeof(CallArg), "DictType");
+          cg.EmitNew(ci);
+          cg.ILG.Emit(OpCodes.Stobj, typeof(CallArg));
+        }
+      
+      cg.EmitCall(typeof(Ops), "Call", new Type[] { typeof(object), typeof(CallArg[]) });
+    }
   }
 
   public override object Evaluate(Frame frame)
   { object callee = Target.Evaluate(frame);
-    if(Arguments.Length==0) return Ops.Call(callee);
+    if(Arguments.Length==0) return Ops.Call0(callee);
 
-    object[] parms = new object[Arguments.Length];
-    for(int i=0; i<Arguments.Length; i++) parms[i] = Arguments[i].Expression.Evaluate(frame);
-    return Ops.Call(callee, parms);
+    int numlist=0, numdict=0, numruns=0, numnamed=0, runlen=0;
+    for(int i=0; i<Arguments.Length; i++)
+      switch(Arguments[i].Type)
+      { case ArgType.Normal:
+          if(Arguments[i].Name==null) runlen++;
+          else numnamed++;
+          break;
+        case ArgType.List: 
+          if(runlen>0) { numruns++; runlen=0; }
+          numlist++;
+          break;
+        case ArgType.Dict: numdict++; break;
+      }
+    if(runlen>0) { numruns++; runlen=0; }
+    if(numnamed>0) numruns++;
+    numruns += numlist + numdict;
+
+    if(numlist==0 && numdict==0)
+    { if(numnamed==0) return Ops.Call(callee, EvaluateRun(frame, Arguments.Length, 0, Arguments.Length));
+      else
+      { string[] names;
+        object[] values;
+        EvaluateNamed(frame, numnamed, out names, out values);
+        return Ops.Call(callee, EvaluateRun(frame, Arguments.Length-numnamed, 0, Arguments.Length), names, values);
+      }
+    }
+    else // TODO: is it worth optimizing constant list args?
+    { int ri=0, rsi=0;
+      CallArg[] cargs = new CallArg[numruns];
+
+      for(int i=0; i<Arguments.Length; i++) // first we'll do positional arguments
+      { if(Arguments[i].Name!=null || Arguments[i].Type==ArgType.Dict) continue;
+        if(Arguments[i].Type==ArgType.Normal) runlen++;
+        else
+        { if(runlen>1) cargs[ri++] = new CallArg(EvaluateRun(frame, runlen, rsi, i), runlen);
+          else if(runlen==1)
+          { for(; rsi<i; rsi++)
+              if(Arguments[rsi].Name==null)
+              { cargs[ri++] = new CallArg(Arguments[rsi].Expression.Evaluate(frame), null);
+                break;
+              }
+          }
+
+          cargs[ri++] = new CallArg(Arguments[i].Expression.Evaluate(frame), CallArg.ListType);
+          runlen=0; rsi=i;
+        }
+      }
+      
+      if(numnamed>0) // then named arguments
+      { string[] names;
+        object[] values;
+        EvaluateNamed(frame, numnamed, out names, out values);
+        cargs[ri++] = new CallArg(names, values);
+      }
+      
+      for(int i=0; i<Arguments.Length; i++)
+        if(Arguments[i].Type==ArgType.Dict)
+          cargs[ri++] = new CallArg(Arguments[i].Expression.Evaluate(frame), CallArg.DictType);
+
+      return Ops.Call(callee, cargs);
+    }
   }
 
   public override void ToCode(System.Text.StringBuilder sb, int indent)
@@ -174,6 +321,56 @@ public class CallExpression : Expression
 
   public Argument[] Arguments;
   public Expression Target;
+  
+  void EmitNamed(CodeGenerator cg, int num)
+  { cg.EmitNewArray(typeof(string), num);
+    for(int i=0,ai=0; i<Arguments.Length; i++)
+      if(Arguments[i].Name!=null)
+      { cg.ILG.Emit(OpCodes.Dup);
+        cg.EmitInt(ai++);
+        cg.EmitString(Arguments[i].Name);
+        cg.ILG.Emit(OpCodes.Stelem_Ref);
+      }
+    cg.EmitNewArray(typeof(object), num);
+    for(int i=0,ai=0; i<Arguments.Length; i++)
+      if(Arguments[i].Name!=null)
+      { cg.ILG.Emit(OpCodes.Dup);
+        cg.EmitInt(ai++);
+        Arguments[i].Expression.Emit(cg);
+        cg.ILG.Emit(OpCodes.Stelem_Ref);
+      }
+  }
+
+  void EmitRun(CodeGenerator cg, int length, int start, int end)
+  { if(length==0) { cg.ILG.Emit(OpCodes.Ldnull); return; }
+    cg.EmitNewArray(typeof(object), length);
+    for(int ai=0; start<end; start++)
+      if(Arguments[start].Name==null)
+      { cg.ILG.Emit(OpCodes.Dup);
+        cg.EmitInt(ai++);
+        Arguments[start].Expression.Emit(cg);
+        cg.ILG.Emit(OpCodes.Stelem_Ref);
+      }
+  }
+  
+  void EvaluateNamed(Frame frame, int num, out string[] names, out object[] values)
+  { names = new string[num];
+    values = new object[num];
+    for(int i=0,ai=0; i<Arguments.Length; i++)
+      if(Arguments[i].Name!=null)
+      { names[ai] = Arguments[i].Name;
+        values[ai] = Arguments[i].Expression.Evaluate(frame);
+        ai++;
+      }
+  }
+  
+  object[] EvaluateRun(Frame frame, int length, int start, int end)
+  { if(length==0) return null;
+    object[] values = new object[length];
+    for(int ai=0; start<end; start++)
+      if(Arguments[start].Name==null) values[ai++] = Arguments[start].Expression.Evaluate(frame);
+    return values;
+  }
 }
 #endregion
 
@@ -361,7 +558,7 @@ public class ListExpression : Expression
   
   public override object Evaluate(Frame frame)
   { List list = new List(Expressions.Length);
-    foreach(Expression e in Expressions) list.append(e);
+    foreach(Expression e in Expressions) list.append(e.Evaluate(frame));
     return list;
   }
 

@@ -11,6 +11,26 @@ public class Dict : HybridDictionary, IComparable, IMapping, ICloneable, IRepres
   public Dict(IDictionary dict) { foreach(DictionaryEntry e in dict) Add(e.Key, e.Value); }
   internal Dict(int size) : base(size) { }
 
+  #region DictEnumerator
+  public class DictEnumerator : IEnumerator
+  { public DictEnumerator(IDictionary dict) { e=dict.GetEnumerator(); }
+
+    public object Current
+    { get
+      { if(current!=null) return current;
+        DictionaryEntry e = (DictionaryEntry)this.e.Current;
+        return current=new Tuple(e.Key, e.Value);
+      }
+    }
+
+    public bool MoveNext() { current=null; return e.MoveNext(); }
+    public void Reset() { current=null; e.Reset(); }
+
+    IDictionaryEnumerator e;
+    Tuple current;
+  }
+  #endregion
+
   public void clear() { Clear(); }
 
   public override int GetHashCode() { throw Ops.TypeError("dict objects are unhashable"); }
@@ -33,6 +53,10 @@ public class Dict : HybridDictionary, IComparable, IMapping, ICloneable, IRepres
   }
   public List keys() { return new List(Keys); }
   public List values() { return new List(Values); }
+  
+  public IEnumerator iteritems() { return new DictEnumerator(this); }
+  public IEnumerator iterkeys() { return Keys.GetEnumerator(); }
+  public IEnumerator itervalues() { return Values.GetEnumerator(); }
 
   public override string ToString() { return __repr__(); }
 

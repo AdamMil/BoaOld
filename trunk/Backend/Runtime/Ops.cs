@@ -153,6 +153,125 @@ public sealed class Ops
     return ic==null ? Invoke(func, "__call__", args) : ic.Call(args);
   }
   
+  public unsafe static object Call(object func, CallArg[] args)
+  { int ai=0, pi=0, num=0;
+    bool hasdict=false;
+
+    for(; ai<args.Length; ai++)
+      if(args[ai].Type==null) num++;
+      else if(args[ai].Type==CallArg.ListType)
+      { ICollection col = args[ai].Value as ICollection;
+        if(col!=null) num += col.Count;
+        else
+        { ISequence seq = args[ai].Value as ISequence;
+          num += seq==null ? Ops.ToInt(Ops.Invoke(args[ai].Value, "__len__")) : seq.__len__();
+        }
+      }
+      else if(args[ai].Type is int) num += (int)args[ai].Type;
+      else break;
+    
+    object[] positional = num==0 ? null : new object[num];
+    for(int i=0; i<ai; i++)
+      if(args[i].Type==null) positional[pi++] = args[ai].Value;
+      else if(args[i].Type==CallArg.ListType)
+      { ICollection col = args[i].Value as ICollection;
+        if(col!=null) { col.CopyTo(positional, pi); pi += col.Count; }
+        else
+        { IEnumerator e = Ops.GetEnumerator(args[i].Value);
+          while(e.MoveNext()) positional[pi++] = e.Current;
+        }
+      }
+      else if(args[i].Value is int)
+      { object[] items = (object[])args[i].Value;
+        items.CopyTo(positional, pi); pi += items.Length;
+      }
+
+    if(ai==args.Length) return Call(func, positional);
+    
+    num = 0;
+    for(int i=ai; i<args.Length; i++)
+      if(args[i].Type==CallArg.DictType)
+      { IDictionary dict = args[i].Value as IDictionary;
+        if(dict!=null) num += dict.Count;
+        else
+        { IMapping map = args[i].Value as IMapping;
+          num += map==null ? Ops.ToInt(Ops.Invoke(args[i].Value, "__len__")) : map.__len__();
+        }
+        hasdict = true;
+      }
+      else num += ((object[])args[i].Type).Length;
+
+    if(!hasdict) return Call(func, positional, (string[])args[ai].Value, (object[])args[ai].Type);
+
+    string[] names = new string[num];
+    object[] values = new object[num];
+    pi = 0;
+    for(; ai<args.Length; ai++)
+      if(args[ai].Type!=CallArg.DictType)
+      { string[] na = (string[])args[ai].Value;
+        na.CopyTo(names, pi);
+        ((object[])args[ai].Type).CopyTo(values, pi);
+        pi += na.Length;
+      }
+      else
+      { IDictionary dict = args[ai].Value as IDictionary;
+        if(dict!=null)
+          foreach(DictionaryEntry e in dict)
+          { names[pi] = Ops.Str(e.Key);
+            values[pi] = e.Value;
+            pi++;
+          }
+        else
+        { IMapping map = args[ai].Value as IMapping;
+          if(map!=null)
+          { IEnumerator e = map.iteritems();
+            while(e.MoveNext())
+            { Tuple tup = (Tuple)e.Current;
+              names[pi] = Ops.Str(tup.items[0]);
+              values[pi] = tup.items[1];
+              pi++;
+            }
+          }
+          else
+          { object eo = Ops.Invoke(args[ai].Value, "itemiter");
+            if(eo is IEnumerator)
+            { IEnumerator e = (IEnumerator)eo;
+              while(e.MoveNext())
+              { Tuple tup = e.Current as Tuple;
+                if(tup==null || tup.items.Length!=2)
+                  throw Ops.TypeError("dict expansion: itemiter()'s iterator should return (key,value)");
+                names[pi] = Ops.Str(tup.items[0]);
+                values[pi] = tup.items[1];
+                pi++;
+              }
+            }
+            else
+            { object next = Ops.GetAttr(eo, "next");
+              try
+              { while(true)
+                { Tuple tup = Ops.Call(next) as Tuple;
+                  if(tup==null || tup.items.Length!=2)
+                    throw Ops.TypeError("dict expansion: itemiter()'s iterator should return (key,value)");
+                  names[pi] = Ops.Str(tup.items[0]);
+                  values[pi] = tup.items[1];
+                  pi++;
+                }
+              }
+              catch(StopIterationException) { }
+            }
+          }
+        }
+      }
+    
+    return Call(func, positional, names, values);
+  }
+
+  public static object Call(object func, object[] positional, string[] names, object[] values)
+  { IFancyCallable ic = func as IFancyCallable;
+    if(ic==null) throw Ops.NotImplemented("This object does not support named arguments.");
+    return ic.Call(positional, names, values);
+  }
+  
   public static object Call0(object func) { return Call(func, Misc.EmptyArray); }
   public static object Call1(object func, object a0) { return Call(func, a0); }
 
@@ -282,6 +401,16 @@ public sealed class Ops
 
   // TODO: check whether we can eliminate this (ie, "true is true" still works)
   public static object FromBool(bool value) { return value ? TRUE : FALSE; }
+
+  public static CompiledFunction GenerateFunction(string name, Boa.AST.Parameter[] parms, Delegate target)
+  { string[] names = new string[parms.Length];
+    for(int i=0; i<parms.Length; i++) names[i] = parms[i].Name.String;
+    if(target is CallTargetN)
+      return new CompiledFunctionN(name, names, null, false, false, names.Length, null, (CallTargetN)target);
+    else if(target is CallTargetFN)
+      return new CompiledFunctionFN(name, names, null, false, false, names.Length, null, (CallTargetFN)target);
+    else throw new ArgumentException("Unhandled target type: " + target.GetType().FullName);
+  }
 
   public static object GetAttr(object o, string name)
   { IHasAttributes iha = o as IHasAttributes;
@@ -593,6 +722,10 @@ public sealed class Ops
 
   public static TypeErrorException TooFewArgs(string name, int expected, int got)
   { return TypeError("{0} requires at least {1} arguments ({2} given)", name, expected, got);
+  }
+
+  public static TypeErrorException TooManyArgs(string name, int expected, int got)
+  { return TypeError("{0} requires at most {1} arguments ({2} given)", name, expected, got);
   }
 
   public static bool TryInvoke(object target, string name, out object retValue, params object[] args)

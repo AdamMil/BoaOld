@@ -250,7 +250,7 @@ public class ReflectedMethod : ReflectedMethodBase, IDescriptor
 #endregion
 
 #region ReflectedMethodBase
-public abstract class ReflectedMethodBase : ReflectedMember, ICallable
+public abstract class ReflectedMethodBase : ReflectedMember, IFancyCallable
 { protected ReflectedMethodBase(MethodBase mb) : base(mb)
   { sigs = new MethodBase[] { mb };
     allStatic = mb.IsStatic;

@@ -44,6 +44,8 @@ public class CodeGenerator
     ILG.Emit(index<256 ? OpCodes.Starg_S : OpCodes.Starg, index);
   }
 
+  public void EmitBool(bool value) { ILG.Emit(value ? OpCodes.Ldc_I4_1 : OpCodes.Ldc_I4_0); }
+
   public void EmitCall(MethodInfo mi)
   { if(mi.IsVirtual) ILG.Emit(OpCodes.Callvirt, mi);
     else ILG.Emit(OpCodes.Call, mi);
