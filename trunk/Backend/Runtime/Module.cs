@@ -48,8 +48,9 @@ public class Module : Boa.AST.Snippet, IHasAttributes, IRepresentable
   { if(!Ops.DelDescriptor(__dict__[key], null)) __dict__.Remove(key);
   }
   public object __getattr__(string name)
-  { if(__dict__.Contains(name)) return Ops.GetDescriptor(__dict__[name], null); // TODO: eliminate double lookup
-    return builtins.__getattr__(name);
+  { object obj = __dict__[name];
+    if(obj==null && !__dict__.Contains(name)) return builtins.__getattr__(name);
+    return Ops.GetDescriptor(obj, null);
   }
   public void __setattr__(string key, object value)
   { if(!Ops.SetDescriptor(__dict__[key], null, value)) __dict__[key] = value;

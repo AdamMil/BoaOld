@@ -125,7 +125,9 @@ public abstract class BoaType : DynamicType, IDynamicObject, ICallable, IHasAttr
   { Initialize();
     if(name=="__dict__") return dict;
     if(name=="mro") return mro;
-    return dict.Contains(name) ? dict[name] : Ops.Missing;
+    object ret = dict[name];
+    if(ret==null && !dict.Contains(name)) ret = Ops.Missing;
+    return ret;
   }
 
   protected void RawRemoveSlot(string name) { dict.Remove(name); }

@@ -22,6 +22,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 using System;
 using System.Collections;
 using System.Reflection;
+using System.Reflection.Emit;
 
 namespace Boa.Runtime
 {
@@ -204,6 +205,94 @@ public class StringRepr : IDescriptor, ICallable
 }
 #endregion
 
+#region DelegateProxy
+public abstract class DelegateProxy
+{ protected DelegateProxy(object callable) { this.callable = callable; }
+	protected object callable;
+
+	public static object Make(object callable, Type delegateType)
+	{ ConstructorInfo ci = (ConstructorInfo)handlers[delegateType];
+	  if(ci==null)
+	  { Type[] ctypes = { typeof(object) };
+
+	    MethodInfo mi = delegateType.GetMethod("Invoke", BindingFlags.Public|BindingFlags.Instance);
+		  if(mi==null) throw new ArgumentException("This doesn't seem to be a delegate.", "delegateType");
+
+		  ParameterInfo[] pis = mi.GetParameters();
+		  Type[] ptypes = new Type[pis.Length];
+		  for(int i=0; i<pis.Length; i++) ptypes[i] = pis[i].ParameterType;
+
+		  Key key = new Key(mi.ReturnType, ptypes);
+      ci = (ConstructorInfo)sigs[key];
+
+		  if(ci==null)
+		  { AST.TypeGenerator tg = AST.SnippetMaker.Assembly.DefineType("EventHandler"+index++, typeof(DelegateProxy));
+
+		    ConstructorInfo pci =
+		      typeof(DelegateProxy).GetConstructor(BindingFlags.Instance|BindingFlags.NonPublic, null, ctypes, null);
+		    AST.CodeGenerator cg = tg.DefineChainedConstructor(pci);
+		    cg.EmitReturn();
+		    cg.Finish();
+
+		    cg = tg.DefineMethod(MethodAttributes.Public, "Handle", mi.ReturnType, ptypes);
+        cg.EmitThis();
+        cg.EmitFieldGet(typeof(DelegateProxy).GetField("callable", BindingFlags.Instance|BindingFlags.NonPublic));
+        if(pis.Length==0) cg.EmitCall(typeof(Ops), "Call0");
+		    else
+		    { cg.EmitNewArray(typeof(object), pis.Length);
+          for(int i=0; i<pis.Length; i++)
+          { cg.ILG.Emit(OpCodes.Dup);
+            cg.EmitInt(i);
+            cg.EmitArgGet(i);
+            cg.ILG.Emit(OpCodes.Stelem_Ref);
+          }
+          cg.EmitCall(typeof(Ops), "Call", new Type[] { typeof(object), typeof(Type[]) });
+		    }
+		    if(mi.ReturnType==typeof(void)) cg.ILG.Emit(OpCodes.Pop);
+		    else if(mi.ReturnType!=typeof(object))
+		    { cg.EmitTypeOf(mi.ReturnType);
+		      cg.EmitCall(typeof(Ops), "ConvertTo", new Type[] { typeof(object), typeof(Type) });
+		    }
+		    cg.EmitReturn();
+		    cg.Finish();
+		    
+		    ci = tg.FinishType().GetConstructor(ctypes);
+		    sigs[key] = ci;
+		  }
+
+		  handlers[delegateType] = ci;
+	  }
+
+	  return ci.Invoke(new object[] { callable });
+	}
+
+  struct Key
+  { public Key(Type returnType, Type[] paramTypes) { ReturnType=returnType; ParamTypes=paramTypes; }
+
+    public override bool Equals(object obj)
+    { if(!(obj is Key)) return false;
+      Key other = (Key)obj;
+      if(ReturnType!=other.ReturnType || ParamTypes.Length!=other.ParamTypes.Length) return false;
+      for(int i=0; i<ParamTypes.Length; i++) if(ParamTypes[i]!=other.ParamTypes[i]) return false;
+      return true;
+    }
+
+    public override int GetHashCode()
+    { int hash = ReturnType.GetHashCode();
+      for(int i=0; i<ParamTypes.Length; i++) hash ^= ParamTypes[i].GetHashCode();
+      return hash;
+    }
+
+    Type ReturnType;
+    Type[] ParamTypes;
+  }
+
+	static Hashtable handlers = new Hashtable();
+	static Hashtable sigs = new Hashtable();
+	static uint index;
+}
+#endregion
+
 #region DocStringAttribute
 public class DocStringAttribute : Attribute
 { public DocStringAttribute(string docs) { Docs=docs.Replace("\r\n", "\n"); }
@@ -239,20 +328,10 @@ public class ReflectedEvent : ReflectedMember, IDescriptor
 { public ReflectedEvent(EventInfo ei) : base(ei) { info=ei; }
   public ReflectedEvent(EventInfo ei, object instance) : base(ei) { info=ei; this.instance=instance; }
 
-	// TODO: automatically create new delegate types for different event signatures
-	public class BoaEventHandler
-	{ public BoaEventHandler(object func) { this.func = func; }
-
-		public void Handle() { Ops.Call(func); }
-		public void Handle(object sender, EventArgs e) { Ops.Call(func, sender, e); }
-		
-		object func;
-	}
-
   // TODO: use __iadd__ and __isub__ when we support that
   public void add(object func)
   { Delegate handler = func as Delegate;
-    if(handler==null) handler = Delegate.CreateDelegate(info.EventHandlerType, new BoaEventHandler(func), "Handle");
+    if(handler==null) handler = Ops.MakeDelegate(func, info.EventHandlerType);
     info.AddEventHandler(instance, handler);
   }
 
