@@ -44,6 +44,7 @@ class App
     return (string[])list.ToArray(typeof(string));
   }
 
+  [STAThread]
   static void Main()
   { Application.ThreadException += new System.Threading.ThreadExceptionEventHandler(Application_ThreadException);
 

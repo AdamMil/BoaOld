@@ -94,6 +94,11 @@
                     Project = "{BAB470DE-C719-4410-8168-58DE0F20BD1E}"
                     Package = "{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}"
                 />
+                <Reference
+                    Name = "ICSharpCode.TextEditor"
+                    Project = "{8A3558ED-502A-4D08-BF64-08A1175648CE}"
+                    Package = "{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}"
+                />
             </References>
         </Build>
         <Files>
@@ -169,18 +174,8 @@
                     BuildAction = "Compile"
                 />
                 <File
-                    RelPath = "PieceTable.cs"
-                    SubType = "Code"
-                    BuildAction = "Compile"
-                />
-                <File
                     RelPath = "TextBox.cs"
-                    SubType = "Component"
-                    BuildAction = "Compile"
-                />
-                <File
-                    RelPath = "TextEditor.cs"
-                    SubType = "Component"
+                    SubType = "Code"
                     BuildAction = "Compile"
                 />
             </Include>

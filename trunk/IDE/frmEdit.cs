@@ -19,26 +19,21 @@ public class EditForm : System.Windows.Forms.Form
 
 	  InitializeComponent();
 	  edit.Focus();
-	  
-	  timer = new Timer();
-	  timer.Interval = 5000;
-	  timer.Tick += new EventHandler(highLight_Tick);
-	  timer.Enabled = true;
+	  edit.Document.DocumentChanged += new ICSharpCode.TextEditor.Document.DocumentEventHandler(Document_DocumentChanged);
 	}
 
   public string Filename { get { return filename; } }
   public bool Modified { get { return modified; } }
 
   public new void Load(string path)
-  { if(modified && MessageBox.Show("The current document has been modified. Loading a file will discard these changes. Discard changes?",
+  { if(Modified && MessageBox.Show("The current document has been modified. Loading a file will discard these changes. Discard changes?",
                                    "Discard changes?", MessageBoxButtons.YesNo, MessageBoxIcon.Warning,
                                    MessageBoxDefaultButton.Button2) != DialogResult.Yes)
       return;
 
-    StreamReader sw = new StreamReader(path);
-    edit.Text = sw.ReadToEnd();
-    sw.Close();
+    edit.LoadFile(path, false);
     SetFilename(Path.GetFullPath(path));
+    modified = false;
   }
 
   public void Run()
@@ -71,11 +66,9 @@ public class EditForm : System.Windows.Forms.Form
   public void Save()
   { if(filename==null) SaveAs();
     else
-    { StreamWriter sw = new StreamWriter(filename);
-      sw.Write(edit.Text);
-      sw.Close();
-      modified = false;
+    { edit.SaveFile(filename);
       Text = Path.GetFileName(filename);
+      modified = false;
     }
   }
 
@@ -96,9 +89,9 @@ public class EditForm : System.Windows.Forms.Form
 	void InitializeComponent()
 	{
     System.Resources.ResourceManager resources = new System.Resources.ResourceManager(typeof(EditForm));
-    this.AcBox = new Boa.IDE.AutoCompleteBox();
     this.immediate = new Boa.IDE.ImmediateBox();
     this.edit = new Boa.IDE.BoaBox();
+    this.acbox = new Boa.IDE.AutoCompleteBox();
     this.lblCode = new System.Windows.Forms.Label();
     this.lblImmediate = new System.Windows.Forms.Label();
     this.pnlCode = new System.Windows.Forms.Panel();
@@ -108,43 +101,48 @@ public class EditForm : System.Windows.Forms.Form
     this.pnlImmediate.SuspendLayout();
     this.SuspendLayout();
     // 
-    // AcBox
-    // 
-    this.AcBox.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
-    this.AcBox.Location = new System.Drawing.Point(144, 144);
-    this.AcBox.Name = "AcBox";
-    this.AcBox.Size = new System.Drawing.Size(208, 106);
-    this.AcBox.TabIndex = 4;
-    this.AcBox.Visible = false;
-    // 
     // immediate
     // 
-    this.immediate.AcceptsTab = true;
+    this.immediate.AllowDrop = true;
     this.immediate.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
       | System.Windows.Forms.AnchorStyles.Left) 
       | System.Windows.Forms.AnchorStyles.Right)));
-    this.immediate.Font = new System.Drawing.Font("Courier New", 10F);
+    this.immediate.ConvertTabsToSpaces = true;
+    this.immediate.EnableFolding = false;
+    this.immediate.Encoding = ((System.Text.Encoding)(resources.GetObject("immediate.Encoding")));
     this.immediate.Location = new System.Drawing.Point(0, 16);
     this.immediate.Name = "immediate";
-    this.immediate.Size = new System.Drawing.Size(656, 84);
+    this.immediate.ShowInvalidLines = false;
+    this.immediate.ShowLineNumbers = false;
+    this.immediate.Size = new System.Drawing.Size(656, 94);
+    this.immediate.TabIndent = 2;
     this.immediate.TabIndex = 0;
-    this.immediate.Text = "";
-    this.immediate.WordWrap = false;
     // 
     // edit
     // 
-    this.edit.AcceptsTab = true;
+    this.edit.AllowDrop = true;
     this.edit.Anchor = ((System.Windows.Forms.AnchorStyles)((((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Bottom) 
       | System.Windows.Forms.AnchorStyles.Left) 
       | System.Windows.Forms.AnchorStyles.Right)));
-    this.edit.Font = new System.Drawing.Font("Courier New", 10F);
+    this.edit.ConvertTabsToSpaces = true;
+    this.edit.EnableFolding = false;
+    this.edit.Encoding = ((System.Text.Encoding)(resources.GetObject("edit.Encoding")));
     this.edit.Location = new System.Drawing.Point(0, 16);
     this.edit.Name = "edit";
-    this.edit.Size = new System.Drawing.Size(656, 289);
+    this.edit.ShowInvalidLines = false;
+    this.edit.ShowLineNumbers = false;
+    this.edit.Size = new System.Drawing.Size(656, 272);
+    this.edit.TabIndent = 2;
     this.edit.TabIndex = 0;
-    this.edit.Text = "";
-    this.edit.WordWrap = false;
-    this.edit.TextChanged += new System.EventHandler(this.edit_TextChanged);
+    // 
+    // acbox
+    // 
+    this.acbox.BorderStyle = System.Windows.Forms.BorderStyle.FixedSingle;
+    this.acbox.Location = new System.Drawing.Point(144, 144);
+    this.acbox.Name = "acbox";
+    this.acbox.Size = new System.Drawing.Size(208, 106);
+    this.acbox.TabIndex = 4;
+    this.acbox.Visible = false;
     // 
     // lblCode
     // 
@@ -173,7 +171,7 @@ public class EditForm : System.Windows.Forms.Form
     this.pnlCode.Dock = System.Windows.Forms.DockStyle.Fill;
     this.pnlCode.Location = new System.Drawing.Point(0, 0);
     this.pnlCode.Name = "pnlCode";
-    this.pnlCode.Size = new System.Drawing.Size(656, 305);
+    this.pnlCode.Size = new System.Drawing.Size(656, 293);
     this.pnlCode.TabIndex = 3;
     // 
     // pnlImmediate
@@ -181,15 +179,15 @@ public class EditForm : System.Windows.Forms.Form
     this.pnlImmediate.Controls.Add(this.lblImmediate);
     this.pnlImmediate.Controls.Add(this.immediate);
     this.pnlImmediate.Dock = System.Windows.Forms.DockStyle.Bottom;
-    this.pnlImmediate.Location = new System.Drawing.Point(0, 305);
+    this.pnlImmediate.Location = new System.Drawing.Point(0, 293);
     this.pnlImmediate.Name = "pnlImmediate";
-    this.pnlImmediate.Size = new System.Drawing.Size(656, 100);
+    this.pnlImmediate.Size = new System.Drawing.Size(656, 112);
     this.pnlImmediate.TabIndex = 3;
     // 
     // splitter
     // 
     this.splitter.Dock = System.Windows.Forms.DockStyle.Bottom;
-    this.splitter.Location = new System.Drawing.Point(0, 302);
+    this.splitter.Location = new System.Drawing.Point(0, 290);
     this.splitter.Name = "splitter";
     this.splitter.Size = new System.Drawing.Size(656, 3);
     this.splitter.TabIndex = 5;
@@ -202,11 +200,11 @@ public class EditForm : System.Windows.Forms.Form
     this.Controls.Add(this.splitter);
     this.Controls.Add(this.pnlCode);
     this.Controls.Add(this.pnlImmediate);
-    this.Controls.Add(this.AcBox);
+    this.Controls.Add(this.acbox);
     this.Icon = ((System.Drawing.Icon)(resources.GetObject("$this.Icon")));
     this.KeyPreview = true;
     this.Name = "EditForm";
-    this.Text = "Editor";
+    this.Text = "New file";
     this.pnlCode.ResumeLayout(false);
     this.pnlImmediate.ResumeLayout(false);
     this.ResumeLayout(false);
@@ -214,18 +212,13 @@ public class EditForm : System.Windows.Forms.Form
   }
 	#endregion
 
-  protected override void Dispose(bool disposing)
-  { timer.Dispose();
-    base.Dispose(disposing);
-  }
-
   protected override void OnEnter(EventArgs e)
   { Boa.Modules.sys.displayhook = immediate.displayhook;
     base.OnEnter(e);
   }
 
   protected override void OnClosing(CancelEventArgs e)
-  { if(!e.Cancel && modified)
+  { if(!e.Cancel && Modified)
     { DialogResult res = MessageBox.Show("This window has not been saved. Save before closing?",
                                          "Save "+(filename==null ? "file" : Path.GetFileName(filename))+"?",
                                          MessageBoxButtons.YesNoCancel, MessageBoxIcon.Warning);
@@ -233,7 +226,7 @@ public class EditForm : System.Windows.Forms.Form
       else if(res==DialogResult.Yes)
         try
         { Save();
-          e.Cancel = modified;
+          e.Cancel = Modified;
         }
         catch { e.Cancel=true; }
     }
@@ -243,23 +236,11 @@ public class EditForm : System.Windows.Forms.Form
 
   protected override void OnKeyDown(KeyEventArgs e)
   { if(e.KeyData==Keys.F6)
-    { if(edit.Focused) immediate.Focus();
+    { if(edit.ContainsFocus) immediate.Focus();
       else edit.Focus();
       e.Handled = true;
     }
     base.OnKeyDown(e);
-  }
-
-  void edit_TextChanged(object sender, EventArgs e)
-  { if(!modified && edit.Modified)
-    { modified=true;
-      Text += "*";
-    }
-  }
-
-  void highLight_Tick(object sender, EventArgs e)
-  { edit.PerformSyntaxHighlighting();
-    immediate.PerformSyntaxHighlighting();
   }
 
   void SetFilename(string path)
@@ -267,11 +248,17 @@ public class EditForm : System.Windows.Forms.Form
     Text = Path.GetFileName(path);
   }
 
-  internal BoaBox edit;
-  internal ImmediateBox immediate;
-  internal AutoCompleteBox AcBox;
+  void Document_DocumentChanged(object sender, ICSharpCode.TextEditor.Document.DocumentEventArgs e)
+  { if(!modified)
+    { modified = true;
+      Text += "*";
+    }
+  }
+
   internal Frame boaFrame;
-  Timer timer;
+  internal AutoCompleteBox acbox;
+  BoaBox edit;
+  ImmediateBox immediate;
   string filename;
   bool modified;
 
