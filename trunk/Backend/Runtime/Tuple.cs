@@ -1,6 +1,8 @@
 using System;
 using System.Collections;
 
+// TODO: don't allow __repr__ to go into an infinite loop with circular references
+
 namespace Boa.Runtime
 {
 

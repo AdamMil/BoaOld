@@ -6,6 +6,8 @@ using Boa.Runtime;
 namespace Boa.Modules
 {
 
+// TODO: optimize by using Match.NextMatch()
+
 [BoaType("module")]
 public sealed class re
 { re() { }
@@ -23,10 +25,9 @@ public sealed class re
     
     public bool MoveNext()
     { if(pos==-2) return false;
-      if(pos==-1) pos=0;
-      match = regex.Match(str, pos);
-      if(match==null || !match.Success) { pos=-2; return false; }
-      pos = match.Index+match.Length;
+      if(pos==-1) { pos=0; match=regex.Match(str); }
+      else match=match.NextMatch();
+      if(!match.Success) { pos=-2; return false; }
       return true;
     }
 
@@ -35,7 +36,6 @@ public sealed class re
     Regex regex;
     string str;
     Match match;
-    int pos;
   }
 
   public class regex : Regex, IRepresentable

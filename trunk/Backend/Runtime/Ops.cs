@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Text.RegularExpressions;
 
 // TODO: investigate python's changes to the division operator
 
@@ -584,6 +585,7 @@ public sealed class Ops
   public static object Modulus(object a, object b)
   { if(a is int && b is int) return (int)a%(int)b;
     if(a is double && b is double) { return Math.IEEERemainder((double)a, (double)b); }
+    if(a is string) return PrintF((string)a, b);
     throw TypeError("unsupported operand type(s) for %: '{0}' and '{1}'", GetDynamicType(a).__name__, GetDynamicType(b).__name__);
   }
 
@@ -630,6 +632,7 @@ public sealed class Ops
   public static object PowerMod(object value, object power, object mod) { return Modulus(Power(value, power), mod); }
 
   public static void Print(object o) { Console.Write(o); }
+  public static string PrintF(string format, object args) { return new StringFormatter(format, args).Format(); }
   public static void PrintNewline() { Console.WriteLine(); }
 
   public static string Repr(object o)
@@ -780,6 +783,112 @@ public sealed class Ops
 
   public static readonly object FALSE=false, TRUE=true;
 
+  #region StringFormatter
+  sealed class StringFormatter
+  { public StringFormatter(string source, object args) { this.source=source; this.args=args; tup=args as Tuple; }
+
+    public string Format()
+    { MatchCollection matches = Ops.printfre.Matches(source);
+      Code[] formats = new Code[matches.Count];
+
+      int argwant=0, arggot, pos=0;
+      bool dict=false, nodict=false;
+      for(int i=0; i<formats.Length; i++)
+      { formats[i] = new Code(matches[i]);
+        argwant += formats[i].Args;
+        if(formats[i].Key==null) nodict=true;
+        else if(formats[i].Length==-2 || formats[i].Precision==-2) nodict=true;
+        else dict=true;
+      }
+      if(dict && nodict) throw Ops.TypeError("keyed format codes and non-keyed format codes (or codes with a "+
+                                             "length/precision of '#') mixed in format string");
+
+      arggot = tup==null ? 1 : tup.items.Length;
+      if(tup==null && dict) getitem = Ops.GetAttr(args, "__getitem__");
+      else if(dict) throw Ops.TypeError("format requires a mapping");
+      else if(argwant!=arggot) throw Ops.TypeError("incorrect number of arguments for string formatting "+
+                                                   "(expected {0}, but got {1})", argwant, arggot);
+
+      System.Text.StringBuilder sb = new System.Text.StringBuilder();
+      for(int fi=0; fi<formats.Length; fi++)
+      { Code f = formats[fi];
+        if(f.Match.Index>pos) sb.Append(source.Substring(pos, f.Match.Index-pos));
+        pos = f.Match.Index+f.Match.Length;        
+
+        if(f.Length==-2) f.Length = Ops.ToInt(NextArg());
+        if(f.Precision==-2) f.Precision = Ops.ToInt(NextArg());
+        
+        switch(f.Type) // TODO: support long integers
+        { case 'd': case 'i': case 'u':
+          { int i = Ops.ToInt(GetArg(f.Key));
+            string s;
+            bool neg, prefix=false;
+            if(f.Type=='u') { s=((uint)i).ToString(); neg=false; }
+            else { s=i.ToString(); neg=prefix=i<0; }
+
+            int ptype = f.HasFlag('+') ? 1 : f.HasFlag(' ') ? 2 : 0;
+            if(!neg && ptype!=0) { s=(ptype==1 ? '+' : ' ') + s; prefix=true; }
+            if(f.Length>0 && s.Length<f.Length)
+            { if(f.HasFlag('-')) s = s.PadRight(f.Length, ' ');
+              else if(f.HasFlag('0'))
+              { if(prefix) s = s[0] + s.Substring(1).PadLeft(f.Length-1, '0');
+                else s = s.PadLeft(f.Length, '0');
+              }
+              else s = s.PadLeft(f.Length, ' ');
+            }
+            sb.Append(s);
+            break;
+          }
+
+          case 'o': throw new NotImplementedException();
+          case 'x': case 'X': throw new NotImplementedException();
+          case 'e': case 'E': case 'f': case 'F': case 'g': case 'G': throw new NotImplementedException();
+          case 'c':
+          { object c = GetArg(f.Key);
+            string s = c as string;
+            sb.Append(s==null ? (char)Ops.ToInt(c) : s[0]);
+            break;
+          }
+          case 'r': sb.Append(Ops.Repr(GetArg(f.Key))); break;
+          case 's': sb.Append(Ops.Str(GetArg(f.Key))); break;
+          case '%': sb.Append('%'); break;
+          default: throw Ops.ValueError("unsupported format character '{0}' (0x{1:X})", f.Type, (int)f.Type);
+        }
+      }
+      if(pos<source.Length) sb.Append(source.Substring(pos));
+      return sb.ToString();
+    }
+    
+    #region Code
+    struct Code
+    { public Code(Match m)
+      { Match     = m;
+        Length    = m.Groups[3].Success ? m.Groups[3].Value=="*" ? -2 : Ops.ToInt(m.Groups[3].Value) : -1;
+        Precision = m.Groups[4].Success ? m.Groups[4].Value=="*" ? -2 : Ops.ToInt(m.Groups[4].Value) : -1;
+      }
+
+      public int    Args  { get { return 1 + (Length==-2 ? 1 : 0) + (Precision==-2 ? 1 : 0); } }
+      public string Flags { get { return Match.Groups[2].Value; } }
+      public string Key   { get { return Match.Groups[1].Success ? Match.Groups[1].Value : null; } }
+      public char   Type  { get { return Match.Groups[5].Value[0]; } }
+      
+      public bool HasFlag(char c) { return Flags.IndexOf(c)!=-1; }
+
+      public Match Match;
+      public int   Length, Precision;
+    }
+    #endregion
+    
+    object GetArg(string name) { return name==null ? NextArg() : Ops.Call(getitem, name); }
+    object NextArg() { return tup==null ? args : tup.items[argi++]; }
+
+    string source;
+    int argi;
+    Tuple tup;
+    object args, getitem;
+  }
+  #endregion
+
   static bool IsIn(Type[] typeArr, Type type)
   { for(int i=0; i<typeArr.Length; i++) if(typeArr[i]==type) return true;
     return false;
@@ -808,6 +917,10 @@ public sealed class Ops
       typeof(long), typeof(ulong)
     }
   };
+
+  static readonly Regex printfre =
+    new Regex(@"%(\([^)]\))?([#0 +-]*)(\d+|\*)?(?:.(\d+|\*))?[hlL]?(.)",
+              RegexOptions.Compiled|RegexOptions.Singleline);
 }
 
 } // namespace Boa.Runtime

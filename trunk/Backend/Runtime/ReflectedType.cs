@@ -532,6 +532,8 @@ public class ReflectedProperty : ReflectedMember, IDataDescriptor
 }
 #endregion
 
+// TODO: add sequence methods (including slicing) to lists and mapping methods to dictionaries
+// TODO: special case Array slicing?
 #region ReflectedType
 public class ReflectedType : BoaType
 { ReflectedType(Type type) : base(type) { }
