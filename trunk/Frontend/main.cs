@@ -17,20 +17,25 @@ public class Text
     { try
       { Console.Write(">>> ");
 string source = 
-@"
+/*@"
 def makeAdder(base):
     def add(n): return base+n
     return add
 a = makeAdder(4)
 b = makeAdder(6)
 print a(3), b(3)
+";*/
+@"
+def outer():
+  a = 5
+  def middle():
+    def inner(): print a
 ";
 //        Statement stmt = Parser.FromStream(stdin).ParseStatement();
         Statement stmt = Parser.FromString(source).Parse();
         #if COMPILED
         stmt.PostProcessForCompile();
         FrameCode code = SnippetMaker.Generate(stmt);
-        SnippetMaker.DumpAssembly();
         code.Run(topFrame);
         #else
         stmt.PostProcessForInterpret();
