@@ -906,6 +906,7 @@ the integer 97, ord('\u2020') returns 8224. This is the inverse of chr().")]
   { if(s.Length!=1) throw Ops.TypeError("ord() expected a character but got string of length {0}", s.Length);
     return (int)s[0];
   }
+  public static int ord(char c) { return (int)c; }
 
   [DocString(@"pow(x, y[, z]) -> object
 

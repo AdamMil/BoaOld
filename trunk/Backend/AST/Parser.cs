@@ -126,7 +126,8 @@ public class Parser
 
   // statement     := <stmt_line> | <compound_stmt>
   // compount_stmt := <if_stmt> | <while_stmt> | <for_stmt> | <def_stmt> | <try_stmt> | <global_stmt> |
-  //                  <import_stmt> | <class_stmt>
+  //                  <import_stmt> | <class_stmt> | <label_stmt>
+  // label_stmt    := <identitier> <suite>
   public Statement ParseStatement()
   { switch(token)
     { case Token.If:     return ParseIf();
@@ -137,7 +138,18 @@ public class Parser
       case Token.Global: return ParseGlobal();
       case Token.Class:  return ParseClass();
       case Token.Import: case Token.From: return ParseImport();
-      default: return ParseStmtLine();
+      default:
+        if(token==Token.Identifier)
+        { string label = (string)value;
+          if(PeekToken()==Token.Colon)
+          { NextToken();
+            Statement st = ParseSuite();
+            if(!(st is Suite)) st = new Suite(new Statement[] { st });
+            ((Suite)st).Name = label;
+            return st;
+          } 
+        }
+        return ParseStmtLine();
     }
   }
 
@@ -793,7 +805,7 @@ public class Parser
   }
 
   // simple_stmt := <expr_stmt> | <print_stmt> | <break_stmt> | <continue_stmt> | <pass_stmt> | <return_stmt>
-  //                <assert_stmt> | <del_stmt> | <yield_stmt>
+  //                <assert_stmt> | <del_stmt> | <yield_stmt> | <goto_stmt>
   // break_stmt    := 'break' EOL
   // continue_stmt := 'continue' EOL
   // pass_stmt     := 'pass' EOL
@@ -803,18 +815,30 @@ public class Parser
   // yield_stmt    := 'yield' <expression>
   // del_stmt      := 'del' <lvalue> (',' <lvalue>)*
   // exec_stmt     := 'exec' <expression> ('in' <expression> (',' <expression>)?)?
+  // goto_stmt     := 'goto' <identifier>
   Statement ParseSimpleStmt()
   { switch(token)
     { case Token.Print: return ParsePrintStmt();
       case Token.Break:
-        // FIXME: this doesn't work if you have a break in a function nested in a loop
-        if(!InLoop) SyntaxError("'break' encountered outside loop");
-        NextToken();
-        return AP(new BreakStatement());
+      { BreakStatement bs=null;
+        if(NextToken()==Token.Identifier)
+        { bs = new BreakStatement((string)value);
+          NextToken();
+        }
+        else if(!InLoop) SyntaxError("'break' encountered outside loop");
+        else bs = new BreakStatement();
+        return AP(bs);
+      }
       case Token.Continue:
-        if(!InLoop) SyntaxError("'continue' encountered outside loop");
-        NextToken();
-        return AP(new ContinueStatement());
+      { ContinueStatement cs=null;
+        if(NextToken()==Token.Identifier)
+        { cs = new ContinueStatement((string)value);
+          NextToken();
+        }
+        else if(!InLoop) SyntaxError("'continue' encountered outside loop");
+        else cs = new ContinueStatement();
+        return AP(cs);
+      }
       case Token.Pass: NextToken(); return AP(new PassStatement());
       case Token.Return:
         NextToken();

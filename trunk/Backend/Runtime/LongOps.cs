@@ -129,7 +129,7 @@ public sealed class LongOps
     switch(Convert.GetTypeCode(b))
     { case TypeCode.Boolean: return (int)(((bool)b ? a-1 : a)>>32);
       case TypeCode.Byte: return (int)(((a - (byte)b)>>32)>>32);
-      case TypeCode.Char: return (int)((a - (char)b)>>32);
+      case TypeCode.Char: case TypeCode.String: return -1;
       case TypeCode.Decimal:
       { Decimal v = (Decimal)b;
         return a<v ? -1 : a>v ? 1 : 0;
@@ -155,7 +155,6 @@ public sealed class LongOps
       { float av=a, bv=(float)b;
         return av<bv ? -1 : av>bv ? 1 : 0;
       }
-      case TypeCode.String: return -1;
       case TypeCode.UInt16: return (int)((a - (ushort)b)>>32);
       case TypeCode.UInt32: return a<0 ? -1 : (int)((ulong)a - (uint)b);
       case TypeCode.UInt64: return a<0 ? -1 : (int)((ulong)a - (ulong)b);
