@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Reflection;
 using System.Reflection.Emit;
 using Boa.Runtime;
@@ -11,16 +12,94 @@ public abstract class Statement : Node
 { public abstract void Emit(CodeGenerator cg);
   public abstract object Execute(Frame frame);
   
-  public static void PostProcessForCompile()
+  public void PostProcessForCompile()
   { PostProcess();
-    DecorateNames();
+    Walk(new NameDecorator());
   }
-  public static void PostProcessForInterpret() { PostProcess(); }
+  public void PostProcessForInterpret() { PostProcess(); }
 
-  static void DecorateNames()
-  { 
+  void PostProcess() { }
+
+  #region NameDecorator
+  // TODO: handle lambda, pragma global, and other types of assignments
+  class NameDecorator : IWalker
+  { public void PostWalk(Node node)
+    { if(node==current)
+      { inDef=false;
+
+        Names = new Name[localNames.Count];
+        localNames.Values.CopyTo(Names, 0);
+
+        foreach(DefStatement def in innerFuncs)
+        { NameDecorator dec = new NameDecorator();
+          def.Walk(dec);
+          foreach(Name dname in dec.localNames.Values)
+            if(dname.Type==Name.Scope.Free)
+            { Name name = (Name)localNames[dname.String];
+              if(name!=null)
+              { if(name.Type==Name.Scope.Local) name.Type=Name.Scope.Closed;
+              }
+              else localNames[dname.String] = name;
+            }
+        }
+      }
+    }
+
+    public bool Walk(Node node)
+    { if(inDef)
+      { if(node is DefStatement)
+        { DefStatement de = (DefStatement)node;
+          innerFuncs.Add(node);
+          de.Name = AddLocal(de.Name);
+          de.Name.Type = Name.Scope.Local;
+          return false;
+        }
+        else if(node is NameExpression)
+        { NameExpression ne = (NameExpression)node;
+          ne.Name = AddLocal(ne.Name);
+        }
+        else if(node is AssignStatement)
+        { AssignStatement ass = (AssignStatement)node;
+          if(ass.LHS is NameExpression)
+          { NameExpression ne = (NameExpression)ass.LHS;
+            ne.Name = AddLocal(ne.Name);
+            ne.Name.Type = Name.Scope.Local;
+          }
+          else throw Ops.NotImplemented("Unhandled type '{0}' in NameDecorator", node.GetType());
+          Walk(ass.RHS);
+          return false;
+        }
+        return true;
+      }
+      else if(node is Suite) return true;
+      else if(node is DefStatement)
+      { if(innerFuncs==null)
+        { innerFuncs = new ArrayList();
+          localNames = new SortedList();
+        }
+        inDef=true; current=node;
+
+        DefStatement def = (DefStatement)node;
+        foreach(Parameter p in def.Parameters) localNames[p.Name.String] = p.Name;
+        return true;
+      }
+      return false;
+    }
+    
+    public Name[] Names;
+    
+    Name AddLocal(Name name)
+    { Name lname = (Name)localNames[name.String];
+      if(lname==null) localNames[name.String] = lname = name;
+      return lname;
+    }
+
+    Node       current;
+    ArrayList  innerFuncs;
+    SortedList localNames;
+    bool inDef;
   }
-  static void PostProcess() { }
+  #endregion
 }
 #endregion
 
@@ -42,7 +121,7 @@ public class Suite : Statement
   }
 
   public override void Walk(IWalker w)
-  { if(w.Walk(this)) foreach(Statement stmt in Statements) w.Walk(stmt);
+  { if(w.Walk(this)) foreach(Statement stmt in Statements) stmt.Walk(w);
     w.PostWalk(this);
   }
 
@@ -67,8 +146,8 @@ public class AssignStatement : Statement
 
   public override void Walk(IWalker w)
   { if(w.Walk(this))
-    { w.Walk(LHS);
-      w.Walk(RHS);
+    { LHS.Walk(w);
+      RHS.Walk(w);
     }
     w.PostWalk(this);
   }
@@ -88,7 +167,7 @@ public class DefStatement : Statement
 
     cg.EmitString(Name.String);
     GetParmsSlot(cg).EmitGet(cg);
-    cg.ILG.Emit(OpCodes.Ldnull);
+    cg.ILG.Emit(OpCodes.Ldnull); // create delegate
     cg.ILG.Emit(OpCodes.Ldftn, impl.MethodBuilder);
     cg.EmitNew((ConstructorInfo)typeof(CallTarget).GetMember(".ctor")[0]);
     cg.EmitNew(typeof(CompiledFunction), new Type[] { typeof(string), typeof(Parameter[]), typeof(CallTarget) });
@@ -103,7 +182,7 @@ public class DefStatement : Statement
   }
   
   public override void Walk(IWalker w)
-  { if(w.Walk(this)) w.Walk(Body);
+  { if(w.Walk(this)) Body.Walk(w);
     w.PostWalk(this);
   }
 
@@ -113,23 +192,23 @@ public class DefStatement : Statement
 
   Slot GetParmsSlot(CodeGenerator cg)
   { if(namesSlot==null)
-    { namesSlot = cg.TypeGenerator.AddStaticSlot(Name.String+"$parms", typeof(Parameter[]));
+    { namesSlot = cg.TypeGenerator.AddStaticSlot(Name.String+"$parms"+index++, typeof(Parameter[]));
       CodeGenerator icg = cg.TypeGenerator.GetInitializer();
-      ConstructorInfo nci = typeof(Name).GetConstructor(new Type[] { typeof(string), typeof(Name.Flag) });
-      ConstructorInfo pci = typeof(Name).GetConstructor(new Type[] { typeof(Name) });
+      ConstructorInfo nci = typeof(Name).GetConstructor(new Type[] { typeof(string), typeof(Name.Scope) });
+      ConstructorInfo pci = typeof(Parameter).GetConstructor(new Type[] { typeof(Name) });
 
       icg.EmitNewArray(typeof(Parameter), Parameters.Length);
       for(int i=0; i<Parameters.Length; i++)
       { icg.ILG.Emit(OpCodes.Dup);
         icg.EmitInt(i);
-        icg.ILG.Emit(OpCodes.Ldelema);
+        icg.ILG.Emit(OpCodes.Ldelema, typeof(Parameter));
         icg.EmitString(Parameters[i].Name.String);
-        icg.EmitInt((int)Parameters[i].Name.Flags);
+        icg.EmitInt((int)Parameters[i].Name.Type);
         icg.EmitNew(nci);
         icg.EmitNew(pci);
         icg.ILG.Emit(OpCodes.Stobj, typeof(Parameter));
       }
-      namesSlot.EmitSet(cg);
+      namesSlot.EmitSet(icg);
     }
     return namesSlot;
   }
@@ -138,7 +217,7 @@ public class DefStatement : Statement
   { Name[] names = new Name[Parameters.Length]; 
     for(int i=0; i<Parameters.Length; i++) names[i] = Parameters[i].Name;
 
-    CodeGenerator icg = cg.TypeGenerator.DefineMethod(Name + "$f" + index++, typeof(object),
+    CodeGenerator icg = cg.TypeGenerator.DefineMethod(Name.String + "$f" + index++, typeof(object),
                                                       new Type[] { typeof(object[]) });
     icg.Namespace = new LocalNamespace(cg.Namespace, icg);
     icg.SetArgs(names);
@@ -151,7 +230,7 @@ public class DefStatement : Statement
   public object MakeFunction(Frame frame) { return new InterpretedFunction(frame, Name.String, Parameters, Body); }
 
   Slot namesSlot;
-  int index;
+  static int index;
 }
 #endregion
 
@@ -166,7 +245,7 @@ public class ExpressionStatement : Statement
   public override object Execute(Frame frame) { return Expression.Evaluate(frame); }
 
   public override void Walk(IWalker w)
-  { if(w.Walk(this)) w.Walk(Expression);
+  { if(w.Walk(this)) Expression.Walk(w);
     w.PostWalk(this);
   }
 
@@ -199,9 +278,9 @@ public class IfStatement : Statement
 
   public override void Walk(IWalker w)
   { if(w.Walk(this))
-    { w.Walk(Test);
-      w.Walk(Body);
-      if(Else!=null) w.Walk(Else);
+    { Test.Walk(w);
+      Body.Walk(w);
+      if(Else!=null) Else.Walk(w);
     }
     w.PostWalk(this);
   }
@@ -234,7 +313,7 @@ public class PrintStatement : Statement
   }
 
   public override void Walk(IWalker w)
-  { if(w.Walk(this)) foreach(Expression e in Expressions) w.Walk(e);
+  { if(w.Walk(this)) foreach(Expression e in Expressions) e.Walk(w);
     w.PostWalk(this);
   }
 
@@ -252,7 +331,7 @@ public class ReturnStatement : Statement
   public override object Execute(Frame frame) { return Expression==null ? null : Expression.Evaluate(frame); }
 
   public override void Walk(IWalker w)
-  { if(w.Walk(this) && Expression!=null) w.Walk(Expression);
+  { if(w.Walk(this) && Expression!=null) Expression.Walk(w);
     w.PostWalk(this);
   }
 
