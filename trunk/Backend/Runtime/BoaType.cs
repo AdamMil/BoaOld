@@ -55,7 +55,8 @@ public abstract class BoaType : DynamicType, IDynamicObject, ICallable, IHasAttr
   #endregion
 
   #region IHasAttributes
-  public List __attrs__()
+  // TODO: this should include virtual slots like __name__, __dict__, etc., I think
+  public virtual List __attrs__()
   { Initialize();
     return dict.keys();
   }
@@ -80,14 +81,33 @@ public abstract class BoaType : DynamicType, IDynamicObject, ICallable, IHasAttr
   }
   #endregion
 
-  // TODO: should this include virtual slots like __dict__ ?
+  public virtual void DelAttr(Tuple mro, int index, object self, string name) { DelAttr(self, name); }
+
   public override List GetAttrNames(object self) { return __attrs__(); }
+
+  public virtual object GetAttr(Tuple mro, int index, object self, string name) { return GetAttr(self, name); }
   public override bool GetAttr(object self, string name, out object value)
   { value = __getattr__(name);
     return value!=Ops.Missing;
   }
 
-  internal object LookupSlot(string name) { return RawGetSlot(name); }
+  internal object LookupSlot(string name)
+  { foreach(BoaType type in mro)
+    { object slot = type.RawGetSlot(name);
+      if(slot!=null) return slot;
+    }
+    return null;
+  }
+  
+  protected object LookupSlot(Tuple mro, int index, string name)
+  { for(; index<mro.Count; index++)
+    { object slot = ((BoaType)mro.items[index]).RawGetSlot(name);
+      if(slot!=null) return slot;
+    }
+    return null;
+  }
+
+  internal Tuple mro;
 
   protected virtual void Initialize()
   { if(!initialized)
@@ -99,12 +119,17 @@ public abstract class BoaType : DynamicType, IDynamicObject, ICallable, IHasAttr
   protected object RawGetSlot(string name)
   { Initialize();
     if(name=="__dict__") return dict;
+    if(name=="mro") return mro;
     return dict[name];
   }
 
   protected void RawRemoveSlot(string name) { dict.Remove(name); }
 
   protected void RawSetSlot(string name, object value) { dict[name] = value; }
+
+  public virtual void SetAttr(Tuple mro, int index, object self, string name, object value)
+  { SetAttr(self, name, value);
+  }
 
   protected Dict dict;
   protected Type type;

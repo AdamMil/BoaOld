@@ -26,6 +26,8 @@ using Boa.AST;
 namespace Boa.Runtime
 {
 
+public enum FunctionType { Unmarked, Static, Class, Method };
+
 public struct CallArg
 { public CallArg(object value, object type) { Value=value; Type=type; }
   public object Value, Type;
@@ -36,6 +38,7 @@ public struct CallArg
 public abstract class Function : IFancyCallable
 { public Function(string name, string[] names, object[] defaults, bool list, bool dict, int required)
   { Name=name; ParamNames=names; Defaults=defaults; HasList=list; HasDict=dict; NumRequired=required;
+    Type=FunctionType.Unmarked;
   }
 
   public string FuncName { get { return Name==null ? "<lambda>" : Name; } }
@@ -43,12 +46,15 @@ public abstract class Function : IFancyCallable
   public abstract object Call(params object[] args);
   public abstract object Call(object[] args, string[] names, object[] values);
 
+  public abstract Function MakeMarked(FunctionType type);
+
   public override string ToString() { return Name==null ? "<lambda>" : string.Format("<function '{0}'>", Name); }
 
   public string Name, __doc__;
   public string[] ParamNames;
   public object[] Defaults;
   public int NumRequired;
+  public FunctionType Type;
   public bool HasList, HasDict;
 
   protected object[] FixArgs(object[] args)
@@ -166,6 +172,12 @@ public sealed class CompiledFunctionN : CompiledFunction
   { return Target(MakeArgs(positional, names, values));
   }
 
+  public override Function MakeMarked(FunctionType type)
+  { Function f = new CompiledFunctionN(Name, ParamNames, Defaults, HasList, HasDict, NumRequired, Closed, Target);
+    f.Type = type;
+    return f;
+  }
+
   CallTargetN Target;
 }
 
@@ -178,6 +190,12 @@ public sealed class CompiledFunctionFN : CompiledFunction
 
   public override object Call(object[] positional, string[] names, object[] values)
   { return Target(this, MakeArgs(positional, names, values));
+  }
+
+  public override Function MakeMarked(FunctionType type)
+  { Function f = new CompiledFunctionFN(Name, ParamNames, Defaults, HasList, HasDict, NumRequired, Closed, Target);
+    f.Type = type;
+    return f;
   }
 
   CallTargetFN Target;
@@ -194,6 +212,13 @@ public sealed class InterpretedFunction : Function
   public override object Call(params object[] args) { return DoCall(FixArgs(args)); }
   public override object Call(object[] positional, string[] names, object[] values)
   { return DoCall(MakeArgs(positional, names, values));
+  }
+
+  public override Function MakeMarked(FunctionType type)
+  { Function f = new InterpretedFunction(Name, ParamNames, Defaults, HasList, HasDict, NumRequired,
+                                         Globals, Frame, Body, __doc__);
+    f.Type = type;
+    return f;
   }
 
   public Name[] Globals;

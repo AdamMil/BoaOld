@@ -549,7 +549,10 @@ public class ReflectedProperty : ReflectedMember, IDataDescriptor
 // TODO: special case Array slicing?
 #region ReflectedType
 public class ReflectedType : BoaType
-{ ReflectedType(Type type) : base(type) { }
+{ ReflectedType(Type type) : base(type)
+  { mro = new Tuple(type==typeof(object) ? new object[] { this } :
+                                           new object[] { this, ReflectedType.FromType(typeof(object)) });
+  }
 
   public ReflectedConstructor Constructor { get { Initialize(); return cons; } }
 

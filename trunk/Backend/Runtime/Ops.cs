@@ -502,7 +502,7 @@ public sealed class Ops
   { object mc = dict["__metaclass__"];
     if(mc!=null) return mc;
     // TODO: use a better rule for choosing the metaclass?
-    return bases.Count>0 ? GetDynamicType(bases.items[0]) : ReflectedType.FromType(typeof(object));
+    return bases.Count>0 ? GetDynamicType(bases.items[0]) : ReflectedType.FromType(typeof(UserType));
   }
 
   public static int FixIndex(int index, int length)
@@ -591,11 +591,13 @@ public sealed class Ops
   }
 
   public static object GetDescriptor(object desc, object instance)
-  { IDescriptor d = desc as IDescriptor;
+  { if(Convert.GetTypeCode(desc)!=TypeCode.Object) return desc; // TODO: i'm not sure how much this optimization helps (if at all)
+
+    IDescriptor d = desc as IDescriptor;
     if(d!=null) return d.__get__(instance);
     object ret;
-    if(TryInvoke(desc, "__get__", out ret, instance)) return ret; // TODO: this is expensive and happens very often
-    return desc;                                                  // but the common case is that it just returns desc
+    if(TryInvoke(desc, "__get__", out ret, instance)) return ret;
+    return desc;
   }
 
   public static DynamicType GetDynamicType(object o)
@@ -775,7 +777,8 @@ public sealed class Ops
   }
 
   public static object MakeClass(string module, string name, Tuple bases, IDictionary dict)
-  { object metaclass = FindMetaclass(bases, dict);
+  { if(bases.Count==0) bases = new Tuple(new object[] { ReflectedType.FromType(typeof(object)) });
+    object metaclass = FindMetaclass(bases, dict);
     if(metaclass==ReflectedType.FromType(typeof(ReflectedType)) ||
        metaclass==ReflectedType.FromType(typeof(UserType)))
       return new UserType(module, name, bases, dict);
