@@ -26,6 +26,8 @@ using System.Reflection;
 namespace Boa.Runtime
 {
 
+// FIXME: handle nested classes
+
 [BoaType("package")]
 public class ReflectedPackage : IHasAttributes
 { public ReflectedPackage(string name) { __name__=name; __dict__=new Dict(); }

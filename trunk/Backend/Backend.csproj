@@ -148,7 +148,16 @@
                     BuildAction = "None"
                 />
                 <File
+                    RelPath = "lib\socket.boa"
+                    BuildAction = "None"
+                />
+                <File
                     RelPath = "Modules\__builtin__.cs"
+                    SubType = "Code"
+                    BuildAction = "Compile"
+                />
+                <File
+                    RelPath = "Modules\_socket.cs"
                     SubType = "Code"
                     BuildAction = "Compile"
                 />
@@ -174,11 +183,6 @@
                 />
                 <File
                     RelPath = "Modules\re.cs"
-                    SubType = "Code"
-                    BuildAction = "Compile"
-                />
-                <File
-                    RelPath = "Modules\socket.cs"
                     SubType = "Code"
                     BuildAction = "Compile"
                 />
