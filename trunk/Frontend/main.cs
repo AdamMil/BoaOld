@@ -1,4 +1,4 @@
-//#define COMPILED
+#define COMPILED
 
 using System;
 using Boa.AST;
@@ -9,41 +9,45 @@ namespace Boa.Frontend
 
 public class Text
 { static void DoInteractive()
-  { Module top = new Module();
-    Frame topFrame = new Frame(top);
+  { Options.Interactive = true;
 
-System.IO.Stream stdin = Console.OpenStandardInput();
-string source = 
-@"
-def makeAdder(base):
-    def add(n): return base+n
-    return add
-";
-Statement glob = Parser.FromString(source).Parse();
-#if COMPILED
-glob.PostProcessForCompile();
-SnippetMaker.Generate(glob).Run(topFrame);
-#else
-glob.PostProcessForInterpret();
-glob.Execute(topFrame);
-#endif
+    Module top = new Module();
+    Frame topFrame = new Frame(top);
+    topFrame.SetGlobal("_", null);
 
     while(true)
     { try
-      { Console.Write(">>> ");
-//        Statement stmt = Parser.FromStream(stdin).ParseStatement();
-        string line = Console.ReadLine();
-        if(line=="quit" || line=="exit") break;
-        Statement stmt = Parser.FromString(line).Parse();
+      { Statement stmt=null;
+        Console.Write(">>> ");
+        string source = Console.ReadLine();
+        if(source=="quit" || source=="exit") break;
+
+        try
+        { stmt = Parser.FromString(source).Parse();
+        }
+        catch(SyntaxErrorException e)
+        { if(e.Message.IndexOf("expected indent")==-1) throw;
+          source += '\n';
+          while(true)
+          { Console.Write("... ");
+            string line = Console.ReadLine();
+            if(line==null) break;
+            source += line + '\n';
+          }
+          stmt = Parser.FromString(source).Parse();
+        }
+
+        topFrame.SetGlobal("_", null);
         #if COMPILED
         stmt.PostProcessForCompile();
-        FrameCode code = SnippetMaker.Generate(stmt);
-        code.Run(topFrame);
+        object ret = SnippetMaker.Generate(stmt).Run(topFrame);
+        if(ret==null) ret = topFrame.GetGlobal("_");
         #else
         stmt.PostProcessForInterpret();
-        object ret = stmt.Execute(topFrame);
-        if(ret!=null) Console.WriteLine(ret);
+        stmt.Execute(topFrame);
+        object ret = topFrame.GetGlobal("_");
         #endif
+        if(ret!=null) Console.WriteLine(ret);
       }
       catch(Exception e)
       { Console.Error.WriteLine();

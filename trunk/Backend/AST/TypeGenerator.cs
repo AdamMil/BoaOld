@@ -1,5 +1,6 @@
 using System;
 using System.Collections;
+using System.Collections.Specialized;
 using System.Reflection;
 using System.Reflection.Emit;
 
@@ -65,7 +66,7 @@ public class TypeGenerator
   public AssemblyGenerator Assembly;
   public TypeBuilder TypeBuilder;
 
-  Hashtable constants = new Hashtable();
+  HybridDictionary constants = new HybridDictionary();
   CodeGenerator initGen;
 }
 

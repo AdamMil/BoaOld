@@ -1,10 +1,18 @@
 using System;
+using System.Collections;
 
 namespace Boa.Runtime
 {
 
 public class Ops
-{ public static AttributeErrorException AttributeError(string format, params object[] args)
+{ public static readonly object Missing = "<missing>";
+  public static readonly DefaultBoaComparer DefaultComparer = new DefaultBoaComparer();
+
+  public class DefaultBoaComparer : IComparer
+  { public int Compare(object x, object y) { return Ops.Compare(x, y); }
+  }
+
+  public static AttributeErrorException AttributeError(string format, params object[] args)
   { return new AttributeErrorException(string.Format(format, args));
   }
 
@@ -53,6 +61,15 @@ public class Ops
 
   public static object Equal(object a, object b) { return a==b ? TRUE : BoolToObject(a.Equals(b)); }
 
+  public static int FixIndex(int index, int length)
+  { if(index<0)
+    { v += len;
+      if(index<0) throw Ops.IndexError("index out of range: {0}", index-len);
+    }
+    else if(index>=length) throw Ops.IndexError("index out of range: {0}", index);
+    return index;
+  }
+
   public static object FloorDivide(object a, object b)
   { if(a is int && b is int) return (int)Math.Floor((double)a/(int)b);
     if(a is double && b is double) return Math.Floor((double)a/(double)b);
@@ -60,24 +77,39 @@ public class Ops
   }
 
   public static object GetAttr(object obj, string name)
-  { throw Ops.AttributeError("type object '{0}' has no attribute '{1}'", obj.GetType(), name);
+  { IHasAttributes iha = obj as IHasAttributes;
+    if(iha!=null) return iha.__getattr__(name);
+    return GetDynamicType(obj).GetAttr(obj, name);
   }
 
   public static bool GetAttr(object obj, string name, out object value)
-  { value = null;
-    return false;
+  { try
+    { IHasAttributes iha = obj as IHasAttributes;
+      if(iha!=null)
+      { value = iha.__getattr__(name);
+        return value!=Ops.Missing;
+      }
+      return GetDynamicType(obj).GetAttr(obj, name, out value);
+    }
+    catch(AttributeErrorException) { value=null; return false; }
+  }
+
+  public static DynamicType GetDynamicType(object obj)
+  { IDynamicObject dt = obj as IDynamicObject;
+    if(dt!=null) return dt.GetDynamicType();
+    if(obj is string) return StringType;
+    if(obj==null) return NoneType.Value;
+    return ReflectedType.FromType(obj.GetType());
   }
 
   public static object Identical(object a, object b) { return a==b ? TRUE : FALSE; }
 
-  public static object Invoke(object target, string name, params object[] args)
-  { return Call(GetAttr(target, name), args);
+  public static IndexErrorException IndexError(string format, params object[] args)
+  { return new IndexErrorException(string.Format(format, args));
   }
 
-  public static bool TryToInvoke(object target, string name, out object retValue, params object[] args)
-  { object method;
-    if(GetAttr(target, name, out method)) { retValue = Call(method, args); return true; }
-    else { retValue = null; return false; }
+  public static object Invoke(object target, string name, params object[] args)
+  { return Call(GetAttr(target, name), args);
   }
 
   public static bool IsTrue(object o)
@@ -146,6 +178,12 @@ public class Ops
     throw Ops.TypeError("unsupported operand type(s) for >>: '{0}' and '{1}'", a.GetType(), b.GetType());
   }
 
+  public static void SetAttr(object value, object obj, string name)
+  { IHasAttributes iha = obj as IHasAttributes;
+    if(iha!=null)  iha.__setattr__(name, value);
+    else GetDynamicType(obj).SetAttr(obj, name, value);
+  }
+
   public static object Subtract(object a, object b)
   { if(a is int && b is int) return (int)a-(int)b;
     if(a is double && b is double) return (double)a-(double)b;
@@ -156,11 +194,25 @@ public class Ops
   { return new SyntaxErrorException(string.Format(format, args));
   }
 
+  public static object ToBoa(object o) { return o is char ? o.ToString() : o; }
+
+  public static bool TryToInvoke(object target, string name, out object retValue, params object[] args)
+  { object method;
+    if(GetAttr(target, name, out method)) { retValue = Call(method, args); return true; }
+    else { retValue = null; return false; }
+  }
+
   public static TypeErrorException TypeError(string format, params object[] args)
   { return new TypeErrorException(string.Format(format, args));
   }
 
+  public static ValueErrorException ValueError(string format, params object[] args)
+  { return new ValueErrorException(string.Format(format, args));
+  }
+
   public static readonly object FALSE=false, TRUE=true;
+  
+  static readonly ReflectedType StringType = ReflectedType.FromType(typeof(string));
 }
 
 } // namespace Boa.Runtime

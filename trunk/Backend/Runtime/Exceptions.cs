@@ -15,6 +15,10 @@ public abstract class CompileTimeException : LanguageException
 { public CompileTimeException(string message) : base(message) { }
 }
 
+public class IndexErrorException : RuntimeException
+{ public IndexErrorException(string message) : base(message) { }
+}
+
 public class NameErrorException : RuntimeException
 { public NameErrorException(string message) : base(message) { }
 }
@@ -29,6 +33,10 @@ public class SyntaxErrorException : CompileTimeException
 
 public class TypeErrorException : RuntimeException
 { public TypeErrorException(string message) : base(message) { }
+}
+
+public class ValueErrorException : RuntimeException
+{ public ValueErrorException(string message) : base(message) { }
 }
 
 } // namespace Boa.Runtime
