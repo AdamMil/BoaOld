@@ -279,11 +279,6 @@ public class AssertStatement : Statement
       cg.EmitString(Expression.ToCode());
       cg.EmitCall(typeof(string), "Concat", new Type[] { typeof(string), typeof(string) });
       cg.EmitNew(typeof(AssertionErrorException));
-      cg.ILG.Emit(OpCodes.Dup);
-      cg.EmitString(Source);
-      cg.EmitInt(Line);
-      cg.EmitInt(Column);
-      cg.EmitCall(typeof(AssertionErrorException), "SetPosition");
       cg.ILG.Emit(OpCodes.Throw);
       cg.ILG.MarkLabel(good);
     }
@@ -371,76 +366,75 @@ public class AssignStatement : Statement
             if(emitted && ti==0) cg.ILG.Emit(OpCodes.Pop);
           }
           else
-          { // TODO: maybe reduce this to a single case that uses an enumerator (after checking lengths)?
-            // TODO: consider removing the string case by converting it to an ISequence with SequenceWrapper
+          { 
             #region lots of MSIL code here
-            Label notseq = cg.ILG.DefineLabel(), notstr = cg.ILG.DefineLabel(), badlen = cg.ILG.DefineLabel(),
-                  end = cg.ILG.DefineLabel();
+            Label notseq = cg.ILG.DefineLabel(), notstr = cg.ILG.DefineLabel(), notcol = cg.ILG.DefineLabel(),
+                  badlen = cg.ILG.DefineLabel(), start  = cg.ILG.DefineLabel(), end = cg.ILG.DefineLabel();
             Slot lenslot = cg.AllocLocalTemp(typeof(int)), seqslot = cg.AllocLocalTemp(typeof(ISequence)),
-                strslot = cg.AllocLocalTemp(typeof(string)), objslot = cg.AllocLocalTemp(typeof(object));
+                strslot = cg.AllocLocalTemp(typeof(string)), colslot = cg.AllocLocalTemp(typeof(ICollection)),
+                eslot = cg.AllocLocalTemp(typeof(IEnumerator));
 
             if(!emitted) { RHS.Emit(cg); emitted=true; }
             if(ti!=0) cg.ILG.Emit(OpCodes.Dup);
+            // maybe it's an ICollection
             cg.ILG.Emit(OpCodes.Dup);
-            cg.ILG.Emit(OpCodes.Isinst, typeof(ISequence)); // this does return a valid object. use it somehow?
-            cg.ILG.Emit(OpCodes.Brfalse, notseq);
-            // it's a sequence
-            cg.ILG.Emit(OpCodes.Castclass, typeof(ISequence));  
+            cg.ILG.Emit(OpCodes.Isinst, typeof(ICollection));
             cg.ILG.Emit(OpCodes.Dup);
-            seqslot.EmitSet(cg);
-            cg.EmitCall(typeof(IContainer), "__len__");
+            colslot.EmitSet(cg);
+            cg.ILG.Emit(OpCodes.Brfalse_S, notcol);
+            // it's an ICollection. check the length
+            colslot.EmitGet(cg);
+            cg.EmitPropGet(typeof(ICollection), "Count");
             cg.ILG.Emit(OpCodes.Dup);
             lenslot.EmitSet(cg);
             cg.EmitInt(lhs.Expressions.Length);
             cg.ILG.Emit(OpCodes.Ceq);
             cg.ILG.Emit(OpCodes.Brfalse, badlen);
-            lenslot.EmitGet(cg);
-            cg.EmitInt(0);
-            cg.ILG.Emit(OpCodes.Ceq);
-            cg.ILG.Emit(OpCodes.Brtrue, end);
-            // sequence is the right length and >0
-            seqslot.EmitGet(cg);
-            for(int i=0; i<lhs.Expressions.Length; i++)
-            { if(i!=lhs.Expressions.Length-1) cg.ILG.Emit(OpCodes.Dup);
-              cg.EmitInt(i);
-              cg.EmitCall(typeof(ISequence), "__getitem__", new Type[] { typeof(int) });
-              lhs.Expressions[i].EmitSet(cg);
-            }
-            cg.ILG.Emit(OpCodes.Br, end);
-            cg.ILG.MarkLabel(notseq);
-            // it's not a sequence. maybe it's a string
+            colslot.EmitGet(cg);
+            cg.EmitCall(typeof(IEnumerable), "GetEnumerator");
+            eslot.EmitSet(cg);
+            cg.ILG.Emit(OpCodes.Br_S, start);
+            cg.ILG.MarkLabel(notcol);
+            // it's not an ICollection. maybe it's a string
             cg.ILG.Emit(OpCodes.Dup);
             cg.ILG.Emit(OpCodes.Isinst, typeof(string));
-            cg.ILG.Emit(OpCodes.Brfalse, notstr);
-            // it's a string, cast and check the length
-            cg.ILG.Emit(OpCodes.Castclass, typeof(string));
             cg.ILG.Emit(OpCodes.Dup);
             strslot.EmitSet(cg);
+            cg.ILG.Emit(OpCodes.Brfalse_S, notstr);
+            // it's a string. check the length
+            strslot.EmitGet(cg);
             cg.EmitPropGet(typeof(string), "Length");
             cg.ILG.Emit(OpCodes.Dup);
             lenslot.EmitSet(cg);
             cg.EmitInt(lhs.Expressions.Length);
             cg.ILG.Emit(OpCodes.Ceq);
             cg.ILG.Emit(OpCodes.Brfalse, badlen);
-            lenslot.EmitGet(cg);
-            cg.EmitInt(0);
-            cg.ILG.Emit(OpCodes.Ceq);
-            cg.ILG.Emit(OpCodes.Brtrue, end);
-            // it's a string of the right length (>0)
             strslot.EmitGet(cg);
-            for(int i=0; i<lhs.Expressions.Length; i++)
-            { if(i!=lhs.Expressions.Length-1) cg.ILG.Emit(OpCodes.Dup);
-              cg.EmitInt(i);
-              cg.EmitCall(typeof(string), "get_Chars");
-              cg.EmitInt(1);
-              cg.EmitNew(typeof(string), new Type[] { typeof(char), typeof(int) });
-              lhs.Expressions[i].EmitSet(cg);
-            }
-            cg.ILG.Emit(OpCodes.Br, end);
+            cg.EmitNew(typeof(BoaCharEnumerator), new Type[] { typeof(string) });
+            eslot.EmitSet(cg);
+            cg.ILG.Emit(OpCodes.Br_S, start);
             cg.ILG.MarkLabel(notstr);
-            // it's not a string. assume it's a dynamic sequence
+            // it's not a string. maybe it's an ISequence
             cg.ILG.Emit(OpCodes.Dup);
-            objslot.EmitSet(cg); // just sticking the object here temporarily
+            cg.ILG.Emit(OpCodes.Isinst, typeof(ISequence));
+            cg.ILG.Emit(OpCodes.Dup);
+            seqslot.EmitSet(cg);
+            cg.ILG.Emit(OpCodes.Brfalse_S, notseq);
+            // it's a sequence. check the length
+            seqslot.EmitGet(cg);
+            cg.EmitCall(typeof(IContainer), "__len__");
+            cg.ILG.Emit(OpCodes.Dup);
+            lenslot.EmitSet(cg);
+            cg.EmitInt(lhs.Expressions.Length);
+            cg.ILG.Emit(OpCodes.Ceq);
+            cg.ILG.Emit(OpCodes.Brfalse, badlen);
+            seqslot.EmitGet(cg);
+            cg.EmitNew(typeof(ISeqEnumerator), new Type[] { typeof(ISequence) });
+            eslot.EmitSet(cg);
+            cg.ILG.Emit(OpCodes.Br_S, start);
+            cg.ILG.MarkLabel(notseq);
+            // assume it's a user-implemented sequence
+            cg.ILG.Emit(OpCodes.Dup);
             cg.EmitString("__len__");
             cg.EmitCall(typeof(Ops), "GetAttr", new Type[] { typeof(object), typeof(string) });
             cg.EmitCall(typeof(Ops), "Call0");
@@ -450,21 +444,23 @@ public class AssignStatement : Statement
             cg.EmitInt(lhs.Expressions.Length);
             cg.ILG.Emit(OpCodes.Ceq);
             cg.ILG.Emit(OpCodes.Brfalse, badlen);
-            lenslot.EmitGet(cg);
-            cg.EmitInt(0);
-            cg.ILG.Emit(OpCodes.Ceq);
-            cg.ILG.Emit(OpCodes.Brtrue, end);
-            // well, it has a __len__ attribute and it returns the correct non-zero length
-            objslot.EmitGet(cg);
-            cg.EmitString("__getitem__");
-            cg.EmitCall(typeof(Ops), "GetAttr", new Type[] { typeof(object), typeof(string) });
+            cg.ILG.Emit(OpCodes.Dup);
+            cg.EmitCall(typeof(Ops), "GetEnumerator", new Type[] { typeof(object) });
+            eslot.EmitSet(cg);
+            // okay, let's do the assignment now
+            cg.ILG.MarkLabel(start);
+            cg.ILG.Emit(OpCodes.Pop);
+            eslot.EmitGet(cg);
             for(int i=0; i<lhs.Expressions.Length; i++)
             { if(i!=lhs.Expressions.Length-1) cg.ILG.Emit(OpCodes.Dup);
-              cg.EmitInt(i);
-              cg.EmitCall(typeof(Ops), "Call1");
+              cg.ILG.Emit(OpCodes.Dup);
+              cg.EmitCall(typeof(IEnumerator), "MoveNext");
+              cg.ILG.Emit(OpCodes.Pop);
+              cg.EmitPropGet(typeof(IEnumerator), "Current");
               lhs.Expressions[i].EmitSet(cg);
             }
-            cg.ILG.Emit(OpCodes.Br, end);
+            cg.ILG.Emit(OpCodes.Br_S, end);
+
             cg.ILG.MarkLabel(badlen);
             cg.EmitString("wrong number of values to unpack (expected {0}, got {1})");
             cg.EmitNewArray(typeof(object), 2);
@@ -479,19 +475,14 @@ public class AssignStatement : Statement
             cg.ILG.Emit(OpCodes.Box, typeof(int));
             cg.ILG.Emit(OpCodes.Stelem_Ref);
             cg.EmitCall(typeof(Ops), "ValueError", new Type[] { typeof(string), typeof(object[]) });
-            cg.ILG.Emit(OpCodes.Dup);
-            cg.EmitString(Source);
-            cg.EmitInt(Line);
-            cg.EmitInt(Column);
-            cg.EmitCall(typeof(ValueErrorException), "SetPosition",
-                        new Type[] { typeof(string), typeof(int), typeof(int) });
             cg.ILG.Emit(OpCodes.Throw);
             cg.ILG.MarkLabel(end); // phew!
 
             cg.FreeLocalTemp(lenslot);
             cg.FreeLocalTemp(seqslot);
             cg.FreeLocalTemp(strslot);
-            cg.FreeLocalTemp(objslot);
+            cg.FreeLocalTemp(colslot);
+            cg.FreeLocalTemp(eslot);
             #endregion
           }
         }

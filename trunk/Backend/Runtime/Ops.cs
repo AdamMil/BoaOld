@@ -24,91 +24,6 @@ public sealed class Ops
   public static readonly object NotImplemented = "<NotImplemented>";
   public static readonly DefaultBoaComparer DefaultComparer = new DefaultBoaComparer();
 
-  #region ISeqEnumerator
-  public class ISeqEnumerator : IEnumerator
-  { public ISeqEnumerator(ISequence seq) { this.seq=seq; index=-1; length=seq.__len__(); }
-
-    public object Current
-    { get
-      { if(index<0 || index>=length) throw new InvalidOperationException();
-        return seq.__getitem__(index);
-      }
-    }
-    
-    public bool MoveNext()
-    { if(index>=length-1) return false;
-      index++;
-      return true;
-    }
-    
-    public void Reset() { index=-1; }
-
-    ISequence seq;
-    int index, length;
-  }
-  #endregion
-
-  #region IterEnumerator
-  public class IterEnumerator : IEnumerator
-  { public IterEnumerator(object o)
-    { iter = o;
-      next = Ops.GetAttr(o, "next");
-      Ops.GetAttr(o, "reset", out reset);
-    }
-
-    public object Current
-    { get
-      { if(state!=State.IN) throw new InvalidOperationException();
-        return current;
-      }
-    }
-
-    public bool MoveNext()
-    { if(state==State.EOF) return false;
-      try { current=Ops.Call(next); state=State.IN; return true; }
-      catch(StopIterationException) { state=State.EOF; return false; }
-    }
-
-    public void Reset()
-    { if(reset==null) throw new NotImplementedException("this iterator does not implement reset()");
-      Ops.Call(reset);
-      state = State.BOF;
-    }
-
-    enum State : byte { BOF, IN, EOF }
-    object iter, current, next, reset;
-    State state;
-  }
-  #endregion
-  
-  #region SeqEnumerator
-  public class SeqEnumerator : IEnumerator
-  { public SeqEnumerator(object seq)
-    { length  = Ops.ToInt(Ops.Invoke(seq, "__length__"));
-      getitem = Ops.GetAttr(seq, "__getitem__");
-      index   = -1;
-    }
-
-    public object Current
-    { get
-      { if(index<0 || index>=length) throw new InvalidOperationException();
-        return current;
-      }
-    }
-    
-    public bool MoveNext()
-    { if(index>=length-1) return false;
-      current = Ops.Call(getitem, ++index);
-      return true;
-    }
-    
-    public void Reset() { index=-1; }
-
-    object getitem, current;
-    int index, length;
-  }
-  #endregion
-
   public class DefaultBoaComparer : IComparer
   { public int Compare(object x, object y) { return Ops.Compare(x, y); }
   }
@@ -670,10 +585,10 @@ public sealed class Ops
   }
 
   public static bool GetEnumerator(object o, out IEnumerator e)
-  { if(o is string) e=StringOps.GetEnumerator((string)o);
-    else if(o is IEnumerator) e=(IEnumerator)o;
+  { if(o is string) e=new BoaCharEnumerator((string)o);
     else if(o is IEnumerable) e=((IEnumerable)o).GetEnumerator();
     else if(o is ISequence) e=new ISeqEnumerator((ISequence)o);
+    else if(o is IEnumerator) e=(IEnumerator)o;
     else
     { object iter;
       if(TryInvoke(o, "__iter__", out iter)) e = new IterEnumerator(iter);
