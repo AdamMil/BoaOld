@@ -201,6 +201,10 @@
                     BuildAction = "None"
                 />
                 <File
+                    RelPath = "lib\math.boa"
+                    BuildAction = "None"
+                />
+                <File
                     RelPath = "lib\md5.boa"
                     BuildAction = "None"
                 />
@@ -282,12 +286,21 @@
                     BuildAction = "Content"
                 />
                 <File
+                    RelPath = "lib\warnings.boa"
+                    BuildAction = "None"
+                />
+                <File
                     RelPath = "Modules\__builtin__.cs"
                     SubType = "Code"
                     BuildAction = "Compile"
                 />
                 <File
                     RelPath = "Modules\_bisect.cs"
+                    SubType = "Code"
+                    BuildAction = "Compile"
+                />
+                <File
+                    RelPath = "Modules\_math.cs"
                     SubType = "Code"
                     BuildAction = "Compile"
                 />
@@ -348,6 +361,11 @@
                 />
                 <File
                     RelPath = "Modules\sys.cs"
+                    SubType = "Code"
+                    BuildAction = "Compile"
+                />
+                <File
+                    RelPath = "Modules\types.cs"
                     SubType = "Code"
                     BuildAction = "Compile"
                 />

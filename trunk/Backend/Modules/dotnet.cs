@@ -134,6 +134,14 @@ public sealed class dotnet
     catch(IOException e) { throw Ops.IOError(e.Message); }
   }
 
+  public static byte[] urandom(int bytes)
+  { if(bytes<0) throw Ops.ValueError("urandom(): 'bytes' must be >= 0");
+    if(urng==null) urng = new System.Security.Cryptography.RNGCryptoServiceProvider();
+    byte[] ret = new byte[bytes];
+    urng.GetBytes(ret);
+    return ret;
+  }
+
   public static BoaFile tmpfile()
   { throw new NotImplementedException();
   }
@@ -166,6 +174,8 @@ public sealed class dotnet
   internal static OSErrorException Invalid(string path)
   { return Ops.OSError("invalid component in path {0}", Ops.Repr(path));
   }
+  
+  static System.Security.Cryptography.RandomNumberGenerator urng;
 }
 
 } // namespace Boa.Modules

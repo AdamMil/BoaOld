@@ -1,0 +1,27 @@
+from _math import *
+import System as _System
+
+ceil  = _System.Math.Ceiling
+floor = _System.Math.Floor
+exp   = _System.Math.Exp
+log   = _System.Math.Log
+log10 = _System.Math.Log10
+pow   = _System.Math.Pow
+sqrt  = _System.Math.Sqrt
+
+acos  = _System.Math.Acos
+asin  = _System.Math.Asin
+atan  = _System.Math.Atan
+atan2 = _System.Math.Atan2
+cos   = _System.Math.Cos
+cosh  = _System.Math.Cosh
+sin   = _System.Math.Sin
+sinh  = _System.Math.Sinh
+tan   = _System.Math.Tan
+tanh  = _System.Math.Tanh
+
+pi    = _System.Math.PI
+e     = _System.Math.E
+
+__all__ = filter(lambda n: n[0]!='_' && n[0]==n[0].lower(), dir())
+
