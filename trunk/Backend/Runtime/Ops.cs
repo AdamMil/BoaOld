@@ -143,7 +143,10 @@ public sealed class Ops
       }
       case TypeCode.SByte: return IntOps.Add((int)(sbyte)a, b);
       case TypeCode.Single: return FloatOps.Add((float)a, b);
-      case TypeCode.String: return StringOps.Concat((string)a, b);
+      case TypeCode.String:
+        if(b is string) return (string)a + (string)b;
+        if(b is char) return (string)a + (char)b;
+        break;
       case TypeCode.UInt16: return IntOps.Add((int)(short)a, b);
       case TypeCode.UInt32: 
       { uint v = (uint)a;
@@ -253,11 +256,11 @@ public sealed class Ops
       case TypeCode.UInt16: return ~(int)(short)a;
       case TypeCode.UInt32:
       { uint v = (uint)a;
-        return v<=int.MaxValue ? ~(int)v : ~(long)v;
+        return v<=int.MaxValue ? (object)~(int)v : (object)~(long)v;
       }
       case TypeCode.UInt64:
       { ulong v = (ulong)a;
-        return v<=long.MaxValue ? ~(long)v : ~new Integer(v);
+        return v<=long.MaxValue ? (object)(~(long)v) : (object)(~new Integer(v));
       }
     }
     throw TypeError("unsupported operand type for ~: '{0}'", TypeName(a));
@@ -435,7 +438,7 @@ public sealed class Ops
       case TypeCode.Single: return FloatOps.Compare((float)a, b);
       case TypeCode.String:
       { string sa=(string)a, sb = b as string;
-        if(sb!=null) return sa<sb ? -1 : sa>sb ? 1 : 0; // TODO: maybe this isn't an optimal way to compare string
+        if(sb!=null) return ((string)a).CompareTo(sb);
         break;
       }
       case TypeCode.UInt16: return IntOps.Compare((int)(short)a, b);
@@ -897,11 +900,11 @@ public sealed class Ops
       case TypeCode.UInt16: return -(int)(short)a;
       case TypeCode.UInt32:
       { uint v = (uint)a;
-        return v<=int.MaxValue ? -(int)v : -(long)v;
+        return v<=int.MaxValue ? (object)-(int)v : (object)-(long)v;
       }
       case TypeCode.UInt64:
       { ulong v = (ulong)a;
-        return v<=long.MaxValue ? -(long)v : -new Integer(v);
+        return v<=long.MaxValue ? (object)-(long)v : (object)-new Integer(v);
       }
     }
     throw TypeError("unsupported operand type for unary -: '{0}'", TypeName(a));

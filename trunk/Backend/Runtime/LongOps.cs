@@ -28,7 +28,11 @@ public sealed class LongOps
         case TypeCode.Single: return a + (float)b;
         case TypeCode.UInt16: return checked(a + (ushort)b);
         case TypeCode.UInt32: return checked(a + (uint)b);
-        case TypeCode.UInt64: return checked(a + (ulong)b);
+        case TypeCode.UInt64:
+        { ulong bv = (ulong)b;
+          if(bv>long.MaxValue) return new Integer(a)+bv;
+          return checked(a + (long)b);
+        }
       }
       throw Ops.TypeError("invalid operand types for +: '{0}' and '{1}'", Ops.TypeName(a), Ops.TypeName(b));
     }
@@ -51,7 +55,7 @@ public sealed class LongOps
       case TypeCode.SByte: return a & (sbyte)b;
       case TypeCode.UInt16: return a & (ushort)b;
       case TypeCode.UInt32: return a & (uint)b;
-      case TypeCode.UInt64: return a & (ulong)b;
+      case TypeCode.UInt64: return (ulong)a & (ulong)b;
     }
     throw Ops.TypeError("invalid operand types for &: '{0}' and '{1}'", Ops.TypeName(a), Ops.TypeName(b));
   }
@@ -61,18 +65,18 @@ public sealed class LongOps
     switch(Convert.GetTypeCode(b))
     { case TypeCode.Boolean: return (bool)b ? a|1 : a;
       case TypeCode.Byte: return a | (byte)b;
-      case TypeCode.Int16: return a | (short)b;
-      case TypeCode.Int32: return a | (int)b;
+      case TypeCode.Int16: return a | (ushort)(short)b;
+      case TypeCode.Int32: return a | (uint)(int)b;
       case TypeCode.Int64: return a | (long)b;
       case TypeCode.Object:
         if(b is Integer) return (Integer)b | a;
         IConvertible ic = b as IConvertible;
         if(ic==null) return Ops.Invoke(b, "__ror__", a);
         return a | ic.ToInt64(NumberFormatInfo.InvariantInfo);
-      case TypeCode.SByte: return a | (sbyte)b;
+      case TypeCode.SByte: return a | (byte)(sbyte)b;
       case TypeCode.UInt16: return a | (ushort)b;
       case TypeCode.UInt32: return a | (uint)b;
-      case TypeCode.UInt64: return a | (ulong)b;
+      case TypeCode.UInt64: return (ulong)a | (ulong)b;
     }
     throw Ops.TypeError("invalid operand types for |: '{0}' and '{1}'", Ops.TypeName(a), Ops.TypeName(b));
   }
@@ -93,7 +97,7 @@ public sealed class LongOps
       case TypeCode.SByte: return a ^ (sbyte)b;
       case TypeCode.UInt16: return a ^ (ushort)b;
       case TypeCode.UInt32: return a ^ (uint)b;
-      case TypeCode.UInt64: return a ^ (ulong)b;
+      case TypeCode.UInt64: return (ulong)a ^ (ulong)b;
     }
     throw Ops.TypeError("invalid operand types for ^: '{0}' and '{1}'", Ops.TypeName(a), Ops.TypeName(b));
   }
@@ -136,7 +140,7 @@ public sealed class LongOps
   }
 
   public static object FloorDivide(long a, object b)
-  { int bv;
+  { long bv;
     if(b is long) bv = (long)b;
     else switch(Convert.GetTypeCode(b))
     { case TypeCode.Boolean: bv = (bool)b ? 1 : 0; break;
@@ -148,7 +152,7 @@ public sealed class LongOps
       case TypeCode.Object:
         if(b is Integer)
         { Integer iv = (Integer)b;
-          if(iv.IsNegative)
+          if(iv.Sign<0)
           { if(a<0 && iv<a) return 0;
             else if(a>=0 && iv<=-a) return -1;
           }
@@ -198,8 +202,8 @@ public sealed class LongOps
         if(ic==null) return Ops.Invoke(b, "__rlshift__", a);
         shift = ic.ToInt32(NumberFormatInfo.InvariantInfo);
         break;
-      case TypeCode.SByte: shift = (sbyte)b;
-      case TypeCode.UInt16: shift = (ushort)b;
+      case TypeCode.SByte: shift = (sbyte)b; break;
+      case TypeCode.UInt16: shift = (ushort)b; break;
       case TypeCode.UInt32:
       { uint ui = (uint)b;
         if(ui>int.MaxValue) throw Ops.OverflowError("long int too large to convert to int");
@@ -218,7 +222,8 @@ public sealed class LongOps
     if(shift<0) throw Ops.ValueError("negative shift count");
     if(shift>63) return new Integer(a)<<shift;
     long res = a << shift;
-    return res<a || (a&0x8000000000000000) != (res&0x8000000000000000) ? new Integer(a)<<shift : res;
+    if(res<a || ((ulong)a&0x8000000000000000) != ((ulong)res&0x8000000000000000)) return new Integer(a)<<shift;
+    else return res;
   }
 
   public static object Modulus(long a, object b)
@@ -233,7 +238,7 @@ public sealed class LongOps
       case TypeCode.Object:
         if(b is Integer)
         { Integer iv = (Integer)b;
-          if(iv.IsNegative)
+          if(iv.Sign<0)
           { if(a<0 && iv<a) return a;
             else if(a>=0 && iv<=-a) return iv+a;
           }
@@ -251,7 +256,7 @@ public sealed class LongOps
       case TypeCode.UInt64:
       { ulong ul = (ulong)b;
         if(a>=0 && ul>(ulong)a) return a;
-        else if(a<0 && ul>=(a==long.MinValue ? unchecked((ulong)-long.MinValue) : (ulong)-a)) return ul+a;
+        else if(a<0 && ul>=(a==long.MinValue ? unchecked((ulong)-long.MinValue) : (ulong)-a)) return ul+(ulong)a;
         else bv = (long)ul;
         break;
       }
@@ -311,8 +316,9 @@ public sealed class LongOps
           bv = iv.ToInt64(null);
         }
         IConvertible ic = b as IConvertible;
-        if(ic!=null) { b = ic.ToInt64(NumberFormatInfo.InvariantInfo); goto int64; }
-        return Ops.Invoke(b, "__rpow__", a);
+        if(ic==null) return Ops.Invoke(b, "__rpow__", a);
+        bv = ic.ToInt64(NumberFormatInfo.InvariantInfo);
+        break;
       case TypeCode.SByte: bv = (sbyte)b; break;
       case TypeCode.Single: return Math.Pow(a, (float)b);
       case TypeCode.UInt16: bv = (ushort)b; break;
@@ -341,7 +347,7 @@ public sealed class LongOps
 		  }
 		  return ix;
 		}
-		catch(OverflowException) { return new IntegerOps(new Integer(a), b); }
+		catch(OverflowException) { return IntegerOps.Power(new Integer(a), b); }
   }
 
   public static object PowerMod(long a, object b, object o)
@@ -406,8 +412,8 @@ public sealed class LongOps
         if(ic==null) return Ops.Invoke(b, "__rlshift__", a);
         shift = ic.ToInt32(NumberFormatInfo.InvariantInfo);
         break;
-      case TypeCode.SByte: shift = (sbyte)b;
-      case TypeCode.UInt16: shift = (ushort)b;
+      case TypeCode.SByte: shift = (sbyte)b; break;
+      case TypeCode.UInt16: shift = (ushort)b; break;
       case TypeCode.UInt32:
       { uint ui = (uint)b;
         if(ui>int.MaxValue) throw Ops.OverflowError("long int too large to convert to int");

@@ -112,7 +112,7 @@ public class BoaFile : IFile, IEnumerable
     catch(IOException e) { throw Ops.IOError(e.Message); }
   }
 
-  public bool isatty() { throw Ops.NotImplemented("isatty(): not implemented"); }
+  public bool isatty() { throw Ops.NotImplementedError("isatty(): not implemented"); }
 
   public string next()
   { string line = readline();
