@@ -207,7 +207,7 @@ public class ReflectedField : ReflectedMember, IDataDescriptor
 { public ReflectedField(FieldInfo fi) : base(fi) { info=fi; }
 
   public object __get__(object instance)
-  { return instance!=null || info.IsStatic ? Ops.ToBoa(info.GetValue(instance)) : this;
+  { return instance!=null || info.IsStatic ? info.GetValue(instance) : this;
   }
 
   public void __set__(object instance, object value)

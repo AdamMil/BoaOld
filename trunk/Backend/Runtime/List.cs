@@ -34,6 +34,7 @@ public class List : IMutableSequence, IList, IComparable, ICloneable, IRepresent
   }
 
   public override bool Equals(object o) { return CompareTo(o)==0; }
+  public override int GetHashCode() { throw Ops.TypeError("list objects are unhashable"); }
 
   public int index(object item) { return IndexOrError(IndexOf(item, 0, size)); }
   public int index(object item, int start)
@@ -241,7 +242,7 @@ public class List : IMutableSequence, IList, IComparable, ICloneable, IRepresent
   #endregion
 
   public override string ToString() { return __repr__(); }
-
+  
   class FunctionComparer : IComparer
   { public FunctionComparer(object func) { this.func=func; }
     public int Compare(object x, object y) { return Ops.ToInt(Ops.Call(func, x, y)); }
