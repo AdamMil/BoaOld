@@ -360,7 +360,7 @@ public class AssignStatement : Statement
             Slot lenslot = cg.AllocLocalTemp(typeof(int)), seqslot = cg.AllocLocalTemp(typeof(ISequence)),
                 strslot = cg.AllocLocalTemp(typeof(string)), objslot = cg.AllocLocalTemp(typeof(object));
 
-            if(!emitted) { cg.EmitConstant(value); emitted=true; }
+            if(!emitted) { RHS.Emit(cg); emitted=true; }
             if(ti!=0) cg.ILG.Emit(OpCodes.Dup);
             cg.ILG.Emit(OpCodes.Dup);
             cg.ILG.Emit(OpCodes.Isinst, typeof(ISequence)); // this does return a valid object. use it somehow?
@@ -477,7 +477,7 @@ public class AssignStatement : Statement
           }
         }
         else
-        { if(!emitted) { cg.EmitConstant(value); emitted=true; }
+        { if(!emitted) { RHS.Emit(cg); emitted=true; }
           if(ti!=0) cg.ILG.Emit(OpCodes.Dup);
           LHS[ti].EmitSet(cg);
         }
@@ -738,7 +738,8 @@ public class ExpressionStatement : Statement
 { public ExpressionStatement(Expression expr) { Expression=expr; }
 
   public override void Emit(CodeGenerator cg)
-  { Expression.Emit(cg);
+  { if(!Options.Debug && Expression.IsConstant) return;
+    Expression.Emit(cg);
     if(Options.Interactive)
     { Slot temp = cg.AllocLocalTemp(typeof(object));
       temp.EmitSet(cg);
@@ -751,7 +752,8 @@ public class ExpressionStatement : Statement
   }
 
   public override void Execute(Frame frame)
-  { object ret = Expression.Evaluate(frame);
+  { if(!Options.Debug && Expression.IsConstant) return;
+    object ret = Expression.Evaluate(frame);
     if(Options.Interactive) Ops.Call(Boa.Modules.sys.displayhook, ret);
   }
 
@@ -911,25 +913,25 @@ public class ForStatement : Statement
 
   public override void Emit(CodeGenerator cg)
   { AssignStatement ass = new AssignStatement(Names);
-    Slot list = cg.IsGenerator ? cg.AllocLocalTemp(typeof(IEnumerator), true) : null;
+    Slot list = cg.AllocLocalTemp(typeof(IEnumerator), true);
     Label start=cg.ILG.DefineLabel(), end=cg.ILG.DefineLabel();
 
     Body.Walk(new JumpFinder(start, end));
     Expression.Emit(cg);
     cg.EmitCall(typeof(Ops), "GetEnumerator", new Type[] { typeof(object) });
-    if(list!=null) list.EmitSet(cg);
+    list.EmitSet(cg);
     cg.ILG.MarkLabel(start);
-    if(list!=null) list.EmitGet(cg);
+    list.EmitGet(cg);
     cg.ILG.Emit(OpCodes.Dup);
     cg.EmitCall(typeof(IEnumerator), "MoveNext");
     cg.ILG.Emit(OpCodes.Brfalse, end);
-    if(list==null) cg.ILG.Emit(OpCodes.Dup);
     cg.EmitPropGet(typeof(IEnumerator), "Current");
     ass.Emit(cg);
     Body.Emit(cg);
     cg.ILG.Emit(OpCodes.Br, start);
     cg.ILG.MarkLabel(end);
-    if(list==null) cg.ILG.Emit(OpCodes.Pop);
+    cg.ILG.Emit(OpCodes.Pop);
+    cg.FreeLocalTemp(list);
   }
 
   public override void Execute(Frame frame)
@@ -1016,6 +1018,7 @@ public class PassStatement : Statement
 }
 #endregion
 
+// FIXME: python puts spaces between arguments
 #region PrintStatement
 public class PrintStatement : Statement
 { public PrintStatement() { Expressions=null; TrailingNewline=true; }

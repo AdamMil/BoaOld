@@ -1,6 +1,7 @@
 using System;
-using System.Text;
 using System.Collections;
+using System.Text;
+using System.Text.RegularExpressions;
 
 namespace Boa.Runtime
 {
@@ -56,6 +57,154 @@ public sealed class StringOps
 
   #endregion
 
+  #region StringFormatter
+  sealed class StringFormatter
+  { public StringFormatter(string source, object args) { this.source=source; this.args=args; tup=args as Tuple; }
+
+    public string Format()
+    { MatchCollection matches = StringOps.printfre.Matches(source);
+      Code[] formats = new Code[matches.Count];
+
+      int argwant=0, arggot, pos=0;
+      bool dict=false, nodict=false;
+      for(int i=0; i<formats.Length; i++)
+      { formats[i] = new Code(matches[i]);
+        argwant += formats[i].Args;
+        if(formats[i].Key==null) nodict=true;
+        else if(formats[i].Length==-2 || formats[i].Precision==-2) nodict=true;
+        else dict=true;
+      }
+      if(dict && nodict) throw Ops.TypeError("keyed format codes and non-keyed format codes (or codes with a "+
+                                             "length/precision of '#') mixed in format string");
+
+      arggot = tup==null ? 1 : tup.items.Length;
+      if(tup==null && dict) getitem = Ops.GetAttr(args, "__getitem__");
+      else if(dict) throw Ops.TypeError("format requires a mapping");
+      else if(argwant!=arggot) throw Ops.TypeError("incorrect number of arguments for string formatting "+
+                                                   "(expected {0}, but got {1})", argwant, arggot);
+
+      System.Text.StringBuilder sb = new System.Text.StringBuilder();
+      for(int fi=0; fi<formats.Length; fi++)
+      { Code f = formats[fi];
+        if(f.Match.Index>pos) sb.Append(source.Substring(pos, f.Match.Index-pos));
+        pos = f.Match.Index+f.Match.Length;        
+
+        if(f.Length==-2) f.Length = Ops.ToInt(NextArg());
+        if(f.Precision==-2) f.Precision = Ops.ToInt(NextArg());
+        
+        char type = f.Type;
+        switch(type) // TODO: support long integers
+        { case 'd': case 'i': case 'u': case 'x': case 'X':
+          { int i = Ops.ToInt(GetArg(f.Key));
+            string s = null;
+            bool neg, prefix=false, althex=false;
+            if(type=='d' || type=='i') { s=i.ToString(); neg=prefix=i<0; }
+            else
+            { uint ui = (uint)i;
+              if(type=='u') s=ui.ToString();
+              else if(type=='x' || type=='X')
+              { s = ui.ToString("x");
+                althex = f.HasFlag('#');
+              }
+              neg = false;
+            }
+
+            int ptype = f.HasFlag('+') ? 1 : f.HasFlag(' ') ? 2 : 0;
+            if(!neg && ptype!=0) { s=(ptype==1 ? '+' : ' ') + s; prefix=true; }
+            if(althex) f.Length -= 2;
+            if(f.Length>0 && s.Length<f.Length)
+            { if(f.HasFlag('-')) s = s.PadRight(f.Length, ' ');
+              else if(f.HasFlag('0'))
+              { if(prefix) s = s[0] + s.Substring(1).PadLeft(f.Length-1, '0');
+                else s = s.PadLeft(f.Length, '0');
+              }
+              else
+              { if(althex) { s = "0x"+s; prefix=true; f.Length += 2; }
+                s = s.PadLeft(f.Length, ' ');
+              }
+            }
+            if(!prefix && althex) s = "0x"+s;
+            if(type=='x') s = s.ToLower();
+            else if(type=='X') s = s.ToUpper();
+            sb.Append(s);
+            break;
+          }
+
+          case 'o': throw new NotImplementedException();
+          case 'e': case 'E': case 'f': case 'F': case 'g': case 'G':
+          { string fmt = f.Match.Groups[5].Value;
+            string s;
+            double d = Ops.ToFloat(GetArg(f.Key));
+            bool neg = d<0;
+            if((type=='f' || type=='F') && f.Precision<0)
+            { s = d.ToString("f15");
+              if(s.IndexOf('.')!=-1)
+              { s = s.TrimEnd('0');
+                if(s[s.Length-1]=='.') s = s.Substring(0, s.Length-1);
+              }
+            }
+            else s = d.ToString(f.Precision>0 ? fmt+f.Precision : fmt);
+
+            if(!neg)
+            { if(f.HasFlag('+')) s = '+'+s;
+              else if(f.HasFlag(' ')) s = ' '+s;
+            }
+            if(f.Length>0 && s.Length<f.Length)
+            { if(f.HasFlag('-')) s = s.PadRight(f.Length, ' ');
+              else if(f.HasFlag('0')) s = Boa.Modules.@string.zfill(s, f.Length);
+              else s = s.PadLeft(f.Length, ' ');
+            }
+            sb.Append(s);
+            break;
+          }
+
+          case 'c':
+          { object c = GetArg(f.Key);
+            string s = c as string;
+            sb.Append(s==null ? (char)Ops.ToInt(c) : s[0]);
+            break;
+          }
+
+          case 'r': sb.Append(Ops.Repr(GetArg(f.Key))); break;
+          case 's': sb.Append(Ops.Str(GetArg(f.Key))); break;
+          case '%': sb.Append('%'); break;
+          default: throw Ops.ValueError("unsupported format character '{0}' (0x{1:X})", f.Type, (int)f.Type);
+        }
+      }
+      if(pos<source.Length) sb.Append(source.Substring(pos));
+      return sb.ToString();
+    }
+    
+    #region Code
+    struct Code
+    { public Code(Match m)
+      { Match     = m;
+        Length    = m.Groups[3].Success ? m.Groups[3].Value=="*" ? -2 : Ops.ToInt(m.Groups[3].Value) : -1;
+        Precision = m.Groups[4].Success ? m.Groups[4].Value=="*" ? -2 : Ops.ToInt(m.Groups[4].Value) : -1;
+      }
+
+      public int    Args  { get { return 1 + (Length==-2 ? 1 : 0) + (Precision==-2 ? 1 : 0); } }
+      public string Flags { get { return Match.Groups[2].Value; } }
+      public string Key   { get { return Match.Groups[1].Success ? Match.Groups[1].Value : null; } }
+      public char   Type  { get { return Match.Groups[5].Value[0]; } }
+      
+      public bool HasFlag(char c) { return Flags.IndexOf(c)!=-1; }
+
+      public Match Match;
+      public int   Length, Precision;
+    }
+    #endregion
+    
+    object GetArg(string name) { return name==null ? NextArg() : Ops.Call(getitem, name); }
+    object NextArg() { return tup==null ? args : tup.items[argi++]; }
+
+    string source;
+    int argi;
+    Tuple tup;
+    object args, getitem;
+  }
+  #endregion
+
   public static IEnumerator GetEnumerator(string s) { return new BoaCharEnumerator(s); }
 
   public static string Escape(string s)
@@ -85,6 +234,8 @@ public sealed class StringOps
     return sb.ToString();
   }
   
+  public static string PrintF(string format, object args) { return new StringFormatter(format, args).Format(); }
+
   public static string Slice(string s, Slice slice)
   { Tuple tup = slice.indices(s.Length);
     int start=(int)tup.items[0], stop=(int)tup.items[1], step=(int)tup.items[2], sign=Math.Sign(step);
@@ -187,6 +338,10 @@ public sealed class StringOps
   }
 
   static char ReadChar(string str, ref int pos) { return pos>=str.Length ? '\0' : str[pos++]; }
+
+  static readonly Regex printfre =
+    new Regex(@"%(?:\(([^)]+)\))?([#0 +-]*)(\d+|\*)?(?:.(\d+|\*))?[hlL]?(.)",
+              RegexOptions.Compiled|RegexOptions.Singleline);
 }
 
 } // namespace Boa.Runtime

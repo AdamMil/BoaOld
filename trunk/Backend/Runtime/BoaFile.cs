@@ -34,6 +34,29 @@ public class FileEnumerator : IEnumerator
 
 #region BoaFile
 [BoaType("file")]
+[DocString(@"file(filename[, mode[, bufsize]])
+file(stream)
+
+Return a new file object. In the first form, 'filename' is the file name to
+be opened and 'mode' indicates how the file is to be opened:
+'r' for reading, 'w' for writing (truncating an existing file), and 'a'
+opens it for appending (which on some systems means that all writes append
+to the end of the file, regardless of the current seek position).
+
+Modes 'r+', 'w+' and 'a+' open the file for updating (note that 'w+'
+truncates the file). Append 'b' to the mode to open the file in binary mode,
+on systems that differentiate between binary and text files (else it is
+ignored). If the file cannot be opened, IOError is raised.
+
+If mode is omitted, it defaults to 'r'. When opening a binary file, you
+should append 'b' to the mode value for improved portability. (It's useful
+even on systems which don't treat binary and text files differently, where
+it serves as documentation.) The optional bufsize argument specifies the
+file's desired buffer size: 0 means unbuffered, 1 means line buffered, any
+other positive value means use a buffer of (approximately) that size.
+A negative bufsize means to use the system default, which is usually line
+buffered for tty devices and fully buffered for other files. If omitted,
+the system default is used.")]
 public class BoaFile : IFile, IEnumerable
 { public BoaFile(string filename) : this(File.Open(filename, FileMode.Open, FileAccess.Read))
   { source=filename; smode="r";
@@ -58,7 +81,7 @@ public class BoaFile : IFile, IEnumerable
     smode  = mode;
   }
 
-  public BoaFile(string filename, string mode, int buffer) : this(filename, mode) { }
+  public BoaFile(string filename, string mode, int bufsize) : this(filename, mode) { }
   public BoaFile(Stream stream) { this.stream = stream; source = "<stream>"; smode = string.Empty; }
 
   public string mode { get { return smode; } }
@@ -164,7 +187,7 @@ public class BoaFile : IFile, IEnumerable
             return ret;
           }
         }
-        
+
         if(max>=0 && pos>=max)
         { string ret = Encoding.GetString(buf, 0, max);
           bufLen -= max;
@@ -216,7 +239,7 @@ public class BoaFile : IFile, IEnumerable
   public void truncate() { truncate((int)stream.Position); }
   public void truncate(int size)
   { AssertOpen();
-    try { bufLen=0; stream.SetLength(size); }
+    try { clearBuffer(); stream.SetLength(size); }
     catch(IOException e) { throw Ops.IOError(e.Message); }
   }
 
@@ -225,7 +248,7 @@ public class BoaFile : IFile, IEnumerable
 
   public void writebyte(int value)
   { AssertOpen();
-    try { bufLen=0; stream.WriteByte((byte)value); }
+    try { clearBuffer(); stream.WriteByte((byte)value); }
     catch(IOException e) { throw Ops.IOError(e.Message); }
   }
 
@@ -237,7 +260,7 @@ public class BoaFile : IFile, IEnumerable
 
   public void write(byte[] bytes, int offset, int length)
   { AssertOpen();
-    try { bufLen=0; stream.Write(bytes, offset, length); }
+    try { clearBuffer(); stream.Write(bytes, offset, length); }
     catch(IOException e) { throw Ops.IOError(e.Message); }
   }
 
@@ -245,27 +268,39 @@ public class BoaFile : IFile, IEnumerable
 
   void AssertOpen() { if(stream==null) throw Ops.IOError("operation attempted on a closed file"); }
 
-  int doread(byte[] buffer, int offset, int length)
-  { if(length==0) return 0;
-    int total=0;
-    while(true)
-    { if(bufLen>0)
-      { int tocopy = Math.Min(length, bufLen);
-        Array.Copy(buf, 0, buffer, offset, tocopy);
-        bufLen -= tocopy;
-        if(bufLen>0) Array.Copy(buf, tocopy, buf, 0, bufLen);
-        
-        total  += tocopy;
-        length -= tocopy;
-        if(length==0) return total;
-        offset += tocopy;
-      }
-      
-      bufLen = stream.Read(buf, 0, buf.Length);
-      if(bufLen==0) return total;
+  void clearBuffer()
+  { if(bufLen>0)
+    { stream.Position -= bufLen;
+      bufLen = 0;
     }
   }
 
+  int doread(byte[] buffer, int offset, int length)
+  { if(length==0) return 0;
+    int total=0;
+
+    if(bufLen>0)
+    { int tocopy = Math.Min(length, bufLen);
+      Array.Copy(buf, 0, buffer, offset, tocopy);
+      bufLen -= tocopy;
+      if(bufLen>0) Array.Copy(buf, tocopy, buf, 0, bufLen);
+      
+      total  += tocopy;
+      length -= tocopy;
+      if(length==0) return total;
+      offset += tocopy;
+    }
+
+    while(true)
+    { int read = stream.Read(buffer, offset, length);
+      if(read==0) return total;
+      total += read;
+      length -= read;
+      if(length==0) return total;
+      offset += read;
+    }
+  }
+  
   System.Text.Encoding enc;
   Stream stream;
   string source, smode;

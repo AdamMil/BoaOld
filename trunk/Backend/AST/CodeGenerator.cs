@@ -65,6 +65,11 @@ public class CodeGenerator
     }
   }
 
+  public void EmitExpression(Expression e)
+  { if(e==null) ILG.Emit(OpCodes.Ldnull);
+    else e.Emit(this);
+  }
+
   public void EmitFieldGet(Type type, string name) { EmitFieldGet(type.GetField(name)); }
   public void EmitFieldGet(FieldInfo field) { ILG.Emit(field.IsStatic ? OpCodes.Ldsfld : OpCodes.Ldfld, field); }
   public void EmitFieldGetAddr(Type type, string name) { EmitFieldGetAddr(type.GetField(name)); }
@@ -151,8 +156,7 @@ public class CodeGenerator
 
   public void EmitReturn() { ILG.Emit(OpCodes.Ret); }
   public void EmitReturn(Expression expr)
-  { if(expr==null) ILG.Emit(OpCodes.Ldnull);
-    else expr.Emit(this);
+  { EmitExpression(expr);
     ILG.Emit(OpCodes.Ret);
   }
   

@@ -5,11 +5,12 @@ using System.IO;
 using System.Text;
 using Boa.Runtime;
 
-// TODO: implement implicit and explicit line joining
 // TODO: give in and change 'null', 'false', and 'true' to 'None', 'False', and 'True' ?
 // TODO: implement backtick operator: `o` == repr(o)
 // TODO: raise OverflowError or ValueError for invalid literals
 // TODO: add switch?
+// TODO: implement 'in' and 'not in'
+// FIXME: having 'and', 'or', and 'not' be low precedence operators may screw up python code in subtle ways
 
 namespace Boa.AST
 {
@@ -39,9 +40,11 @@ enum Token
 #region Parser
 public class Parser
 { public Parser(Stream data) : this("<unknown>", data) { }
-  public Parser(string source, Stream data) : this(source, new StreamReader(data)) { }
-  public Parser(string source, TextReader data)
+  public Parser(string source, Stream data) : this(source, new StreamReader(data), false) { }
+  public Parser(string source, TextReader data) : this(source, data, false) { }
+  public Parser(string source, TextReader data, bool autoclose)
   { sourceFile = source; this.data = data.ReadToEnd();
+    if(autoclose) data.Close();
     NextToken();
   }
 
@@ -56,7 +59,7 @@ public class Parser
     foreach(Token token in tokens) stringTokens.Add(Enum.GetName(typeof(Token), token).ToLower(), token);
   }
 
-  public static Parser FromFile(string filename) { return new Parser(filename, new StreamReader(filename)); }
+  public static Parser FromFile(string filename) { return new Parser(filename, new StreamReader(filename), true); }
   public static Parser FromStream(Stream stream) { return new Parser("<stream>", new StreamReader(stream)); }
   public static Parser FromString(string text) { return new Parser("<string>", new StringReader(text)); }
 
@@ -81,7 +84,7 @@ public class Parser
     if(bareTuples && token==Token.Comma)
     { ArrayList exprs = new ArrayList();
       exprs.Add(expr);
-      while(TryEat(Token.Comma)) exprs.Add(ParseExpression());
+      while(TryEat(Token.Comma) && token!=Token.EOL && token!=Token.Assign) exprs.Add(ParseExpression());
       expr = AP(new TupleExpression((Expression[])exprs.ToArray(typeof(Expression))));
     }
     return expr;
@@ -169,6 +172,7 @@ public class Parser
         c = ReadChar();
         if(!char.IsLetter(c)) SyntaxError("expected letter");
         return (char)(char.ToUpper(c)-64);
+      case '\n': return '\0';
       default: SyntaxError(string.Format("unknown escape character '{0}'", c)); return c;
     }
   }
@@ -192,10 +196,10 @@ public class Parser
   Argument[] ParseArguments()
   { if(token==Token.RParen) return new Argument[0];
     ArrayList args = new ArrayList();
-    bool old = bareTuples;
+    bool obt=bareTuples, owe=wantEOL;
+    bareTuples=wantEOL=false;
     do
-    { bareTuples = false;
-      if(TryEat(Token.Asterisk)) args.Add(new Argument(ParseExpression(), ArgType.List));
+    { if(TryEat(Token.Asterisk)) args.Add(new Argument(ParseExpression(), ArgType.List));
       else if(TryEat(Token.Power)) args.Add(new Argument(ParseExpression(), ArgType.Dict));
       else if(token!=Token.Identifier) args.Add(new Argument(ParseExpression()));
       else
@@ -207,7 +211,6 @@ public class Parser
         else args.Add(new Argument(e));
       }
     } while(TryEat(Token.Comma));
-    bareTuples = old;
 
     ListDictionary ld = new ListDictionary();
     foreach(Argument a in args)
@@ -216,6 +219,7 @@ public class Parser
         else ld[a.Name] = null;
       }
 
+    bareTuples=obt; wantEOL=owe;
     return (Argument[])args.ToArray(typeof(Argument));
   }
 
@@ -245,16 +249,14 @@ public class Parser
         Eat(Token.RParen);
       }
       else if(TryEat(Token.LBracket))
-      { Expression start = token==Token.Colon ? new ConstantExpression(null) : ParseExpression();
+      { Expression start = token==Token.Colon ? null : ParseExpression();
         if(TryEat(Token.Colon))
-        { Expression stop = token==Token.Colon || token==Token.RBracket ? new ConstantExpression(null)
-                                                                        : ParseExpression();
-          Expression step = null;
-          if(TryEat(Token.Colon)) step=ParseExpression();
-          start = new SliceExpression(start, stop, step);
+        { Expression stop = token==Token.Colon || token==Token.RBracket ? null : ParseExpression();
+          Expression step = TryEat(Token.Colon) ? ParseExpression() : null;
+          start = AP(new SliceExpression(start, stop, step));
         }
         Eat(Token.RBracket);
-        return new IndexExpression(expr, start);
+        expr = AP(new IndexExpression(expr, start));
       }
       else if(TryEat(Token.Period)) expr = AP(new AttrExpression(expr, ParseIdentifier()));
       else return expr;
@@ -500,6 +502,8 @@ public class Parser
   // tuple of T := '(' (<T> ',')+ <T>? ')'
   Expression ParsePrimary()
   { Expression expr;
+    bool obt=bareTuples, owe=wantEOL;
+
     switch(token)
     { case Token.Literal:
         if(value is string)
@@ -514,12 +518,11 @@ public class Parser
         break;
       case Token.Identifier: expr = AP(new NameExpression(new Name((string)value))); break;
       case Token.LParen:
+        bareTuples=wantEOL=false;
         NextToken();
         if(token==Token.RParen) expr = AP(new TupleExpression());
         else
-        { bool old = bareTuples;
-          bareTuples = false;
-          expr = ParseExpression();
+        { expr = ParseExpression();
           if(token==Token.Comma)
           { NextToken();
             ArrayList list = new ArrayList();
@@ -532,17 +535,15 @@ public class Parser
             expr = AP(new TupleExpression((Expression[])list.ToArray(typeof(Expression))));
           }
           else expr = AP(new ParenExpression(expr));
-          bareTuples = old;
         }
         Expect(Token.RParen);
         break;
       case Token.LBracket:
+        bareTuples=wantEOL=false;
         NextToken();
         if(token==Token.RBracket) expr = AP(new ListExpression());
         else
-        { bool old = bareTuples;
-          bareTuples = false;
-          Expression fe = ParseExpression();
+        { Expression fe = ParseExpression();
           if(token==Token.For) expr = ParseListComprehension(fe);
           else
           { ArrayList list = new ArrayList();
@@ -554,31 +555,29 @@ public class Parser
               if(!TryEat(Token.Comma)) break;
             }
             expr = AP(new ListExpression((Expression[])list.ToArray(typeof(Expression))));
-            bareTuples = old;
           }
         }
         Expect(Token.RBracket);
         break;
       case Token.LBrace:
+        bareTuples=wantEOL=false;
         NextToken();
         if(token==Token.RBrace) expr = AP(new HashExpression());
         else
         { ArrayList list = new ArrayList();
-          bool old = bareTuples;
           while(token!=Token.RBrace)
-          { bareTuples = false;
-            Expression e = ParseExpression();
+          { Expression e = ParseExpression();
             Eat(Token.Colon);
             list.Add(new DictionaryEntry(e, ParseExpression()));
             if(!TryEat(Token.Comma)) break;
           }
           expr = AP(new HashExpression((DictionaryEntry[])list.ToArray(typeof(DictionaryEntry))));
-          bareTuples = old;
         }
         Expect(Token.RBrace);
         break;
       default: Unexpected(token); return null;
     }
+    bareTuples=obt; wantEOL=owe;
     NextToken();
     return expr;
   }
@@ -590,8 +589,9 @@ public class Parser
 
     ArrayList stmts = new ArrayList();
     bool comma, old=bareTuples;
+    bareTuples = false;
     do
-    { bareTuples=comma=false;
+    { comma=false;
       stmts.Add(ParseExpression());
       if(TryEat(Token.Comma)) comma=true;
     } while(token!=Token.EOL && token!=Token.Semicolon);
@@ -616,7 +616,9 @@ public class Parser
   { if(token==end) return new Parameter[0];
     ArrayList parms = new ArrayList();
     string ident;
-    bool old = bareTuples;
+    bool obt=bareTuples, owe=wantEOL;
+    bareTuples=wantEOL=false;
+
     while(true) // required identifiers
     { if(TryEat(Token.Asterisk)) goto list;
       if(token==Token.Power) goto dict;
@@ -627,8 +629,7 @@ public class Parser
       Eat(Token.Comma);
     }
     while(true) // positional parameters
-    { bareTuples = false;
-      parms.Add(new Parameter(ident, ParseExpression()));
+    { parms.Add(new Parameter(ident, ParseExpression()));
       if(token==end) goto done;
       Eat(Token.Comma);
       if(TryEat(Token.Asterisk)) break;
@@ -641,14 +642,14 @@ public class Parser
     Eat(Token.Comma);
     dict: Eat(Token.Power);
     parms.Add(new Parameter(ParseIdentifier(), ParamType.Dict));
-    done:
-    bareTuples=old;
 
+    done:
     ListDictionary ld = new ListDictionary();
     foreach(Parameter p in parms)
       if(ld.Contains(p.Name.String)) SyntaxError("duplicate parameter name '{0}'", p.Name.String);
       else ld[p.Name.String] = null;
 
+    bareTuples=obt; wantEOL=owe;
     return (Parameter[])parms.ToArray(typeof(Parameter));
   }
 
@@ -863,7 +864,10 @@ public class Parser
     while(true)
     { if(token==Token.EOL)
       { indent=0; c=ReadChar();
-        while(c!='\n' && c!=0 && char.IsWhiteSpace(c)) { indent++; c=ReadChar(); }
+        while(c!=0 && char.IsWhiteSpace(c))
+        { if(c=='\n') indent=0; else indent++;
+          c=ReadChar();
+        }
       }
       else do c=ReadChar(); while(c!='\n' && c!=0 && char.IsWhiteSpace(c));
 
@@ -914,34 +918,52 @@ public class Parser
         
         if(s=="r" && (c=='\"' || c=='\''))
         { char delim = c;
-          s = string.Empty;
+          sb.Remove(0, sb.Length);
           while(true)
           { c = ReadChar();
             if(c==delim) break;
             if(c==0) SyntaxError("unexpected EOF in string literal");
-            s += c;
+            sb.Append(c);
           }
-          value = s;
+          value = sb.ToString();
           return Token.Literal;
         }
-        
+
         value = s;
         return Token.Identifier;
       }
       else switch(c)
-      { case '\n': return Token.EOL;
+      { case '\n': newline: if(wantEOL) return Token.EOL; else { token=Token.EOL; break; }
         case '\"': case '\'':
-          string s = string.Empty;
+        { StringBuilder sb = new StringBuilder();
           char delim = c;
+          bool triple = false;
+
+          c = ReadChar();
+          if(c==delim)
+          { c = ReadChar();
+            if(c==delim) triple = true;
+            else { lastChar=c; value=string.Empty; return Token.Literal; }
+          }
+          else sb.Append(c);
+
           while(true)
           { c = ReadChar();
-            if(c=='\\') s += GetEscapeChar();
-            else if(c==delim) break;
+            if(c=='\\') { char e = GetEscapeChar(); if(e!=0) sb.Append(e); }
+            else if(c==delim)
+            { if(!triple) break;
+              if((c=ReadChar())==delim)
+              { if((c=ReadChar())==delim) break;
+                else { sb.Append(delim, 2); sb.Append(c); }
+              }
+              else { sb.Append(delim); sb.Append(c); }
+            }
             else if(c==0) SyntaxError("unexpected EOF in string literal");
-            else s += c;
+            else sb.Append(c);
           }
-          value = s;
+          value = sb.ToString();
           return Token.Literal;
+        }
         case '<':
           c = ReadChar();
           if(c=='<') return Token.LeftShift;
@@ -980,8 +1002,7 @@ public class Parser
         case '/':
           c = ReadChar();
           if(c=='*')
-          { do c = ReadChar(); while(c!=0 && c!='*' && (c=ReadChar())!='/');
-            lastChar = c;
+          { do c = ReadChar(); while(c!=0 && (c!='*' || (c=ReadChar())!='/'));
             break;
           }
           if(c=='/') return Token.FloorDivide;
@@ -1000,7 +1021,14 @@ public class Parser
         case '}': return Token.RBrace;
         case '?': return Token.Question;
         case ';': return Token.Semicolon;
-        case '\0': nextToken=Token.EOF; return Token.EOL;
+        case '#':
+          do c = ReadChar(); while(c!='\n' && c!=0);
+          goto newline;
+        case '\\':
+          c = ReadChar();
+          if(c=='\n') break;
+          goto default;
+        case '\0': if(wantEOL) { nextToken=Token.EOF; return Token.EOL; } else return Token.EOF;
         default: SyntaxError(string.Format("unexpected character '{0}' (0x{1:X})", c, (int)c)); break;
       }
     }
@@ -1024,11 +1052,11 @@ public class Parser
   }
 
   string     sourceFile, data;
-  Token      token=Token.None, nextToken=Token.None;
+  Token      token=Token.EOL, nextToken=Token.None;
   object     value, nextValue;
   int        line=1, column=1, pos, indent, loopDepth;
   char       lastChar;
-  bool       bareTuples=true;
+  bool       bareTuples=true, wantEOL=true;
   
   static Hashtable stringTokens;
 }

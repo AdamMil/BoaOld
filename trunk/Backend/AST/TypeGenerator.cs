@@ -75,7 +75,7 @@ public class TypeGenerator
       MethodInfo mi = typeof(List).GetMethod("append");
       foreach(object o in list)
       { cg.ILG.Emit(OpCodes.Dup);
-        GetConstant(o).EmitGet(cg);
+        cg.EmitConstant(o);
         cg.EmitCall(mi);
       }
     }
@@ -86,8 +86,8 @@ public class TypeGenerator
       MethodInfo mi = typeof(Dict).GetMethod("Add");
       foreach(DictionaryEntry e in dict)
       { cg.ILG.Emit(OpCodes.Dup);
-        GetConstant(e.Key).EmitGet(cg);
-        GetConstant(e.Value).EmitGet(cg);
+        cg.EmitConstant(e.Key);
+        cg.EmitConstant(e.Value);
         cg.EmitCall(mi);
       }
     }

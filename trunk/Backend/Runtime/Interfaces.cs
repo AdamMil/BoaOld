@@ -31,6 +31,7 @@ public interface IDynamicObject
 { DynamicType GetDynamicType();
 }
 
+#region IFile
 public interface IFile
 { bool canread { get; }
   bool canseek { get; }
@@ -59,6 +60,7 @@ public interface IFile
   void writebyte(int value);
   void writelines(object sequence);
 }
+#endregion
 
 public interface IHasAttributes
 { List __attrs__();
@@ -85,8 +87,25 @@ public interface IMutableSequence : ISequence
 }
 
 public interface IMapping : IContainer
-{ object get(object key);
+{ void clear();
+  object copy();
+  
+  object get(object key);
   object get(object key, object defaultValue);
+
+  bool has_key(object key);
+  
+  //static object fromkeys(object seq);
+  //static object fromkeys(object seq, object value);
+
+  object pop(object key);
+  object pop(object key, object defaultValue);
+  Tuple popitem();
+  
+  object setdefault(object key);
+  object setdefault(object key, object defaultValue);
+  
+  void update(object dict);
 
   List items();
   List keys();

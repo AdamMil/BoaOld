@@ -24,7 +24,7 @@ public abstract class Function : IFancyCallable
 
   public override string ToString() { return Name==null ? "<lambda>" : string.Format("<function '{0}'>", Name); }
 
-  public string Name;
+  public string Name, __doc__;
   public string[] ParamNames;
   public object[] Defaults;
   public int NumRequired;
@@ -165,8 +165,10 @@ public sealed class CompiledFunctionFN : CompiledFunction
 
 public sealed class InterpretedFunction : Function
 { public InterpretedFunction(string name, string[] names, object[] defaults, bool list, bool dict, int required,
-                             Name[] globals, Frame frame, Statement body)
-    : base(name, names, defaults, list, dict, required) { Globals=globals; Frame=frame; Body=body; }
+                             Name[] globals, Frame frame, Statement body, string docstring)
+    : base(name, names, defaults, list, dict, required)
+  { Globals=globals; Frame=frame; Body=body; __doc__=docstring;
+  }
 
   public override object Call(params object[] args) { return DoCall(FixArgs(args)); }
   public override object Call(object[] positional, string[] names, object[] values)
