@@ -227,9 +227,9 @@ public abstract class DelegateProxy
       lock(sigs) ci = (ConstructorInfo)sigs[key];
 
 		  if(ci==null)
-		  { AST.TypeGenerator tg = AST.SnippetMaker.Assembly.DefineType("EventHandler"+Misc.NextIndex,
+		  { AST.TypeGenerator tg = AST.SnippetMaker.Assembly.DefineType(TypeAttributes.Public|TypeAttributes.Sealed,
+		                                                                "EventHandler"+Misc.NextIndex,
 		                                                                typeof(DelegateProxy));
-
 		    ConstructorInfo pci =
 		      typeof(DelegateProxy).GetConstructor(BindingFlags.Instance|BindingFlags.NonPublic, null, ctypes, null);
 		    AST.CodeGenerator cg = tg.DefineChainedConstructor(pci);
@@ -316,7 +316,7 @@ public class ReflectedMember
 
 // TODO: allow extra keyword parameters to set properties
 #region ReflectedConstructor
-public class ReflectedConstructor : ReflectedMethodBase
+public sealed class ReflectedConstructor : ReflectedMethodBase
 { public ReflectedConstructor(ConstructorInfo ci) : base(ci) { }
   public override string ToString()
   { return string.Format("<constructor for '{0}'>", sigs[0].DeclaringType.FullName);
@@ -325,7 +325,7 @@ public class ReflectedConstructor : ReflectedMethodBase
 #endregion
 
 #region ReflectedEvent
-public class ReflectedEvent : ReflectedMember, IDescriptor
+public sealed class ReflectedEvent : ReflectedMember, IDescriptor
 { public ReflectedEvent(EventInfo ei) : base(ei) { info=ei; }
   public ReflectedEvent(EventInfo ei, object instance) : base(ei) { info=ei; this.instance=instance; }
 
@@ -354,7 +354,7 @@ public class ReflectedEvent : ReflectedMember, IDescriptor
 #endregion
 
 #region ReflectedField
-public class ReflectedField : ReflectedMember, IDataDescriptor
+public sealed class ReflectedField : ReflectedMember, IDataDescriptor
 { public ReflectedField(FieldInfo fi) : base(fi) { info=fi; }
 
   public object __get__(object instance)
@@ -378,7 +378,7 @@ public class ReflectedField : ReflectedMember, IDataDescriptor
 #endregion
 
 #region ReflectedMethod
-public class ReflectedMethod : ReflectedMethodBase, IDescriptor
+public sealed class ReflectedMethod : ReflectedMethodBase, IDescriptor
 { public ReflectedMethod(MethodInfo mi) : base(mi) { }
   public ReflectedMethod(MethodBase[] sigs, object instance, string docs) : base(sigs, instance, docs) { }
 
@@ -619,7 +619,7 @@ public abstract class ReflectedMethodBase : ReflectedMember, IFancyCallable
 #endregion
 
 #region ReflectedProperty
-public class ReflectedProperty : ReflectedMember, IDataDescriptor
+public sealed class ReflectedProperty : ReflectedMember, IDataDescriptor
 { public ReflectedProperty(PropertyInfo info) : base(info) { state=new State(info); Add(info); }
   ReflectedProperty(State state, object instance, string docs) : base(docs)
   { this.state=state; this.instance=instance;
@@ -683,7 +683,7 @@ public class ReflectedProperty : ReflectedMember, IDataDescriptor
 // TODO: add string methods
 // TODO: special case Array slicing?
 #region ReflectedType
-public class ReflectedType : BoaType
+public sealed class ReflectedType : BoaType
 { ReflectedType(Type type) : base(type)
   { mro = new Tuple(type==typeof(object) ? new object[] { this } :
                                            new object[] { this, ReflectedType.FromType(typeof(object)) });

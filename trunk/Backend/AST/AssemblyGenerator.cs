@@ -44,9 +44,12 @@ public class AssemblyGenerator
     OutFileName = outFileName;
   }
 
-  public TypeGenerator DefineType(string name) { return DefineType(name, null); }
+  public TypeGenerator DefineType(string name) { return DefineType(TypeAttributes.Public, name, null); }
   public TypeGenerator DefineType(string name, Type parent)
-  { return new TypeGenerator(this, Module.DefineType(name, TypeAttributes.Public, parent));
+  { return DefineType(TypeAttributes.Public, name, parent);
+  }
+  public TypeGenerator DefineType(TypeAttributes attrs, string name, Type parent)
+  { return new TypeGenerator(this, Module.DefineType(name, attrs, parent));
   }
 
   public void Save() { Assembly.Save(OutFileName); }
