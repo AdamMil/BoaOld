@@ -868,9 +868,9 @@ public abstract class ListGenExpression : Expression
         if(n==null)
         { TupleExpression te = (TupleExpression)f.Names;
           foreach(NameExpression ne in te.Expressions)
-            if(ne.Name.String==itemname.String) { itemname.Scope=Scope.Private; break; }
+            if(ne.Name.String==itemname.String) { itemname.Scope=Scope.Temporary; break; }
         }
-        else if(n.Name.String==itemname.String) itemname.Scope=Scope.Private;
+        else if(n.Name.String==itemname.String) itemname.Scope=Scope.Temporary;
       }
   }
 
@@ -905,6 +905,8 @@ public abstract class ListGenExpression : Expression
     else slot.EmitGet(cg);
     e.EmitSet(cg);
 
+    cg.Namespace.BeginScope(Misc.ToNameArray(Fors[n].Names), true);
+
     cg.ILG.MarkLabel(next);
     e.EmitGet(cg);
     cg.EmitCall(typeof(IEnumerator), "MoveNext");
@@ -938,6 +940,7 @@ public abstract class ListGenExpression : Expression
 
     cg.ILG.Emit(OpCodes.Br, next);
     cg.ILG.MarkLabel(end);
+    cg.Namespace.EndScope();
     cg.FreeLocalTemp(e);
   }
 

@@ -24,7 +24,7 @@ using System;
 namespace Boa.AST
 {
 
-public enum Scope : byte { Free, Local, Global, Closed, Private }
+public enum Scope : byte { Free, Local, Global, Temporary }
 
 public interface IWalker
 { void PostWalk(Node node);
@@ -104,7 +104,7 @@ public struct ListCompFor
 { public ListCompFor(Name[] names, Expression list, Expression test)
   { List=list; Test=test;
 
-    for(int i=0; i<names.Length; i++) names[i].Scope = Scope.Private;
+    for(int i=0; i<names.Length; i++) names[i].Scope = Scope.Temporary;
     if(names.Length==1) Names = new NameExpression(names[0]);
     else
     { Expression[] ne = new NameExpression[names.Length];
@@ -112,7 +112,7 @@ public struct ListCompFor
       Names = new TupleExpression(ne);
     }
   }
-  
+
   public void ToCode(System.Text.StringBuilder sb)
   { sb.Append(" for ");
     Names.ToCode(sb, 0);

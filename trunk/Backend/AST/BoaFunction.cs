@@ -73,7 +73,7 @@ public sealed class BoaFunction : Node
       for(int i=0; i<Inherit.Length; i++)
       { cg.ILG.Emit(OpCodes.Dup);
         cg.Namespace.GetSlotForGet(Inherit[i]).EmitGet(cg);
-        cg.EmitFieldSet(((FieldSlot)impl.Namespace.GetSlotForSet(Inherit[i])).Info);
+        cg.EmitFieldSet(((FieldSlot)impl.Namespace.GetLocalSlot(Inherit[i])).Info);
       }
     }
 
