@@ -254,7 +254,8 @@ public class ListCompExpression : Expression
 
 #region NameExpression
 public class NameExpression : Expression
-{ public NameExpression(Name name) { Name=name; }
+{ public NameExpression(string name) { Name=new Name(name); }
+  public NameExpression(Name name) { Name=name; }
 
   public override void Assign(object value, Frame frame) { frame.Set(Name.String, value); }
   public override void Emit(CodeGenerator cg) { cg.EmitGet(Name); }

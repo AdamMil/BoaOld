@@ -66,6 +66,8 @@ public sealed class sys
   public static string version = "0.1.0";
   public static Tuple version_info = new Tuple(0, 1, 0, "devel");
 
+  internal static Stack Exceptions = new Stack();
+
   static object display(params object[] values) // TODO: optimize this and use CallTarget1 or something
   { if(values[0]!=null)
     { Console.WriteLine(Ops.Repr(values[0]));

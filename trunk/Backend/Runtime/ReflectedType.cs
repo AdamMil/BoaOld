@@ -312,6 +312,11 @@ public class ReflectedType : BoaType
   }
 
   public override DynamicType GetDynamicType() { return MyDynamicType; }
+  
+  public override bool IsSubclassOf(object other)
+  { ReflectedType rt = other as ReflectedType;
+    return rt==null ? false : rt.type.IsAssignableFrom(type);
+  }
 
   public override void SetAttr(object self, string name, object value)
   { object slot = RawGetSlot(name);

@@ -22,7 +22,7 @@ enum Token
   
   // keywords
   Def, Print, Return, And, Or, Not, While, If, Elif, Else, Pass, Break, Continue, Global, Import, From, For, In,
-  Lambda,
+  Lambda, Try, Except, Finally, Raise,
   
   // abstract
   Identifier, Literal, Assign, Compare, Call, Member, Index, Slice, Hash, List, Tuple, Suite,
@@ -44,7 +44,7 @@ public class Parser
     Token[] tokens =
     { Token.Def, Token.Print, Token.Return, Token.And, Token.Or, Token.Not, Token.While, Token.Import, Token.From,
       Token.For, Token.If,  Token.Elif, Token.Else, Token.Pass, Token.Break, Token.Continue, Token.Global, Token.In,
-      Token.Lambda,
+      Token.Lambda, Token.Try, Token.Except, Token.Finally, Token.Raise,
     };
     foreach(Token token in tokens) stringTokens.Add(Enum.GetName(typeof(Token), token).ToLower(), token);
   }
@@ -74,13 +74,14 @@ public class Parser
     return expr;
   }
   // statement     := <stmt_line> | <compound_stmt>
-  // compount_stmt := <if_stmt> | <while_stmt> | <for_stmt> | <funcdef> | <global_stmt> | <import_stmt>
+  // compount_stmt := <if_stmt> | <while_stmt> | <for_stmt> | <funcdef> | <try_stmt> | <global_stmt> | <import_stmt>
   public Statement ParseStatement()
   { switch(token)
     { case Token.If:     return ParseIf();
       case Token.While:  return ParseWhile();
       case Token.For:    return ParseFor();
       case Token.Def:    return ParseDef();
+      case Token.Try:    return ParseTry();
       case Token.Global: return ParseGlobal();
       case Token.Import: case Token.From: return ParseImport();
       default: return ParseStmtLine();
@@ -90,6 +91,7 @@ public class Parser
   bool InLoop { get { return loopDepth>0; } }
 
   Expression AP(Expression e) { e.SetLocation(sourceFile, line, column); return e; }
+  Node AP(Node n) { n.SetLocation(sourceFile, line, column); return n; }
   Statement AP(Statement s) { s.SetLocation(sourceFile, line, column); return s; }
 
   #region GetEscapeChar
@@ -229,6 +231,13 @@ public class Parser
     return AP(new DefStatement(name, parms, ParseSuite()));
   }
 
+  // module := <identifier> ('.' <identifier>)*
+  string ParseDotted()
+  { string ret = ParseIdentifier();
+    while(TryEat(Token.Period)) ret += '.' + ParseIdentifier();
+    return ret;
+  }
+
   // expr_stmt  := <expression> | <lvalue> '=' (<expression> | <tuple>)
   // assignable := <name> | <index> | <slice>
   // lvalue     := <assignable> | <tuple of <assignable>>
@@ -299,14 +308,14 @@ public class Parser
   }
 
   // import_stmt := 'import' <import_package> (',' <import_package>)* EOL |
-  //                'from' <module> 'import' <import_ident> (',' <import_ident>)* EOL |
-  //                'from' <module> 'import' '*' EOL
-  // import_package := <module> ('as' <identifier>)?
+  //                'from' <dotted> 'import' <import_ident> (',' <import_ident>)* EOL |
+  //                'from' <dotted> 'import' '*' EOL
+  // import_package := <dotted> ('as' <identifier>)?
   // import_ident   := <identifier> ('as' <identifier>)?
   Statement ParseImport()
   { Statement stmt;
     if(TryEat(Token.From))
-    { string module = ParseModule();
+    { string module = ParseDotted();
       Eat(Token.Import);
       if(TryEat(Token.Asterisk)) stmt = AP(new ImportFromStatement(module, new ImportName("*")));
       else
@@ -327,7 +336,7 @@ public class Parser
     { Eat(Token.Import);
       ArrayList list = new ArrayList();
       do
-      { string module = ParseModule();
+      { string module = ParseDotted();
         if(token==Token.Identifier && (string)value=="as")
         { NextToken();
           list.Add(new ImportName(module, ParseIdentifier()));
@@ -341,36 +350,35 @@ public class Parser
   }
 
   // lambda := 'lambda' <namelist> ':' <lambda_body>
+  // lambda_body := <simple_stmt> (';' <simple_stmt>)* <lambda_end>
+  // lambda_end := EOL | ',' | ')' | ']' | '}' | 'for'
   Expression ParseLambda()
   { Eat(Token.Lambda);
     Parameter[] parms = ParseParamList(Token.Colon);
     Eat(Token.Colon);
-    return AP(new LambdaExpression(parms, ParseLambdaBody()));
-  }
-  
-  // lambda_body := <simple_stmt> (';' <simple_stmt>)* (';' <lambda_end>?) | <lambda_end>
-  // lambda_end := <return_stmt> | <pass_stmt>
-  Statement ParseLambdaBody() { return ParseLambdaBody(false); }
-  Statement ParseLambdaBody(bool inside)
-  { if(TryEat(Token.Return))
-      switch(token)
-      { case Token.EOL: case Token.Comma: case Token.RParen: case Token.RBrace: case Token.RBracket: case Token.For:
-          return AP(new ReturnStatement());
-        default: return AP(new ReturnStatement(ParseExpression()));
-      }
-    else if(TryEat(Token.Pass)) return AP(new PassStatement());
+    Statement body;
 
-    Statement stmt = ParseSimpleStmt();
-    if(!inside && TryEat(Token.Semicolon))
-    { ArrayList list = new ArrayList();
-      list.Add(stmt);
-      do
-      { stmt = ParseLambdaBody(true);
-        list.Add(stmt);
-      } while(!(stmt is ReturnStatement || stmt is PassStatement) && TryEat(Token.Semicolon));
-      stmt = new Suite((Statement[])list.ToArray(typeof(Statement)));
-    }
-    return stmt;
+    ArrayList list = new ArrayList();
+    do
+    { switch(token)
+      { case Token.EOL: case Token.Comma: case Token.RParen: case Token.RBrace: case Token.RBracket: case Token.For:
+          goto done;
+        case Token.Return:
+          switch(NextToken())
+          { case Token.EOL: case Token.Comma: case Token.RParen: case Token.RBrace: case Token.RBracket:
+            case Token.For:
+              list.Add(AP(new ReturnStatement())); break;
+            default: list.Add(AP(new ReturnStatement(ParseExpression()))); break;
+          }
+          break;
+        default: list.Add(ParseSimpleStmt()); break;
+      }
+    } while(TryEat(Token.Semicolon));
+
+    done:
+    if(list.Count==0) Unexpected(token);
+    body = list.Count==1 ? (Statement)list[0] : new Suite((Statement[])list.ToArray(typeof(Statement)));
+    return AP(new LambdaExpression(parms, body));
   }
 
   // list_comprehension := <expression> 'for' <namelist> 'in' <expression> ('if' <expression>)?
@@ -414,13 +422,6 @@ public class Parser
   { Expression expr = ParsePrimary();
     while(TryEat(Token.Period)) expr = AP(new AttrExpression(expr, ParseIdentifier()));
     return expr;
-  }
-
-  // module := <identifier> ('.' <identifier>)*
-  string ParseModule()
-  { string ret = ParseIdentifier();
-    while(TryEat(Token.Period)) ret += '.' + ParseIdentifier();
-    return ret;
   }
 
   // primary := LITERAL | <ident> | '(' <expression> ')' | '[' <array_list> ']' | '{' <hash_list> '}' |
@@ -540,52 +541,47 @@ public class Parser
     }
   }
 
-  // simple_stmt := <expr_stmt> | <print_stmt>
-  Statement ParseSimpleStmt()
-  { if(token==Token.Print) return ParsePrintStmt();
-    return ParseExprStmt();
-  }
-
-  // stmt_line := <break_stmt> | <continue_stmt> | <pass_stmt>  | <return_stmt> |
-  //              <simple_stmt> (';' <simple_stmt>)* [';'] (NEWLINE | EOF)
+  // simple_stmt := <expr_stmt> | <print_stmt> | <break_stmt> | <continue_stmt> | <pass_stmt>  | <return_stmt>
   // break_stmt    := 'break' EOL
   // continue_stmt := 'continue' EOL
   // pass_stmt     := 'pass' EOL
-  // return_stmt := return <expression>?
-  Statement ParseStmtLine()
-  { Statement stmt;
-    switch(token)
-    { case Token.Break:
+  // raise_stmt    := 'raise' <expression>?
+  // return_stmt   := return <expression>?
+  Statement ParseSimpleStmt()
+  { switch(token)
+    { case Token.Print: return ParsePrintStmt();
+      case Token.Break:
         // FIXME: this doesn't work if you have a break in a function nested in a loop
         if(!InLoop) throw Ops.SyntaxError("'break' encountered outside loop");
         NextToken();
-        stmt = AP(new BreakStatement());
-        break;
+        return AP(new BreakStatement());
       case Token.Continue:
         if(!InLoop) throw Ops.SyntaxError("'break' encountered outside loop");
         NextToken();
-        stmt = AP(new ContinueStatement());
-        break;
+        return AP(new ContinueStatement());
       case Token.Pass:
         NextToken();
-        stmt = AP(new PassStatement());
-        break;
+        return AP(new PassStatement());
       case Token.Return:
         NextToken();
-        stmt = AP(token==Token.EOL ? new ReturnStatement() : new ReturnStatement(ParseExpression()));
-        break;
-      default:
-        stmt = ParseSimpleStmt();
-        if(TryEat(Token.Semicolon))
-        { ArrayList stmts = new ArrayList();
-          stmts.Add(stmt);
-          while(token!=Token.EOL)
-          { stmts.Add(ParseSimpleStmt());
-            if(!TryEat(Token.Semicolon)) break;
-          }
-          stmt = new Suite((Statement[])stmts.ToArray(typeof(Statement)));
-        }
-        break;
+        return AP(token==Token.EOL || token==Token.Semicolon ? new ReturnStatement()
+                                                             : new ReturnStatement(ParseExpression()));
+      case Token.Raise:
+        NextToken();
+        return AP(token==Token.EOL || token==Token.Semicolon ? new RaiseStatement()
+                                                             : new RaiseStatement(ParseExpression()));
+      default: return ParseExprStmt();
+    }
+  }
+
+  // stmt_line := <simple_stmt> (';' <simple_stmt>)* (NEWLINE | EOF)
+  Statement ParseStmtLine()
+  { Statement stmt = ParseSimpleStmt();
+    if(token==Token.Semicolon)
+    { ArrayList stmts = new ArrayList();
+      stmts.Add(stmt);
+      while(TryEat(Token.Semicolon)) stmts.Add(ParseSimpleStmt());
+      stmt = new Suite((Statement[])stmts.ToArray(typeof(Statement)));
     }
     Eat(Token.EOL);
     return stmt;
@@ -629,6 +625,23 @@ public class Parser
       expr = AP(new TernaryExpression(expr, it, ParseExpression()));
     }
     return expr;
+  }
+
+  Statement ParseTry()
+  { int indent=this.indent;
+    Eat(Token.Try);
+    Statement body = ParseSuite(), elze=null, final=null;
+    ArrayList list = new ArrayList();
+    while(indent==this.indent && TryEat(Token.Except))
+    { Expression     type = token==Token.Comma || token==Token.Colon || token==Token.EOL ? null : ParseExpression();
+      NameExpression name = TryEat(Token.Comma) ? (NameExpression)AP(new NameExpression(ParseIdentifier())) : null;
+      list.Add(AP((Node)new ExceptClause(type, name, ParseSuite())));
+      if(type==null) break;
+    }
+    if(indent==this.indent && TryEat(Token.Else)) elze = ParseSuite();
+    if(indent==this.indent && TryEat(Token.Finally)) final = ParseSuite();
+    if(list.Count==0 && elze==null && final==null) SyntaxError("expecting 'except', 'else', or 'finally'");
+    return AP(new TryStatement(body, (ExceptClause[])list.ToArray(typeof(ExceptClause)), elze, final));
   }
 
   // typelow := <ternary>
@@ -688,9 +701,8 @@ public class Parser
   { char c;
     while(true)
     { if(token==Token.EOL)
-      { indent=0;
-        do { c=ReadChar(); indent++; } while(c!='\n' && c!=0 && char.IsWhiteSpace(c));
-        if(c=='\n') indent--;
+      { indent=0; c=ReadChar();
+        while(c!='\n' && c!=0 && char.IsWhiteSpace(c)) { indent++; c=ReadChar(); }
       }
       else do c=ReadChar(); while(c!='\n' && c!=0 && char.IsWhiteSpace(c));
 
