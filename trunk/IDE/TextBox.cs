@@ -66,7 +66,13 @@ public class BoaBox : TextEditorControl
     else if(code==Keys.Back)
     { if(typed.Length!=0) typed = typed.Substring(0, typed.Length-1);
       int curPos = ActiveTextAreaControl.Caret.Offset;
-      if(curPos>0 && Document.GetCharAt(curPos-1)=='.') HideCompletionBox();
+      if(curPos>0)
+      { if(Document.GetCharAt(curPos-1)=='.') HideCompletionBox();
+        else
+        { int index = AcBox.FindString(typed);
+          if(index!=ListBox.NoMatches) AcBox.SelectedIndex = index;
+        }
+      }
       return false;
     }
     else if(!AcBox.Visible)
@@ -268,6 +274,7 @@ public class BoaBox : TextEditorControl
 }
 #endregion
 
+#region ImmediateBox
 public class ImmediateBox : BoaBox
 { public ImmediateBox()
   { displayhook = Ops.GenerateFunction("display", new Parameter[] { new Parameter("value") },
@@ -288,5 +295,6 @@ public class ImmediateBox : BoaBox
   internal object displayhook;
   StringDelegate invoke;
 }
+#endregion
 
 }

@@ -156,56 +156,76 @@ public class TypeGenerator
   void EmitConstantInitializer(object value)
   { CodeGenerator cg = GetInitializer();
 
-    if(value is Tuple)
-    { Tuple tup = (Tuple)value;
-      cg.EmitObjectArray(tup.items);
-      cg.EmitNew(typeof(Tuple), new Type[] { typeof(object[]) });
-    }
-    else if(value is List)
-    { List list = (List)value;
-      cg.EmitInt(list.Count);
-      cg.EmitNew(typeof(List), new Type[] { typeof(int) });
-      MethodInfo mi = typeof(List).GetMethod("append");
-      foreach(object o in list)
-      { cg.ILG.Emit(OpCodes.Dup);
-        cg.EmitConstant(o);
-        cg.EmitCall(mi);
-      }
-    }
-    else if(value is Dict)
-    { Dict dict = (Dict)value;
-      cg.EmitInt(dict.Count);
-      cg.EmitNew(typeof(Dict), new Type[] { typeof(int) });
-      MethodInfo mi = typeof(Dict).GetMethod("Add");
-      foreach(DictionaryEntry e in dict)
-      { cg.ILG.Emit(OpCodes.Dup);
-        cg.EmitConstant(e.Key);
-        cg.EmitConstant(e.Value);
-        cg.EmitCall(mi);
-      }
-    }
-    else if(value is Slice)
-    { Slice slice = (Slice)value;
-      cg.EmitConstant(slice.start);
-      cg.EmitConstant(slice.stop);
-      cg.EmitConstant(slice.step);
-      cg.EmitNew(typeof(Slice), new Type[] { typeof(object), typeof(object), typeof(object) });
-    }
-    else if(value is Complex)
-    { Complex c = (Complex)value;
-      cg.EmitDouble(c.real);
-      cg.EmitDouble(c.imag);
-      cg.EmitNew(typeof(Complex), new Type[] { typeof(double), typeof(double) });
-      cg.ILG.Emit(OpCodes.Box, typeof(Complex));
-    }
-    else switch(Convert.GetTypeCode(value)) // TODO: see if this is faster than using 'is'
-    { case TypeCode.Int32:
+    switch(Convert.GetTypeCode(value))
+    { case TypeCode.Double:
+        cg.ILG.Emit(OpCodes.Ldc_R8, (double)value);
+        cg.ILG.Emit(OpCodes.Box, typeof(double));
+        break;
+      case TypeCode.Int32:
         cg.EmitInt((int)value);
         cg.ILG.Emit(OpCodes.Box, typeof(int));
         break;
-      case TypeCode.Double:
-        cg.ILG.Emit(OpCodes.Ldc_R8, (double)value);
-        cg.ILG.Emit(OpCodes.Box, typeof(double));
+      case TypeCode.Int64:
+        cg.ILG.Emit(OpCodes.Ldc_I8, (long)value);
+        cg.ILG.Emit(OpCodes.Box, typeof(long));
+        break;
+      case TypeCode.Object:
+        if(value is Tuple)
+        { Tuple tup = (Tuple)value;
+          cg.EmitObjectArray(tup.items);
+          cg.EmitNew(typeof(Tuple), new Type[] { typeof(object[]) });
+        }
+        else if(value is List)
+        { List list = (List)value;
+          cg.EmitInt(list.Count);
+          cg.EmitNew(typeof(List), new Type[] { typeof(int) });
+          MethodInfo mi = typeof(List).GetMethod("append");
+          foreach(object o in list)
+          { cg.ILG.Emit(OpCodes.Dup);
+            cg.EmitConstant(o);
+            cg.EmitCall(mi);
+          }
+        }
+        else if(value is Dict)
+        { Dict dict = (Dict)value;
+          cg.EmitInt(dict.Count);
+          cg.EmitNew(typeof(Dict), new Type[] { typeof(int) });
+          MethodInfo mi = typeof(Dict).GetMethod("Add");
+          foreach(DictionaryEntry e in dict)
+          { cg.ILG.Emit(OpCodes.Dup);
+            cg.EmitConstant(e.Key);
+            cg.EmitConstant(e.Value);
+            cg.EmitCall(mi);
+          }
+        }
+        else if(value is Slice)
+        { Slice slice = (Slice)value;
+          cg.EmitConstant(slice.start);
+          cg.EmitConstant(slice.stop);
+          cg.EmitConstant(slice.step);
+          cg.EmitNew(typeof(Slice), new Type[] { typeof(object), typeof(object), typeof(object) });
+        }
+        else if(value is Complex)
+        { Complex c = (Complex)value;
+          cg.EmitDouble(c.real);
+          cg.EmitDouble(c.imag);
+          cg.EmitNew(typeof(Complex), new Type[] { typeof(double), typeof(double) });
+          cg.ILG.Emit(OpCodes.Box, typeof(Complex));
+        }
+        else if(value is Integer)
+        { Integer iv = (Integer)value;
+          cg.EmitInt(iv.Sign);
+          cg.EmitNewArray(typeof(uint), iv.length);
+          for(int i=0; i<iv.length; i++)
+          { cg.ILG.Emit(OpCodes.Dup);
+            cg.EmitInt(i);
+            cg.EmitInt((int)iv.data[i]);
+            cg.ILG.Emit(OpCodes.Stelem_I4);
+          }
+          cg.EmitNew(typeof(Integer), new Type[] { typeof(short), typeof(uint[]) });
+          cg.ILG.Emit(OpCodes.Box, typeof(Integer));
+        }
+        else goto default;
         break;
       default: throw new NotImplementedException("constant: "+value.GetType());
     }

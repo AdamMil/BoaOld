@@ -39,7 +39,7 @@ namespace Boa.Runtime
   Failure=8, Success=1
 }
 
-// TODO: make heavy use of regions in here
+// TODO: make use of #regions in here to group things together
 public sealed class Ops
 { Ops() { }
 
@@ -505,6 +505,7 @@ public sealed class Ops
     }
   }
 
+  public static DivideByZeroException DivideByZeroError(string message) { return new DivideByZeroException(message); }
   public static DivideByZeroException DivideByZeroError(string format, params object[] args)
   { return new DivideByZeroException(string.Format(format, args));
   }
