@@ -8,6 +8,7 @@ Based on the J. Myers POP3 draft, Jan. 96
 # Updated: Piers Lauder <piers@cs.su.oz.au> [Jul '97]
 # String method conversion and test jig improvements by ESR, February 2001.
 # Added the POP3_SSL class. Methods loosely based on IMAP_SSL. Hector Urtubia <urtubia@mrbook.org> Aug 2003
+# Updated: Adam Milazzo [Oct '04], Making it work with Boa
 
 # Example (see the test function at the end of this file)
 
