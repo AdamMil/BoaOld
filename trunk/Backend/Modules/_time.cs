@@ -32,7 +32,7 @@ namespace Boa.Modules
 public sealed class _time
 { _time() { }
 
-  public class struct_time : IRepresentable
+  public class struct_time : IRepresentable, ISequence
   { public struct_time(double seconds) : this(toDateTime(seconds)) { }
     public struct_time(DateTime dt)
     { tm_year = dt.Year;
@@ -61,6 +61,30 @@ public sealed class _time
          tm_isdst<-1 || tm_mon>12 || tm_mday>31 || tm_hour>23 || tm_min>59 || tm_sec>61 || tm_wday>6 || tm_yday>366)
         throw Ops.ValueError("tuple does not represent a valid time: "+Ops.Repr(tup));
     }
+
+    #region ISequence Members
+    public object __add__(object o) { throw new NotImplementedException(); }
+    public object __getitem__(int index)
+    { switch(index)
+      { case 0: return tm_year;
+        case 1: return tm_mon;
+        case 2: return tm_mday;
+        case 3: return tm_hour;
+        case 4: return tm_min;
+        case 5: return tm_sec;
+        case 6: return tm_wday;
+        case 7: return tm_yday;
+        case 8: return tm_isdst;
+        default: throw Ops.IndexError("invalid index for struct_time: "+index);
+      }
+    }
+
+    object Boa.Runtime.ISequence.__getitem__(Slice slice) { return gettuple().__getitem__(slice); }
+
+    public int __len__() { return 9; }
+
+    public bool __contains__(object value) { return gettuple().__contains__(value); }
+    #endregion
 
     public Tuple gettuple()
     { return new Tuple(tm_year, tm_mon, tm_mday, tm_hour, tm_min, tm_sec, tm_wday, tm_yday, tm_isdst);
