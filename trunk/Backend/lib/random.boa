@@ -110,7 +110,7 @@ class Random(_random.Random):
                 a = long(_hexlify(_urandom(16)), 16)
             except NotImplementedError:
                 import time
-                a = time.time() * 256 # use fractional seconds
+                a = time.time()
 
         super(Random, self).seed(a)
         self.gauss_next = None
