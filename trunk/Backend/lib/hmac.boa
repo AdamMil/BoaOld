@@ -90,8 +90,9 @@ class HMAC:
     def hexdigest(self):
         """Like digest(), but returns a string of hexadecimal digits instead.
         """
-        return "".join([hex(ord(x))[2:].zfill(2)
-                        for x in tuple(self.digest())])
+        h = self.outer.copy()
+        h.update(self.inner.digest())
+        return h.hexdigest()
 
 def new(key, msg = None, digestmod = None):
     """Create a new hashing object and return it.

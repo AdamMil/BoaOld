@@ -210,6 +210,10 @@
                     BuildAction = "None"
                 />
                 <File
+                    RelPath = "lib\time.boa"
+                    BuildAction = "None"
+                />
+                <File
                     RelPath = "Modules\__builtin__.cs"
                     SubType = "Code"
                     BuildAction = "Compile"
@@ -231,6 +235,11 @@
                 />
                 <File
                     RelPath = "Modules\_string.cs"
+                    SubType = "Code"
+                    BuildAction = "Compile"
+                />
+                <File
+                    RelPath = "Modules\_time.cs"
                     SubType = "Code"
                     BuildAction = "Compile"
                 />
@@ -261,11 +270,6 @@
                 />
                 <File
                     RelPath = "Modules\sys.cs"
-                    SubType = "Code"
-                    BuildAction = "Compile"
-                />
-                <File
-                    RelPath = "Modules\time.cs"
                     SubType = "Code"
                     BuildAction = "Compile"
                 />

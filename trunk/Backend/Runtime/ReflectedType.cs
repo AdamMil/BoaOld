@@ -615,6 +615,8 @@ public class ReflectedType : BoaType
     if(!Ops.DelDescriptor(slot, self)) dict.Remove(name);
   }
 
+  public object GetRawAttr(string name) { return RawGetSlot(name); }
+
   public override bool GetAttr(object self, string name, out object value)
   { object slot = RawGetSlot(name);
     if(slot!=Ops.Missing)

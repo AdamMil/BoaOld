@@ -30,14 +30,21 @@ namespace Boa.Runtime
 [BoaType("tuple")]
 public class Tuple : ISequence, ICollection, IComparable, IRepresentable
 { public Tuple() { items = Misc.EmptyArray; }
-  public Tuple(ICollection col)
+  public Tuple(object obj)
+  { ICollection col = obj as ICollection;
+    if(col!=null)
+    { items = new object[col.Count];
+      col.CopyTo(items, 0);
+    }
+    else
+    { List list = new List(obj);
+      items = new object[list.Count];
+      list.CopyTo(items, 0);
+    }
+  }
+  internal Tuple(ICollection col)
   { items = new object[col.Count];
     col.CopyTo(items, 0);
-  }
-  public Tuple(object obj)
-  { List list = new List(obj);
-    items = new object[list.Count];
-    list.CopyTo(items, 0);
   }
   internal Tuple(params object[] items) { this.items=items; }
 

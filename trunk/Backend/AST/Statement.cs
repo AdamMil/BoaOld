@@ -186,6 +186,15 @@ public abstract class Statement : Node
         else if(node is TryStatement)
         { foreach(ExceptClause ec in ((TryStatement)node).Except) if(ec.Target!=null) HandleAssignment(ec.Target);
         }
+        else if(node is ImportStatement)
+        { ImportStatement imp = (ImportStatement)node;
+          foreach(ImportName n in imp.Names) AddName(new Name(n.AsName==null ? n.Name : n.AsName, Scope.Local));
+        }
+        else if(node is ImportFromStatement)
+        { ImportFromStatement imp = (ImportFromStatement)node;
+          if(imp.Names[0].Name=="*") ; // TODO: handle this case
+          foreach(ImportName n in imp.Names) AddName(new Name(n.AsName==null ? n.Name : n.AsName, Scope.Local));
+        }
         else if(node is NameExpression)
         { NameExpression ne = (NameExpression)node;
           ne.Name = AddName(ne.Name);
@@ -325,6 +334,7 @@ public class AssertStatement : Statement
 }
 #endregion
 
+// FIXME: make this work: ((a,b)) = ((1,2))
 #region AssignStatement
 public class AssignStatement : Statement
 { public AssignStatement() { }
@@ -911,6 +921,7 @@ public class IfStatement : Statement
 }
 #endregion
 
+// FIXME: make this be scoped properly in functions, classes, etc
 #region ImportFromStatement
 public class ImportFromStatement : Statement
 { public ImportFromStatement(string module, params ImportName[] names) { Module=module; Names=names; }
@@ -957,18 +968,16 @@ public class ImportStatement : Statement
 { public ImportStatement(params ImportName[] names) { Names=names; }
 
   public override void Emit(CodeGenerator cg)
-  { string[] names=new string[Names.Length], asNames=new string[Names.Length];
-    for(int i=0; i<Names.Length; i++) { names[i]=Names[i].Name; asNames[i]=Names[i].AsName; }
-    cg.TypeGenerator.ModuleField.EmitGet(cg);
-    cg.EmitStringArray(names);
-    cg.EmitStringArray(asNames);
-    cg.EmitCall(typeof(Ops), "Import");
+  { foreach(ImportName n in Names)
+    { cg.EmitString(n.Name);
+      cg.EmitCall(typeof(Importer), "ImportTop", new Type[] { typeof(string) });
+      cg.EmitSet(new Name(n.AsName==null ? n.Name : n.AsName, Scope.Local));
+    }
   }
 
   public override void Execute(Frame frame)
-  { string[] names=new string[Names.Length], asNames=new string[Names.Length];
-    for(int i=0; i<Names.Length; i++) { names[i]=Names[i].Name; asNames[i]=Names[i].AsName; }
-    Ops.Import(frame.Module, names, asNames);
+  { foreach(ImportName n in Names)
+      frame.Set(n.AsName==null ? n.Name : n.AsName, Importer.ImportTop(n.Name));
   }
 
   public override void ToCode(System.Text.StringBuilder sb, int indent)

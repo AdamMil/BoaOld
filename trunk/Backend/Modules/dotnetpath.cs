@@ -88,20 +88,20 @@ public sealed class dotnetpath
   public static string expandvars(string path) { return varre.Replace(path, new MatchEvaluator(VarReplace)); }
 
   public static long getatime(string path)
-  { if(File.Exists(path)) return time.fromDateTime(File.GetLastAccessTime(path));
-    else if(Directory.Exists(path)) return time.fromDateTime(Directory.GetLastAccessTime(path));
+  { if(File.Exists(path)) return (long)_time.fromDateTime(File.GetLastAccessTime(path));
+    else if(Directory.Exists(path)) return (long)_time.fromDateTime(Directory.GetLastAccessTime(path));
     else throw new FileNotFoundException("path not found: "+path);
   }
   
   public static long getctime(string path)
-  { if(File.Exists(path)) return time.fromDateTime(File.GetCreationTime(path));
-    else if(Directory.Exists(path)) return time.fromDateTime(Directory.GetCreationTime(path));
+  { if(File.Exists(path)) return (long)_time.fromDateTime(File.GetCreationTime(path));
+    else if(Directory.Exists(path)) return (long)_time.fromDateTime(Directory.GetCreationTime(path));
     else throw new FileNotFoundException("path not found: "+path);
   }
 
   public static long getmtime(string path)
-  { if(File.Exists(path)) return time.fromDateTime(File.GetLastWriteTime(path));
-    else if(Directory.Exists(path)) return time.fromDateTime(Directory.GetLastWriteTime(path));
+  { if(File.Exists(path)) return (long)_time.fromDateTime(File.GetLastWriteTime(path));
+    else if(Directory.Exists(path)) return (long)_time.fromDateTime(Directory.GetLastWriteTime(path));
     else throw new FileNotFoundException("path not found: "+path);
   }
   

@@ -564,7 +564,6 @@ public class GeneratorExpression : ListGenExpression
     EmitFors(nc, argslot);
 
     nc.ILG.BeginCatchBlock(typeof(StopIterationException));
-    nc.ILG.Emit(OpCodes.Pop);
     nc.ILG.EndExceptionBlock();
     nc.ILG.Emit(OpCodes.Ldc_I4_0);
     nc.ILG.Emit(OpCodes.Ret);
@@ -816,11 +815,11 @@ public class ListCompExpression : ListGenExpression
     { Slot list = cg.AllocLocalTemp(typeof(List), true);
       cg.EmitNew(typeof(List), Type.EmptyTypes);
       list.EmitSet(cg);
-      cg.ILG.BeginExceptionBlock();
+// FIXME: this should catch StopIteration, but try blocks empty the evaluation stack...
+//      cg.ILG.BeginExceptionBlock();
       EmitFors(cg, list);
-      cg.ILG.BeginCatchBlock(typeof(StopIterationException));
-      cg.ILG.Emit(OpCodes.Pop);
-      cg.ILG.EndExceptionBlock();
+//      cg.ILG.BeginCatchBlock(typeof(StopIterationException));
+//      cg.ILG.EndExceptionBlock();
       list.EmitGet(cg);
       cg.FreeLocalTemp(list);
     }
@@ -878,10 +877,8 @@ public abstract class ListGenExpression : Expression
   }
 
   public override void ToCode(System.Text.StringBuilder sb, int indent)
-  { sb.Append('[');
-    Item.ToCode(sb, 0);
+  { Item.ToCode(sb, 0);
     for(int i=0; i<Fors.Length; i++) Fors[i].ToCode(sb);
-    sb.Append(']');
   }
 
   public override void Walk(IWalker w)
