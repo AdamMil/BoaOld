@@ -34,7 +34,6 @@ public sealed class sys
   static sys()
   { modules["__builtin__"] = Importer.Import("__builtin__");
     if(Options.Interactive) path.append("");
-    path.append(System.IO.Path.GetFullPath("../lib"));
   }
 
   public static string __repr__() { return "<module 'sys' (built-in)>"; }

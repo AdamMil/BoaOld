@@ -32,7 +32,7 @@ using Boa.Runtime;
 // TODO: try to make precedence match python's where it makes sense
 // TODO: support unicode string parsing
 // FIXME: make this parse:   (lambda: print)
-// TODO: disallow assignment to constants
+// TODO: detect assignment to constants in the parser itself
 // TODO: make string parsing closer to python's if possible
 // TODO: add proper parsing of octal numbers
 // TODO: add support for parsing numbers in any base (eg 3#1212 is 1212 using base 3)
@@ -121,6 +121,8 @@ public class Parser
     }
     return expr;
   }
+
+  public BoaFunction ParseFunction() { return ((DefStatement)ParseDef()).Function; }
 
   // statement     := <stmt_line> | <compound_stmt>
   // compount_stmt := <if_stmt> | <while_stmt> | <for_stmt> | <def_stmt> | <try_stmt> | <global_stmt> |
