@@ -8,6 +8,8 @@ using Boa.Runtime;
 namespace Boa.AST
 {
 
+// TODO: clone mutable constants (eg, lists), or just don't emit them as constants
+// TODO: mark assignmentstatements as constant sometimes (if RHS is constant)
 // TODO: possibly rework compiled closures
 // TODO: using exceptions is very slow
 #region Exceptions (used to aid implementation)
