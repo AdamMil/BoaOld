@@ -1,10 +1,14 @@
 using System;
 using System.Collections;
 using System.IO;
+using System.Text;
 using Boa.Runtime;
 
 // TODO: allow nonparenthesized tuples
 // TODO: allow chained assignment (eg, a = b = c)
+// TODO: implement string literal concatenation
+// TODO: implement implicit and explicit line joining
+// TODO: implement 'exec'
 namespace Boa.AST
 {
 
@@ -115,7 +119,7 @@ public class Parser
   \cC       Control code (eg, \cC is ctrl-c)
   \OOO      Up to 3 octal digits -> byte value
   */
-  char GetEscapeChar()
+  char GetEscapeChar() // keep in sync with StringOps.Unescape
   { char c = ReadChar();
     if(char.IsDigit(c))
     { if(c>'7') SyntaxError("invalid octal digit");
@@ -139,19 +143,19 @@ public class Parser
       case 'f': return '\f';
       case 'v': return '\v';
       case 'x': case 'u':
-        { int num = 0;
-          for(int i=0,limit=(c=='x'?2:4); i<limit; i++)
-          { c = ReadChar();
-            if(char.IsDigit(c)) num = (num<<4) | (c-'0');
-            else if((c<'A' || c>'F') && (c<'a' || c>'f'))
-            { if(i==0) SyntaxError("expected hex digit");
-              lastChar = c;
-              break;
-            }
-            num = (num<<4) | (char.ToUpper(c)-'A'+10);
+      { int num = 0;
+        for(int i=0,limit=(c=='x'?2:4); i<limit; i++)
+        { c = ReadChar();
+          if(char.IsDigit(c)) num = (num<<4) | (c-'0');
+          else if((c<'A' || c>'F') && (c<'a' || c>'f'))
+          { if(i==0) SyntaxError("expected hex digit");
+            lastChar = c;
+            break;
           }
-          return (char)num;
+          else num = (num<<4) | (char.ToUpper(c)-'A'+10);
         }
+        return (char)num;
+      }
       case 'c':
         c = ReadChar();
         if(!char.IsLetter(c)) SyntaxError("expected letter");
@@ -778,9 +782,24 @@ public class Parser
         catch(FormatException) { SyntaxError("invalid number"); }
       }
       else if(c=='_' || char.IsLetter(c))
-      { string s = string.Empty;
-        do { s += c; c = ReadChar(); } while(c=='_' || char.IsLetterOrDigit(c));
+      { StringBuilder sb = new StringBuilder();
+
+        if(c=='r')
+        { char temp=c; c=ReadChar();
+          if(c=='\"' || c=='\'')
+          { char delim = c;
+            while((c=ReadChar())!=0 && c!=delim) sb.Append(c);
+            if(c==0) SyntaxError("unterminated string constant");
+            value = sb.ToString();
+            return Token.Literal;
+          }
+          else sb.Append(temp);
+        }
+
+        while(c=='_' || char.IsLetterOrDigit(c)) { sb.Append(c); c = ReadChar(); }
         lastChar = c;
+
+        string s = sb.ToString();
         if(s=="null")  { value=null;  return Token.Literal; }
         if(s=="true")  { value=true;  return Token.Literal; }
         if(s=="false") { value=false; return Token.Literal; }

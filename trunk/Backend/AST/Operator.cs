@@ -57,7 +57,7 @@ public class BitwiseNotOperator : UnaryOperator
 public class LogicalNotOperator : UnaryOperator
 { public override void Emit(CodeGenerator cg)
   { cg.EmitIsFalse();
-    cg.EmitCall(typeof(Ops), "BoolToObject");
+    cg.EmitCall(typeof(Ops), "FromBool");
   }
   public override object Evaluate(object value) { return Ops.FromBool(!Ops.IsTrue(value)); }
   public override string ToString() { return "!"; }

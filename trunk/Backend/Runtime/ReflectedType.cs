@@ -5,7 +5,7 @@ using System.Reflection;
 namespace Boa.Runtime
 {
 
-// TODO: add accessor methods to 'string' (eg, __getitem__)
+// FIXME: make 'repr(slice)' work
 
 #region Specialized attributes
 public class SpecialAttr
@@ -76,6 +76,25 @@ public class StringRepr : IDescriptor, ICallable
 }
 #endregion
 
+#region DocStringAttribute
+public class DocStringAttribute : Attribute
+{ public DocStringAttribute(string docs) { Docs=docs.Replace("\r\n", "\n"); }
+  public string Docs;
+}
+#endregion
+
+#region ReflectedMember
+public class ReflectedMember
+{ public ReflectedMember() { }
+  public ReflectedMember(MemberInfo mi)
+  { object[] docs = mi.GetCustomAttributes(typeof(DocStringAttribute), false);
+    if(docs.Length!=0) __doc__ = ((DocStringAttribute)docs[0]).Docs;
+  }
+
+  public string __doc__;
+}
+#endregion
+
 #region ReflectedConstructor
 public class ReflectedConstructor : ReflectedMethodBase
 { public ReflectedConstructor(ConstructorInfo ci) : base(ci) { }
@@ -84,8 +103,8 @@ public class ReflectedConstructor : ReflectedMethodBase
 #endregion
 
 #region ReflectedEvent
-public class ReflectedEvent : IDescriptor
-{ public ReflectedEvent(EventInfo ei) { info=ei; }
+public class ReflectedEvent : ReflectedMember, IDescriptor
+{ public ReflectedEvent(EventInfo ei) : base(ei) { info=ei; }
 
 	// TODO: automatically create new delegate types for different event signatures
 	public class BoaEventHandler
@@ -122,8 +141,8 @@ public class ReflectedEvent : IDescriptor
 #endregion
 
 #region ReflectedField
-public class ReflectedField : IDataDescriptor
-{ public ReflectedField(FieldInfo fi) { info=fi; }
+public class ReflectedField : ReflectedMember, IDataDescriptor
+{ public ReflectedField(FieldInfo fi) : base(fi) { info=fi; }
 
   public object __get__(object instance)
   { return instance!=null || info.IsStatic ? Ops.ToBoa(info.GetValue(instance)) : this;
@@ -159,9 +178,8 @@ public class ReflectedMethod : ReflectedMethodBase, IDescriptor
 #endregion
 
 #region ReflectedMethodBase
-public abstract class ReflectedMethodBase : ICallable
-{ protected ReflectedMethodBase(MethodBase mb) : this(new MethodBase[] { mb }) { }
-  protected ReflectedMethodBase(MethodBase[] sigs) { this.sigs=sigs; }
+public abstract class ReflectedMethodBase : ReflectedMember, ICallable
+{ protected ReflectedMethodBase(MethodBase mb) : base(mb) { sigs = new MethodBase[] { mb }; }
   protected ReflectedMethodBase(MethodBase[] sigs, object instance) { this.sigs=sigs; this.instance=instance; }
 
   public string __name__ { get { return sigs[0].Name; } }
@@ -272,7 +290,12 @@ public abstract class ReflectedMethodBase : ICallable
   }
 
   internal void Add(MethodBase sig)
-  { MethodBase[] narr = new MethodBase[sigs.Length+1];
+  { if(__doc__==null)
+    { object[] docs = sig.GetCustomAttributes(typeof(DocStringAttribute), false);
+      if(docs.Length!=0) __doc__ = ((DocStringAttribute)docs[0]).Docs;
+    }
+
+    MethodBase[] narr = new MethodBase[sigs.Length+1];
     sigs.CopyTo(narr, 0);
     narr[sigs.Length] = sig;
     sigs = narr;
@@ -307,8 +330,8 @@ public abstract class ReflectedMethodBase : ICallable
 
 // TODO: either extend this to handle property parameters, or handle them some other way
 #region ReflectedProperty
-public class ReflectedProperty : IDataDescriptor
-{ public ReflectedProperty(PropertyInfo info) { this.info=info; }
+public class ReflectedProperty : ReflectedMember, IDataDescriptor
+{ public ReflectedProperty(PropertyInfo info) : base(info) { this.info=info; }
 
   public object __get__(object instance)
   { if(!info.CanRead) throw Ops.TypeError("{0} is a non-readable attribute", info.Name);
@@ -379,6 +402,8 @@ public class ReflectedType : BoaType
     return rt;
   }
 
+  public string __doc__;
+
   protected override void Initialize()
   { if(initialized) return;
     base.Initialize();
@@ -393,12 +418,20 @@ public class ReflectedType : BoaType
       if(!dict.Contains("reset")) dict["reset"] = dict["Reset"];
       if(!dict.Contains("value")) dict["value"] = dict["Current"];
     }
+    else if(typeof(IEnumerable).IsAssignableFrom(type))
+    { if(!dict.Contains("__iter__")) dict["__iter__"] = dict["GetEnumerator"];
+    }
     else if(type.IsSubclassOf(typeof(Delegate)))
     { dict["__call__"] = SpecialAttr.DelegateCaller.Value;
     }
     else if(type==typeof(string))
     { dict["__repr__"] = new SpecialAttr.StringRepr();
       dict["__getitem__"] = new SpecialAttr.StringGetItem();
+    }
+
+    if(!dict.Contains("__doc__"))
+    { object[] docs = type.GetCustomAttributes(typeof(DocStringAttribute), false);
+      if(docs.Length!=0) __doc__ = ((DocStringAttribute)docs[0]).Docs;
     }
   }
 

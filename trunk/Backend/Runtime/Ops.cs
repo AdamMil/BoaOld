@@ -319,7 +319,7 @@ public sealed class Ops
   }
 
   public static DynamicType GetDynamicType(object o)
-  { if(o==null) return NoneType.Value;
+  { if(o==null) return NullType.Value;
     IDynamicObject dt = o as IDynamicObject;
     if(dt!=null) return dt.GetDynamicType();
     if(o is string) return StringType;
