@@ -4,11 +4,13 @@ using System.Collections;
 namespace Boa.Runtime
 {
 
+[BoaType("list")]
 public class List : IMutableSequence, IList, IComparable
 { public List() { items = new object[16]; }
   public List(int capacity) { items = new object[Math.Max(capacity, 4)]; }
-  public List(ICollection c) : this(c.Count) { c.CopyTo(items, 0); }
+  public List(ICollection c) : this(c.Count) { c.CopyTo(items, 0); size=c.Count; }
   public List(IEnumerator e) : this() { while(e.MoveNext()) append(e.Current); }
+  public List(object o) : this(Ops.GetEnumerator(o)) { }
 
   public void append(object item)
   { ResizeTo(size+1);

@@ -58,8 +58,13 @@ public abstract class BoaType : DynamicType, IDynamicObject, ICallable, IHasAttr
   #endregion
 
   public override List GetAttrNames(object self) { return __attrs__(); }
+  public override bool GetAttr(object self, string name, out object value)
+  { value = __getattr__(name);
+    return value!=Ops.Missing;
+  }
 
-  protected object LookupSlot(string name) { return RawGetSlot(name); }
+
+  internal object LookupSlot(string name) { return RawGetSlot(name); }
 
   protected object RawGetSlot(string name)
   { if(name=="__dict__") return dict;

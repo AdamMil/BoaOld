@@ -52,9 +52,12 @@ public class CodeGenerator
   public void EmitCall(Type type, string method, Type[] paramTypes) { EmitCall(type.GetMethod(method, paramTypes)); }
 
   public void EmitConstant(object value)
-  { string s = value as string;
-    if(s!=null) EmitString(s);
-    else TypeGenerator.GetConstant(value).EmitGet(this);
+  { if(value==null) ILG.Emit(OpCodes.Ldnull);
+    else
+    { string s = value as string;
+      if(s!=null) EmitString(s);
+      else TypeGenerator.GetConstant(value).EmitGet(this);
+    }
   }
 
   public void EmitFieldGet(Type type, string name) { EmitFieldGet(type.GetField(name)); }
@@ -128,7 +131,11 @@ public class CodeGenerator
     ILG.Emit(OpCodes.Ret);
   }
   
-  public void EmitString(string value) { ILG.Emit(OpCodes.Ldstr, value); }
+  public void EmitString(string value)
+  { if(value==null) ILG.Emit(OpCodes.Ldnull);
+    else ILG.Emit(OpCodes.Ldstr, value);
+  }
+
   public void EmitStringArray(string[] strings)
   { EmitNewArray(typeof(string), strings.Length);
     for(int i=0; i<strings.Length; i++)

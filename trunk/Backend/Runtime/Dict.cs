@@ -5,8 +5,12 @@ using System.Collections.Specialized;
 namespace Boa.Runtime
 {
 
+[BoaType("dict")]
 public class Dict : HybridDictionary, IComparable, IMapping
-{ public void clear() { Clear(); }
+{ public Dict() { }
+  public Dict(IDictionary dict) { foreach(DictionaryEntry e in dict) Add(e.Key, e.Value); }
+
+  public void clear() { Clear(); }
 
   public override int GetHashCode() { throw Ops.TypeError("dict objects are unhashable"); }
 

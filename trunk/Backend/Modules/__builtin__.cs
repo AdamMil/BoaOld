@@ -3,11 +3,143 @@ using System.Collections;
 using Boa.AST;
 using Boa.Runtime;
 
+// TODO: make these conform to python specs
+// TODO: allow functions to return 'longint' if they'd overflow an 'int'
 namespace Boa.Modules
 {
 
-public class __builtin__
-{ 
+[BoaType("module")]
+public sealed class __builtin__
+{ __builtin__() { }
+
+  #region EnumerateEnumerator
+  public class EnumerateEnumerator : IEnumerator
+  { public EnumerateEnumerator(IEnumerator e) { this.e = e; }
+
+    public object Current
+    { get
+      { if(current==null) throw new InvalidOperationException();
+        return current;
+      }
+    }
+
+    public bool MoveNext()
+    { if(!e.MoveNext()) { current=null; return false; }
+      current = new Tuple(index++, e.Current);
+      return true;
+    }
+
+    public void Reset()
+    { e.Reset();
+      index = 0;
+    }
+    
+    IEnumerator e;
+    Tuple current;
+    int index;
+  }
+  #endregion
+  
+  #region SentinelEnumerator
+  public class SentinelEnumerator : IEnumerator
+  { public SentinelEnumerator(IEnumerator e, object sentinel) { this.e=e; this.sentinel=sentinel; }
+
+    public object Current
+    { get
+      { if(done) throw new InvalidOperationException();
+        return e.Current;
+      }
+    }
+
+    public bool MoveNext()
+    { if(!e.MoveNext() || Ops.Compare(e.Current, sentinel)==0) { done=true; return false; }
+      return true;
+    }
+
+    public void Reset() { e.Reset(); done = false; }
+
+    IEnumerator e;
+    object sentinel;
+    bool done;
+  }
+  #endregion
+  
+  #region XRange
+  [BoaType("xrange")]
+  public class XRange : IEnumerable, ISequence, IRepresentable
+  { public XRange(int stop) : this(0, stop, 1) { }
+    public XRange(int start, int stop) : this(start, stop, 1) { }
+    public XRange(int start, int stop, int step)
+    { if(step==0) throw Ops.ValueError("step of 0 passed to xrange()");
+      this.start=start; this.stop=stop; this.step=step;
+      if(start<=stop && step<0 || start>=stop && step>0) length = 0;
+      else length = (stop-start)/step;
+    }
+
+    public override string ToString() { return __repr__(); }
+
+    #region IEnumerable Members
+    public IEnumerator GetEnumerator() { return new XRangeEnumerator(start, stop, step); }
+    #endregion
+    
+    #region ISequence Members
+    public object __add__(object o) { throw Ops.TypeError("xrange concatenation is not supported"); }
+
+    public object __getitem__(int index)
+    { if(index<0 || index>=length) throw Ops.IndexError("xrange object index out of range");
+      return start + step*index;
+    }
+
+    public int __len__() { return length; }
+
+    public bool __contains__(object value)
+    { int val   = Ops.ToInt(value);
+      int index = (val-start)/step;
+      if(index<0 || index>=length || index*step!=val-start) return false;
+      return true;
+    }
+    #endregion
+
+    #region IRepresentable Members
+    public string __repr__() { return string.Format("xrange({0}, {1}, {2})", start, stop, step); }
+    #endregion
+
+    int start, stop, step, length;
+  }
+
+  public class XRangeEnumerator : IEnumerator
+  { public XRangeEnumerator(int start, int stop, int step)
+    { this.start=start; this.stop=stop; this.step=step; current=start-step;
+    }
+
+    public object Current
+    { get
+      { if(step<0)
+        { if(current<=stop) throw new InvalidOperationException();
+        }
+        else if(current>=stop) throw new InvalidOperationException();
+        return current;
+      }
+    }
+    
+    public bool MoveNext()
+    { if(step<0)
+      { if(current<=stop+step) return false;
+      }
+      else if(current>=stop-step) return false;
+      current += step;
+      return true;
+    }
+
+    public void Reset() { current=start-step; }
+
+    internal int start, stop, step, current;
+  }
+  #endregion
+
+  public static string __repr__() { return __str__(); }
+  public static string __str__() { return "<module '__builtin__' (built-in)>"; }
+
   public static object abs(object o)
   { if(o is int) return Math.Abs((int)o);
     if(o is double) return Math.Abs((double)o);
@@ -15,12 +147,15 @@ public class __builtin__
   }
 
   public static object apply(object func, object args) { return Ops.CallWithArgsSequence(func, args); }
+  public static object @bool(object o) { return Ops.FromBool(Ops.IsTrue(o)); }
+  public static object callable(object o) { return o is ICallable ? Ops.TRUE : hasattr(o, "__call__"); }
   public static string chr(int value) { return new string((char)value, 1); }
   public static int cmp(object a, object b) { return Ops.Compare(a, b); }
   public static void delattr(object o, string name) { Ops.DelAttr(o, name); }
-  public static List dir() { throw new NotImplementedException(); }
+  public static List dir() { return dir(Ops.GetExecutingModule()); }
   public static List dir(object o) { return Ops.GetAttrNames(o); }
   public static Tuple divmod(object a, object b) { return new Tuple(Ops.Divide(a, b), Ops.Modulus(a, b)); }
+  public static IEnumerator enumerate(object o) { return new EnumerateEnumerator(Ops.GetEnumerator(o)); }
 
   public static object eval(string expr)
   { IDictionary dict = (IDictionary)globals();
@@ -46,7 +181,7 @@ public class __builtin__
       ICollection col = seq as ICollection;
       IEnumerator e;
       if(col!=null) { ret=new List(Math.Max(col.Count/2, 16)); e=col.GetEnumerator(); }
-      else { ret=new List(); e=Ops.GetEnumerator(list); }
+      else { ret=new List(); e=Ops.GetEnumerator(seq); }
 
       if(function==null)
       { while(e.MoveNext()) if(Ops.IsTrue(e.Current)) ret.append(Ops.ToBoa(e.Current));
@@ -56,6 +191,9 @@ public class __builtin__
     }
   }
 
+  public static double @float(string s) { return double.Parse(s); }
+  public static double @float(object o) { return Ops.ToFloat(o); }
+
   public static object getattr(object o, string name) { return Ops.GetAttr(o, name); }
   public static object getattr(object o, string name, object defaultValue)
   { object ret;
@@ -64,7 +202,17 @@ public class __builtin__
 
   public static object globals() { throw new NotImplementedException(); }
   public static object hasattr(object o, string name) { object dummy; return Ops.GetAttr(o, name, out dummy); }
+  
+  // FIXME: python says: Numeric values that compare equal have the same hash value (even if they are of
+  //                     different types, as is the case for 1 and 1.0).
   public static int hash(object o) { return o.GetHashCode(); }
+
+  public static void help() { }
+  public static void help(object o)
+  { object doc;
+    if(Ops.GetAttr(o, "__doc__", out doc)) Console.WriteLine(doc);
+    else Console.WriteLine("No help available for {0}.", Ops.GetDynamicType(o).__name__);
+  }
 
   public static object hex(object o)
   { if(o is int) return "0x" + ((int)o).ToString("x");
@@ -72,10 +220,29 @@ public class __builtin__
     return Ops.Invoke(o, "__hex__");
   }
 
+  public static int id(object o) { throw new NotImplementedException(); }
+
+  public static int @int(string s) { return int.Parse(s); }
+  public static int @int(object o) { return Ops.ToInt(o); }
+  public static int @int(string s, int radix)
+  { if(radix==0)
+    { s = s.ToLower();
+      if(s.IndexOf('.')!=-1 || s.IndexOf('e')!=-1) radix=10;
+      else if(s.StartsWith("0x")) { radix=16; s=s.Substring(2); }
+      else if(s.StartsWith("0")) radix=8;
+      else radix=10;
+    }
+    return Convert.ToInt32(s, radix);
+  }
+
   public static string intern(string s) { return string.Intern(s); }
   public static bool isInstance(object o, object type) { throw new NotImplementedException(); }
   public static bool isSubClass(object XX, object YY) { throw new NotImplementedException(); }
+
   public static IEnumerator iter(object o) { return Ops.GetEnumerator(o); }
+  public static IEnumerator iter(object o, object sentinel)
+  { return new SentinelEnumerator(Ops.GetEnumerator(o), sentinel);
+  }
 
   public static int len(object o)
   { string s = o as string;
@@ -180,11 +347,19 @@ public class __builtin__
     return ret;
   }
   public static List range(int start, int stop, int step)
-  { if(stop==0) throw Ops.ValueError("step of 0 passed to range()");
+  { if(step==0) throw Ops.ValueError("step of 0 passed to range()");
     if(start<=stop && step<0 || start>=stop && step>0) return new List();
     List ret = new List((stop-start)/step);
     for(; start<stop; start += step) ret.append(start);
     return ret;
+  }
+  
+  public static string raw_input() { return raw_input(null); }
+  public static string raw_input(string prompt)
+  { if(prompt!=null) Console.Write(prompt);
+    string line = Console.ReadLine();
+    if(line==null) throw Ops.EOFError("raw_input() reached EOF");
+    return line;
   }
 
   public static object reduce(object function, object seq)
@@ -200,6 +375,7 @@ public class __builtin__
     return initial;
   }
 
+  public static Module reload(Module module) { throw new NotImplementedException(); }
   public static string repr(object o) { return Ops.Repr(o); }
 
   public static double round(double value) { return Math.Round(value); }
@@ -213,13 +389,16 @@ public class __builtin__
 
   public static void setattr(object o, string name, object value) { Ops.SetAttr(value, o, name); }
 
+  public static string str() { return string.Empty; }
+  public static string str(object o) { return Ops.Str(o); }
+
   public static object sum(object seq) { return sum(seq, 0); }
   public static object sum(object seq, object start)
   { IEnumerator e = Ops.GetEnumerator(seq);
     while(e.MoveNext()) start = Ops.Add(start, e.Current);
     return start;
   }
-
+  
   public static List zip(params object[] seqs)
   { if(seqs.Length==0) throw Ops.TypeError("zip() requires at least one sequence");
 
@@ -234,33 +413,34 @@ public class __builtin__
         else items[i]=enums[i].Current;
       ret.append(new Tuple(items));
     }
-    return ret;
   }
 
   #region Data types
-  public static object @bool   = ReflectedType.FromType(typeof(bool));
-  public static object dict    = ReflectedType.FromType(typeof(Dict));
-  public static object @float  = ReflectedType.FromType(typeof(double));
-  public static object @int    = ReflectedType.FromType(typeof(int));
-  public static object list    = ReflectedType.FromType(typeof(List));
-  public static object @object = ReflectedType.FromType(typeof(object));
-  public static object @string = ReflectedType.FromType(typeof(string));
-  public static object tuple   = ReflectedType.FromType(typeof(Tuple));
+  //public static readonly object @bool   = ReflectedType.FromType(typeof(bool));
+  public static readonly object dict    = ReflectedType.FromType(typeof(Dict));
+  //public static readonly object @float  = ReflectedType.FromType(typeof(double));
+  //public static readonly object @int    = ReflectedType.FromType(typeof(int));
+  public static readonly object list    = ReflectedType.FromType(typeof(List));
+  public static readonly object @object = ReflectedType.FromType(typeof(object));
+  public static readonly object @string = ReflectedType.FromType(typeof(string));
+  public static readonly object tuple   = ReflectedType.FromType(typeof(Tuple));
+  public static readonly object xrange  = ReflectedType.FromType(typeof(XRange));
   #endregion
 
   #region Exceptions
-  public static object StopIteration = ReflectedType.FromType(typeof(StopIterationException));
-  public static object ValueError = ReflectedType.FromType(typeof(ValueErrorException));
-  //public static object FloatingPointError = ReflectedType.FromType(typeof(FloatingPointErrorException));
-  //public static object ImportError = ReflectedType.FromType(typeof(ImportErrorException));
-  public static object IndexError = ReflectedType.FromType(typeof(IndexErrorException));
-  public static object KeyError = ReflectedType.FromType(typeof(KeyErrorException));
-  //public static object LookupError = ReflectedType.FromType(typeof(LookupErrorException));
-  public static object NameError = ReflectedType.FromType(typeof(NameErrorException));
-  //public static object NotImplementedError = ReflectedType.FromType(typeof(NotImplementedErrorException));
-  //public static object OverflowError = ReflectedType.FromType(typeof(OverflowErrorException));
-  public static object SyntaxError = ReflectedType.FromType(typeof(SyntaxErrorException));
-  public static object TypeError = ReflectedType.FromType(typeof(TypeErrorException));
+  public static readonly object StopIteration = ReflectedType.FromType(typeof(StopIterationException));
+  public static readonly object ValueError = ReflectedType.FromType(typeof(ValueErrorException));
+  public static readonly object EOFError = ReflectedType.FromType(typeof(EOFErrorException));
+  //public static readonly object FloatingPointError = ReflectedType.FromType(typeof(FloatingPointErrorException));
+  //public static readonly object ImportError = ReflectedType.FromType(typeof(ImportErrorException));
+  public static readonly object IndexError = ReflectedType.FromType(typeof(IndexErrorException));
+  public static readonly object KeyError = ReflectedType.FromType(typeof(KeyErrorException));
+  //public static readonly object LookupError = ReflectedType.FromType(typeof(LookupErrorException));
+  public static readonly object NameError = ReflectedType.FromType(typeof(NameErrorException));
+  //public static readonly object NotImplementedError = ReflectedType.FromType(typeof(NotImplementedErrorException));
+  //public static readonly object OverflowError = ReflectedType.FromType(typeof(OverflowErrorException));
+  public static readonly object SyntaxError = ReflectedType.FromType(typeof(SyntaxErrorException));
+  public static readonly object TypeError = ReflectedType.FromType(typeof(TypeErrorException));
   #endregion
 }
   

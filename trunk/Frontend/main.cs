@@ -11,7 +11,7 @@ public class Test
 { public string Foo { get { return foo; } set { foo=value; if(FooChanged!=null) FooChanged(this, new EventArgs()); } }
   public string Foo2 { get { return foo.Replace(" ", ""); } }
   public object a=1, b=2, c=3;
-  
+
   public event EventHandler FooChanged;
 
   public override string ToString()
@@ -27,9 +27,10 @@ public class Text
 
     Module top = new Module();
     Frame topFrame = new Frame(top);
-    topFrame.SetGlobal("_", null);
 
-topFrame.Set("obj", new Test());
+    top.__setattr__("__builtins__", Importer.Import("__builtin__"));
+    top.__setattr__("__name__", "main");
+    top.__setattr__("_", null);
 
     while(true)
     { try
@@ -60,10 +61,12 @@ topFrame.Set("obj", new Test());
         if(ret==null) ret = topFrame.GetGlobal("_");
         #else
         stmt.PostProcessForInterpret();
+        Ops.Frames.Push(topFrame);
         stmt.Execute(topFrame);
+        Ops.Frames.Pop();
         object ret = topFrame.GetGlobal("_");
         #endif
-        if(ret!=null) Console.WriteLine(ret);
+        if(ret!=null) Console.WriteLine(Ops.Str(ret));
       }
       catch(Exception e)
       { Console.Error.WriteLine();
