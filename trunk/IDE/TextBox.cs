@@ -103,9 +103,10 @@ public class BoaBox : TextEditorControl
         return true;
       }
       else if(code==Keys.Space && control && !shift && !alt) // ctrl-space
-      { string text = PopulatePartial();
-        if(AcBox.Items.Count==1) { typed=text; AcBox.SelectedIndex=0; SelectItem(); typed=""; }
-        else if(AcBox.Items.Count!=0) ShowCompletionBox();
+      { typed = PopulatePartial();
+        if(AcBox.Items.Count==1) { AcBox.SelectedIndex=0; SelectItem(); typed=""; }
+        else if(AcBox.Items.Count!=0) { ShowCompletionBox(); AcBox.SelectedIndex=0; }
+        else typed="";
         return true;
       }
       else if(code==Keys.OemCloseBrackets && control && !shift && !alt) // ctrl-]
@@ -211,7 +212,8 @@ public class BoaBox : TextEditorControl
     if(obj!=null)
     { int index=ident.LastIndexOf('.');
       if(index!=-1) ident = ident.Substring(index+1);
-      foreach(string s in Modules.__builtin__.dir(obj)) if(s.StartsWith(ident)) acbox.Items.Add(s);
+      foreach(string s in Modules.__builtin__.dir(obj))
+        if(string.Compare(s, 0, ident, 0, ident.Length, true)==0) acbox.Items.Add(s);
     }
     return ident;
   }
