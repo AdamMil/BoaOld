@@ -50,7 +50,7 @@ public class TypeGenerator
 
   public Slot GetConstant(object value)
   { Slot slot;
-    bool hash = Convert.GetTypeCode(value)!=TypeCode.Object || value is Slice;
+    bool hash = Convert.GetTypeCode(value)!=TypeCode.Object || !(value is List || value is Dict);
 
     if(hash) slot = (Slot)constants[value];
     else
@@ -110,6 +110,13 @@ public class TypeGenerator
       cg.EmitConstant(slice.stop);
       cg.EmitConstant(slice.step);
       cg.EmitNew(typeof(Slice), new Type[] { typeof(object), typeof(object), typeof(object) });
+    }
+    else if(value is Complex)
+    { Complex c = (Complex)value;
+      cg.EmitDouble(c.real);
+      cg.EmitDouble(c.imag);
+      cg.EmitNew(typeof(Complex), new Type[] { typeof(double), typeof(double) });
+      cg.ILG.Emit(OpCodes.Box, typeof(Complex));
     }
     else switch(Convert.GetTypeCode(value)) // TODO: see if this is faster than using 'is'
     { case TypeCode.Int32:

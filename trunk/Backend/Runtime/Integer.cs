@@ -68,7 +68,7 @@ public struct Integer : IConvertible, IRepresentable, IComparable, ICloneable
     for(int i=0; i<length; i++) hash ^= data[i];
     return (int)hash;
   }
-
+  
   #region ToString
   public override string ToString() { return ToString(10); }
   public string ToString(int radix)
@@ -76,10 +76,13 @@ public struct Integer : IConvertible, IRepresentable, IComparable, ICloneable
   }
   #endregion
 
+  public static Integer Parse(string s) { return Parse(s, 10); }
+  public static Integer Parse(string s, int radix) { throw new NotImplementedException(); }
+
   public static readonly Integer MinusOne = new Integer(-1, new uint[1]{1});
   public static readonly Integer One  = new Integer(1, new uint[1]{1});
   public static readonly Integer Zero = new Integer(0, new uint[0]);
-
+  
   #region Comparison operators
   public static bool operator==(Integer a, Integer b) { return a.CompareTo(b)==0; }
   public static bool operator==(Integer a, int b)     { return a.CompareTo(b)==0; }

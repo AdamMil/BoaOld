@@ -757,6 +757,15 @@ public sealed class Ops
   { return new System.IO.IOException(string.Format(format, args));
   }
 
+  public static object IsIn(object a, object b, bool not)
+  { IContainer ct = b as IContainer;
+    if(ct==null)
+    { object isin = Invoke(b, "__contains__", a);
+      return not ? FromBool(!Ops.IsTrue(isin)) : isin;
+    }
+    else return FromBool(not ? !ct.__contains__(a) : ct.__contains__(a));
+  }
+
   public static bool IsTrue(object a)
   { switch(Convert.GetTypeCode(a))
     { case TypeCode.Boolean: return (bool)a;

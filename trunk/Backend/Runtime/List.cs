@@ -178,7 +178,9 @@ public class List : IMutableSequence, IList, IComparable, ICloneable, IRepresent
   public void Clear() { size=0; }
   public int IndexOf(object value) { return IndexOf(value, 0, size); }
   public int IndexOf(object value, int start, int length)
-  { for(int i=0; i<items.Length; i++) if(Ops.Compare(items[i], value)==0) return i;
+  { int end = start+length;
+    if(start<0 || end>size) throw new ArgumentOutOfRangeException();
+    for(; start<end; start++) if(Ops.Compare(items[start], value)==0) return start;
     return -1;
   }
   public int Add(object value) { append(value); return size-1; }
