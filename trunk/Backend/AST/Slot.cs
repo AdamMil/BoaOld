@@ -79,18 +79,38 @@ public class ClosedSlot : Slot
 }
 #endregion
 
-#region LocalSlot
-public class LocalSlot : Slot
-{ public LocalSlot(LocalBuilder lb) { builder = lb; } // TODO: reenable this ---v
-  public LocalSlot(LocalBuilder lb, string name) { builder = lb; /*lb.SetLocalSymInfo(name);*/ }
+#region FieldSlot
+public class FieldSlot : Slot
+{ public FieldSlot(FieldInfo fi) { Info=fi; }
+  public FieldSlot(Slot instance, FieldInfo fi) { Instance=instance; Info=fi; }
+
+  public override Type Type { get { return Info.FieldType; } }
+
+  public override void EmitGet(CodeGenerator cg)
+  { if(Instance!=null) Instance.EmitGet(cg);
+    cg.EmitFieldGet(Info);
+  }
   
-  public override Type Type { get { return builder.LocalType; } }
+  public override void EmitGetAddr(CodeGenerator cg)
+  { if(Instance!=null) Instance.EmitGet(cg);
+    cg.EmitFieldGetAddr(Info);
+  }
 
-  public override void EmitGet(CodeGenerator cg) { cg.ILG.Emit(OpCodes.Ldloc, builder); }
-  public override void EmitGetAddr(CodeGenerator cg) { cg.ILG.Emit(OpCodes.Ldloca, builder); }
-  public override void EmitSet(CodeGenerator cg) { cg.ILG.Emit(OpCodes.Stloc, builder); }
+  public override void EmitSet(CodeGenerator cg)
+  { if(Instance==null) cg.EmitFieldSet(Info);
+    Slot temp = cg.AllocLocalTemp(Info.FieldType);
+    temp.EmitSet(cg);
+    EmitSet(cg, temp);
+    cg.FreeLocalTemp(temp);
+  }
+  public override void EmitSet(CodeGenerator cg, Slot val)
+  { if(Instance!=null) Instance.EmitGet(cg);
+    val.EmitGet(cg);
+    cg.EmitFieldSet(Info);
+  }
 
-  LocalBuilder builder;
+  public FieldInfo Info;
+  public Slot Instance;
 }
 #endregion
 
@@ -118,6 +138,24 @@ public class FrameObjectSlot : Slot
   public ArgSlot ArgSlot;
   public Slot FieldSlot;
   public CodeGenerator BaseCodeGenerator;
+}
+#endregion
+
+#region LocalSlot
+public class LocalSlot : Slot
+{ public LocalSlot(LocalBuilder lb) { builder = lb; }
+  public LocalSlot(LocalBuilder lb, string name)
+  { builder = lb; 
+    if(Options.Debug) lb.SetLocalSymInfo(name);
+  }
+  
+  public override Type Type { get { return builder.LocalType; } }
+
+  public override void EmitGet(CodeGenerator cg) { cg.ILG.Emit(OpCodes.Ldloc, builder); }
+  public override void EmitGetAddr(CodeGenerator cg) { cg.ILG.Emit(OpCodes.Ldloca, builder); }
+  public override void EmitSet(CodeGenerator cg) { cg.ILG.Emit(OpCodes.Stloc, builder); }
+
+  LocalBuilder builder;
 }
 #endregion
 
@@ -167,6 +205,20 @@ public class StaticSlot : Slot
   public override void EmitSet(CodeGenerator cg) { cg.EmitFieldSet(field); }
 
   FieldInfo field;
+}
+#endregion
+
+#region ThisSlot
+public class ThisSlot : Slot
+{ public ThisSlot(Type type) { this.type=type; }
+
+  public override Type Type { get { return type; } }
+
+  public override void EmitGet(CodeGenerator cg) { cg.ILG.Emit(OpCodes.Ldarg_0); }
+  public override void EmitGetAddr(CodeGenerator cg) { cg.ILG.Emit(OpCodes.Ldarga, 0); }
+  public override void EmitSet(CodeGenerator cg) { cg.ILG.Emit(OpCodes.Starg, 0); }
+  
+  Type type;
 }
 #endregion
 

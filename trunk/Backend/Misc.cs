@@ -17,6 +17,7 @@ public sealed class Misc
   }
   
   public static readonly object[] EmptyArray = new object[0];
+  public static readonly Type TypeOfObjectRef = Type.GetType("System.Object&");
 }
 
 public sealed class Options

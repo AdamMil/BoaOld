@@ -26,7 +26,7 @@ enum Token
   
   // keywords
   Def, Print, Return, And, Or, Not, While, If, Elif, Else, Pass, Break, Continue, Global, Import, From, For, In,
-  Lambda, Try, Except, Finally, Raise, Class, Assert, Is, Del,
+  Lambda, Try, Except, Finally, Raise, Class, Assert, Is, Del, Yield,
   
   // abstract
   Identifier, Literal, Assign, Compare, Call, Member, Index, Slice, Hash, List, Tuple, Suite,
@@ -49,7 +49,7 @@ public class Parser
     { Token.Def, Token.Print, Token.Return, Token.And, Token.Or, Token.Not, Token.While, Token.Import, Token.From,
       Token.For, Token.If,  Token.Elif, Token.Else, Token.Pass, Token.Break, Token.Continue, Token.Global, Token.In,
       Token.Lambda, Token.Try, Token.Except, Token.Finally, Token.Raise, Token.Class, Token.Assert, Token.Is,
-      Token.Del,
+      Token.Del, Token.Yield
     };
     foreach(Token token in tokens) stringTokens.Add(Enum.GetName(typeof(Token), token).ToLower(), token);
   }
@@ -216,9 +216,9 @@ public class Parser
     }
   }
   
-  // <member> '(' <argument_list> ')' | '[' <index> ']'
-  Expression ParseCallIndex()
-  { Expression expr = ParseMember();
+  // cim_expr := <primary> ('(' <argument_list> ')' | '[' <index> ']' | '.' <identifier>)*
+  Expression ParseCIM()
+  { Expression expr = ParsePrimary();
     while(true)
     { if(TryEat(Token.LParen))
       { expr = AP(new CallExpression(expr, ParseArguments()));
@@ -236,6 +236,7 @@ public class Parser
         Eat(Token.RBracket);
         return new IndexExpression(expr, start);
       }
+      else if(TryEat(Token.Period)) expr = AP(new AttrExpression(expr, ParseIdentifier()));
       else return expr;
     }
   }
@@ -474,14 +475,6 @@ public class Parser
     return ParseTypeLow();
   }
   
-  // member := <primary> <member_access>*
-  // member_access ::= '.' LITERAL
-  Expression ParseMember()
-  { Expression expr = ParsePrimary();
-    while(TryEat(Token.Period)) expr = AP(new AttrExpression(expr, ParseIdentifier()));
-    return expr;
-  }
-
   // primary := LITERAL | <ident> | '(' <expression> ')' | '[' <array_list> ']' | '{' <hash_list> '}' |
   //            '[' <list_comprehension> ']' | <tuple of <expression>>
   // tuple of T := '(' (<T> ',')+ <T>? ')'
@@ -625,13 +618,14 @@ public class Parser
   }
 
   // simple_stmt := <expr_stmt> | <print_stmt> | <break_stmt> | <continue_stmt> | <pass_stmt> | <return_stmt>
-  //                <assert_stmt> | <del_stmt>
+  //                <assert_stmt> | <del_stmt> | <yield_stmt>
   // break_stmt    := 'break' EOL
   // continue_stmt := 'continue' EOL
   // pass_stmt     := 'pass' EOL
   // raise_stmt    := 'raise' <expression>?
   // return_stmt   := 'return' <expression>?
   // assert_stmt   := 'assert' <expression>
+  // yield_stmt    := 'yield' <expression>
   // del_stmt      := 'del' <lvalue> (',' <lvalue>)*
   Statement ParseSimpleStmt()
   { switch(token)
@@ -655,6 +649,7 @@ public class Parser
         return AP(token==Token.EOL || token==Token.Semicolon ? new RaiseStatement()
                                                              : new RaiseStatement(ParseExpression()));
       case Token.Assert: NextToken(); return AP(new AssertStatement(ParseExpression()));
+      case Token.Yield: NextToken(); return AP(new YieldStatement(ParseExpression()));
       case Token.Del:
       { NextToken();
         ArrayList list = new ArrayList();
@@ -759,7 +754,7 @@ public class Parser
     { NextToken();
       return AP(new UnaryExpression(ParseUnary(), op));
     }
-    return ParseCallIndex();
+    return ParseCIM();
   }
 
   // while_stmt := 'while' <expression> <suite>

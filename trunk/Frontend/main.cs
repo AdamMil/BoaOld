@@ -1,4 +1,4 @@
-//#define COMPILED
+#define COMPILED
 
 using System;
 using Boa.AST;

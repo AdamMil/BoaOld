@@ -5,7 +5,7 @@ using System.Collections.Specialized;
 namespace Boa.Runtime
 {
 
-[AttributeUsage(AttributeTargets.Class|AttributeTargets.Interface|AttributeTargets.Struct, Inherited=false)]
+[AttributeUsage(AttributeTargets.Class|AttributeTargets.Interface|AttributeTargets.Struct)]
 public class BoaTypeAttribute : Attribute
 { public BoaTypeAttribute(string name) { Name=name; }
   public string Name;
@@ -20,7 +20,7 @@ public abstract class BoaType : DynamicType, IDynamicObject, ICallable, IHasAttr
     else if(type==typeof(int)) __name__ = "int";
     else if(type==typeof(double)) __name__ = "float";
     else
-    { BoaTypeAttribute attr = (BoaTypeAttribute)Attribute.GetCustomAttribute(type, typeof(BoaTypeAttribute), false);
+    { BoaTypeAttribute attr = (BoaTypeAttribute)Attribute.GetCustomAttribute(type, typeof(BoaTypeAttribute));
       __name__ = attr==null ? type.FullName : attr.Name;
     }
   }

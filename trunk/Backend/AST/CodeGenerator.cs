@@ -12,8 +12,10 @@ public class CodeGenerator
   { TypeGenerator = tg; MethodBuilder = mb; ILG = ilg;
   }
 
-  public Slot AllocLocalTemp(Type type)
+  public Slot AllocLocalTemp(Type type) { return AllocLocalTemp(type, false); }
+  public Slot AllocLocalTemp(Type type, bool keepAround)
   { if(localTemps==null) localTemps = new ArrayList();
+    if(keepAround && IsGenerator) return Namespace.AllocTemp(type);
     Slot ret;
     for(int i=localTemps.Count-1; i>=0; i--)
     { ret = (Slot)localTemps[i];
@@ -184,6 +186,7 @@ public class CodeGenerator
   public void SetArgs(Name[] names, int offset) { Namespace.SetArgs(names, offset, MethodBuilder); }
 
   public Namespace Namespace;
+  public bool IsGenerator;
 
   public readonly TypeGenerator TypeGenerator;
   public readonly MethodBuilder MethodBuilder;

@@ -15,6 +15,7 @@ public abstract class Namespace
     Global = parent==null || parent.Parent==null ? parent : parent.Parent;
   }
 
+  public virtual Slot AllocTemp(Type type) { throw new NotImplementedException(); }
   // TODO: make sure this works with closures, etc
   public virtual void DeleteSlot(Name name) { slots.Remove(name.String); }
   public Slot GetLocalSlot(Name name) { return (Slot)slots[name.String]; } // does NOT make the slot!
@@ -42,6 +43,36 @@ public abstract class Namespace
     slots[name.String] = ret = MakeSlot(name);
     return ret;
   }
+}
+#endregion
+
+#region FieldNamespace
+public class FieldNamespace : Namespace
+{ public FieldNamespace(Namespace parent, string prefix, TypeGenerator tg) : base(parent)
+  { this.tg=tg; Prefix=prefix;
+  }
+  public FieldNamespace(Namespace parent, string prefix, TypeGenerator tg, Slot instance)
+    : base(parent) { this.tg=tg; this.instance=instance; Prefix=prefix; }
+  
+  public override Slot AllocTemp(Type type)
+  { return new FieldSlot(instance, tg.TypeBuilder.DefineField("temp$"+count++, type, FieldAttributes.Public));
+  }
+
+  protected override Slot MakeSlot(Name name)
+  { FieldInfo info = tg.TypeBuilder.DefineField(Prefix+name.String, typeof(object), FieldAttributes.Public);
+    return new FieldSlot(instance, info);
+  }
+
+  public override void SetArgs(Name[] names, int offset, MethodBuilder mb)
+  { for(; offset<names.Length; offset++) GetSlotForSet(names[offset]);
+  }
+
+  public string Prefix;
+
+  TypeGenerator tg;
+  Slot instance;
+  
+  static int count;
 }
 #endregion
 

@@ -1,4 +1,5 @@
 using System;
+using System.Collections;
 using System.Text;
 using Boa.Runtime;
 
@@ -13,57 +14,14 @@ namespace Boa.Modules
 public sealed class codecs
 { codecs() { }
 
-  #region Encodings
-  // must override GetEncoder() and GetDecoder() to prevent infinite loops!
-  public abstract class StatefulEncoding : Encoding
-  { public override int GetByteCount(char[] chars, int index, int count)
-    { return GetEncoder().GetByteCount(chars, index, count, true);
-    }
-    
-    public override int GetBytes(char[] chars, int charIndex, int charCount, byte[] bytes, int byteIndex)
-    { return GetEncoder().GetBytes(chars, charIndex, charCount, bytes, byteIndex, true);
-    }
-    
-    public override int GetCharCount(byte[] bytes, int index, int count)
-    { return GetDecoder().GetCharCount(bytes, index, count);
-    }
-
-    public override int GetChars(byte[] bytes, int byteIndex, int byteCount, char[] chars, int charIndex)
-    { return GetDecoder().GetChars(bytes, byteIndex, byteCount, chars, charIndex);
-      
-    }
-  }
-
-  public class Base64Encoding : StatefulEncoding
-  { 
-  }
-
-  public class HexEncoding : Encoding
-  {
-  }
-  
-  public class QuoPriEncoding : ???
-  {
-  }
-  
-  public class Rot13Encoding : Encoding
-  {
-  }
-  
-  public class EscapeEncoding : StatefulEncoding
-  {
-  }
-  
-  public class UUEncoding : ???
-  {
-  }
-  
-  public class ZLibEncoding : StatefulEncoding
-  {
-  }
-  #endregion
   
   #region Support classes
+  public class BoaEncoding// TODO: : Encoding
+  { public BoaEncoding(Tuple tup) { encoder=tup.items[0]; decoder=tup.items[1]; }
+
+    object encoder, decoder;
+  }
+
   public class encoder
   { public encoder(Encoder encoder) { enc=encoder; }
     
@@ -87,27 +45,32 @@ public sealed class codecs
   { return Encoding.Convert(from, to, bytes, offset, length);
   }
 
-  public static Decoder getdecoder(string encoding) { return new decoder(lookup(encoding).GetDecoder()); }
-  public static Encoder getencoder(string encoding) { return new encoder(lookup(encoding).GetEncoder()); }
+  public static decoder getdecoder(string encoding) { return new decoder(lookup(encoding).GetDecoder()); }
+  public static decoder getdecoder(Encoding encoding) { return new decoder(encoding.GetDecoder()); }
+  public static encoder getencoder(string encoding) { return new encoder(lookup(encoding).GetEncoder()); }
+  public static encoder getencoder(Encoding encoding) { return new encoder(encoding.GetEncoder()); }
 
   public static Encoding lookup(string encoding)
-  { use registered functions;
-    switch(encoding)
-    { case "base64_codec": if(base64==null) base64=new Base64Encoding(); return base64;
-      case "hex_codec": if(hex==null) hex=new HexEncoding(); return hex;
-      case "quopri_codec": if(quopri==null) quopri=new QuoPriEncoding(); return quopri;
-      case "rot_13": if(rot13==null) rot13=new Rot13Encoding(); return rot13;
-      case "string_escape": case "unicode_escape": case "raw_unicode_escape":
-        if(escape==null) escape=new EscapeEncoding(); return escape;
-      case "uu_codec": if(uu==null) uu=new UUEncoding(); return uu;
-      case "zlib_codec": if(zlib==null) zlib=new ZLibEncoding(); return zlib;
-      default:
-        try { return Encoding.GetEncoding(encoding); }
-        catch(NotSupportedException) { throw Ops.LookupError("codec '{0}' not supported on this system"); }
+  { foreach(object lf in lookups)
+    { object ret = Ops.Call(lf, encoding);
+      if(ret!=null)
+      { if(ret is Encoding) return (Encoding)ret;
+        Tuple tup = ret as Tuple;
+        if(tup==null || tup.Count!=2)
+          throw Ops.TypeError("lookup(): expected null or (encoder, decoder), but got {0}", Ops.Repr(ret));
+        // TODO: return new BoaEncoding(ret);
+        throw new NotImplementedException("BoaEncoding");
+      }
     }
+
+    try { return Encoding.GetEncoding(encoding); }
+    catch(NotSupportedException) { throw Ops.LookupError("codec '{0}' not supported on this system"); }
   }
   
-  public static void register(object function);
+  public static void register(object function)
+  { if(lookups==null) lookups = new ArrayList();
+    lookups.Add(function);
+  }
 
   public static readonly Encoding ascii = Encoding.ASCII;
   public static readonly Encoding bigendianunicode = Encoding.BigEndianUnicode;
@@ -116,7 +79,7 @@ public sealed class codecs
   public static readonly Encoding utf7 = Encoding.UTF7;
   public static readonly Encoding utf8 = Encoding.UTF8;
   
-  static Encoding base64, hex, quopri, rot13, escape, uu, zlib;
+  static ArrayList lookups;
 }
 
 } // namespace Boa.Modules

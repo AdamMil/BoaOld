@@ -65,6 +65,11 @@ public class Optimizer : IWalker
 #endregion
 #endregion
 
+public struct YieldTarget
+{ public Statement Statement;
+  public Label Label;
+}
+
 #region Statement
 public abstract class Statement : Node
 { public abstract void Emit(CodeGenerator cg);
@@ -122,6 +127,8 @@ public abstract class Statement : Node
           { fun.Name = AddName(fun.Name);
             fun.Name.Scope = Scope.Local;
           }
+          for(int i=0; i<fun.Parameters.Length; i++)
+            if(fun.Parameters[i].Default!=null) fun.Parameters[i].Default.Walk(this);
           return false;
         }
         else if(node is AssignStatement)
@@ -560,9 +567,7 @@ public class ContinueStatement : JumpStatement
 public class DefStatement : Statement
 { public DefStatement(string name, Parameter[] parms, Statement body)
   { Function = new BoaFunction(this, name, parms, body);
-    GlobalFinder gf = new GlobalFinder();
-    Function.Body.Walk(gf);
-    Function.Globals = gf.Globals==null || gf.Globals.Count==0 ? null : (Name[])gf.Globals.ToArray(typeof(Name));
+    Function.Globals = GlobalFinder.Find(Function.Body);
   }
 
   public override void Emit(CodeGenerator cg)
@@ -591,7 +596,13 @@ public class DefStatement : Statement
 
   #region GlobalFinder
   class GlobalFinder : IWalker
-  { public void PostWalk(Node node) { }
+  { public static Name[] Find(Node node)
+    { GlobalFinder gf = new GlobalFinder();
+      node.Walk(gf);
+      return gf.Globals==null || gf.Globals.Count==0 ? null : (Name[])gf.Globals.ToArray(typeof(Name));
+    }
+
+    public void PostWalk(Node node) { }
 
     public bool Walk(Node node)
     { while(node is ParenExpression) node = ((ParenExpression)node).Expression;
@@ -624,7 +635,7 @@ public class DefStatement : Statement
       else if(e is TupleExpression) foreach(Expression te in ((TupleExpression)e).Expressions) HandleAssignment(te);
     }
 
-    public ArrayList Globals;
+    ArrayList Globals;
     HybridDictionary assigned;
   }
   #endregion
@@ -833,22 +844,25 @@ public class ForStatement : Statement
 
   public override void Emit(CodeGenerator cg)
   { AssignStatement ass = new AssignStatement(Names);
+    Slot list = cg.IsGenerator ? cg.AllocLocalTemp(typeof(IEnumerator), true) : null;
     Label start=cg.ILG.DefineLabel(), end=cg.ILG.DefineLabel();
 
     Body.Walk(new JumpFinder(start, end));
     Expression.Emit(cg);
     cg.EmitCall(typeof(Ops), "GetEnumerator", new Type[] { typeof(object) });
+    if(list!=null) list.EmitSet(cg);
     cg.ILG.MarkLabel(start);
+    if(list!=null) list.EmitGet(cg);
     cg.ILG.Emit(OpCodes.Dup);
     cg.EmitCall(typeof(IEnumerator), "MoveNext");
     cg.ILG.Emit(OpCodes.Brfalse, end);
-    cg.ILG.Emit(OpCodes.Dup);
+    if(list==null) cg.ILG.Emit(OpCodes.Dup);
     cg.EmitPropGet(typeof(IEnumerator), "Current");
     ass.Emit(cg);
     Body.Emit(cg);
     cg.ILG.Emit(OpCodes.Br, start);
     cg.ILG.MarkLabel(end);
-    cg.ILG.Emit(OpCodes.Pop);
+    if(list==null) cg.ILG.Emit(OpCodes.Pop);
   }
 
   public override void Execute(Frame frame)
@@ -1029,9 +1043,17 @@ public class ReturnStatement : Statement
 { public ReturnStatement() { }
   public ReturnStatement(Expression expression) { Expression=expression; }
 
-  public override void Emit(CodeGenerator cg) { cg.EmitReturn(Expression); }
+  public override void Emit(CodeGenerator cg)
+  { if(!InGenerator) cg.EmitReturn(Expression);
+    else
+    { cg.ILG.Emit(OpCodes.Ldc_I4_0);
+      cg.ILG.Emit(OpCodes.Ret);
+    }
+  }
+
   public override void Execute(Frame frame)
-  { throw new ReturnException(Expression==null ? null : Expression.Evaluate(frame));
+  { if(InGenerator) throw new NotImplementedException();
+    throw new ReturnException(Expression==null ? null : Expression.Evaluate(frame));
   }
 
   public override void ToCode(System.Text.StringBuilder sb, int indent)
@@ -1048,6 +1070,7 @@ public class ReturnStatement : Statement
   }
 
   public Expression Expression;
+  public bool InGenerator;
 }
 #endregion
 
@@ -1087,20 +1110,49 @@ public class TryStatement : Statement
 { public TryStatement(Statement body, ExceptClause[] except, Statement elze, Statement final)
   { Body=body; Except=except; Else=elze; Finally=final;
   }
-  
+
   public override void Emit(CodeGenerator cg)
-  { Slot occurred = Else==null ? null : cg.AllocLocalTemp(typeof(bool)), dt = cg.AllocLocalTemp(typeof(DynamicType)),
-         type = cg.AllocLocalTemp(typeof(object)), et = cg.AllocLocalTemp(typeof(DynamicType)),
-         e = cg.AllocLocalTemp(typeof(Exception));
+  { Slot occurred = Else==null ? null : cg.AllocLocalTemp(typeof(bool));
 
     if(occurred!=null)
     { cg.EmitInt(0);
       occurred.EmitSet(cg);
     }
 
+    Slot choice=null;
+    if(Yields!=null)
+    { choice = cg.AllocLocalTemp(typeof(int));
+      Label label = cg.ILG.DefineLabel();
+      cg.EmitInt(int.MaxValue);
+      choice.EmitSet(cg);
+      cg.ILG.Emit(OpCodes.Br, label);
+      for(int i=0; i<Yields.Length; i++)
+      { YieldStatement ys = Yields[i];
+        for(int j=0; j<ys.Targets.Length; j++)
+          if(ys.Targets[j].Statement==this) { cg.ILG.MarkLabel(ys.Targets[j].Label); break; }
+        cg.EmitInt(i);
+        choice.EmitSet(cg);
+        if(i!=Yields.Length-1) cg.ILG.Emit(OpCodes.Br, label);
+      }
+      cg.ILG.MarkLabel(label);
+    }
+
     Label done = cg.ILG.BeginExceptionBlock();      // try {
+    if(Yields!=null)
+    { Label[] jumps = new Label[Yields.Length];
+      for(int i=0; i<Yields.Length; i++)
+      { YieldStatement ys = (YieldStatement)Yields[i];
+        for(int j=0; j<ys.Targets.Length; j++)
+          if(ys.Targets[j].Statement==this) { jumps[i] = ys.Targets[j+1].Label; break; }
+      }
+      choice.EmitGet(cg);
+      cg.ILG.Emit(OpCodes.Switch, jumps);
+      cg.FreeLocalTemp(choice);
+    }
     Body.Emit(cg);                                  //   body
     cg.ILG.BeginCatchBlock(typeof(Exception));      // } catch(Exception e) {
+    Slot dt = cg.AllocLocalTemp(typeof(DynamicType)), type = cg.AllocLocalTemp(typeof(object)),
+         et = cg.AllocLocalTemp(typeof(DynamicType)), e = cg.AllocLocalTemp(typeof(Exception));
     cg.ILG.Emit(OpCodes.Dup);
     e.EmitSet(cg);
     if(occurred!=null)                              // occurred = true
@@ -1231,10 +1283,12 @@ public class TryStatement : Statement
       if(Else!=null) Else.Walk(w);
       if(Finally!=null) Finally.Walk(w);
     }
+    w.PostWalk(this);
   }
 
   public Statement Body, Else, Finally;
   public ExceptClause[] Except;
+  public YieldStatement[] Yields;
 }
 #endregion
 
@@ -1282,6 +1336,42 @@ public class WhileStatement : Statement
 
   public Expression Test;
   public Statement  Body;
+}
+#endregion
+
+#region YieldStatement
+public class YieldStatement : Statement
+{ public YieldStatement(Expression e) { Expression=e; }
+
+  public override void Emit(CodeGenerator cg)
+  { cg.ILG.Emit(OpCodes.Ldarg_0);
+    cg.EmitInt(YieldNumber);
+    cg.EmitFieldSet(typeof(Generator), "jump");
+    cg.ILG.Emit(OpCodes.Ldarg_1);
+    Expression.Emit(cg);
+    cg.ILG.Emit(OpCodes.Stind_Ref);
+    cg.ILG.Emit(OpCodes.Ldc_I4_1);
+    cg.ILG.Emit(OpCodes.Ret);
+    cg.ILG.MarkLabel(Targets[Targets.Length-1].Label);
+  }
+
+  public override void Execute(Frame frame)
+  { throw new NotImplementedException();
+  }
+
+  public override void ToCode(System.Text.StringBuilder sb, int indent)
+  { sb.Append("yield ");
+    Expression.ToCode(sb, 0);
+  }
+
+  public override void Walk(IWalker w)
+  { if(w.Walk(this)) Expression.Walk(w);
+    w.PostWalk(this);
+  }
+
+  public Expression Expression;
+  public YieldTarget[] Targets;
+  public int YieldNumber;
 }
 #endregion
 
