@@ -58,7 +58,7 @@ public class LogicalNotOperator : UnaryOperator
   { cg.EmitIsFalse();
     cg.EmitCall(typeof(Ops), "BoolToObject");
   }
-  public override object Evaluate(object value) { return Ops.BoolToObject(Ops.IsTrue(value)); }
+  public override object Evaluate(object value) { return Ops.FromBool(Ops.IsTrue(value)); }
 }
 
 public class UnaryMinusOperator : UnaryOperator
@@ -75,7 +75,7 @@ public class EqualOperator : BinaryOperator
 
 public class NotEqualOperator : BinaryOperator
 { public override void Emit(CodeGenerator cg) { cg.EmitCall(typeof(Ops), "NotEqual"); }
-  public override object Evaluate(object lhs, object rhs) { return Ops.Add(NotEqual, rhs); }
+  public override object Evaluate(object lhs, object rhs) { return Ops.NotEqual(lhs, rhs); }
 }
 
 public class IdenticalOperator : BinaryOperator

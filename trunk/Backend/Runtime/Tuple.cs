@@ -9,9 +9,9 @@ public class Tuple : ISequence, ICollection, IComparable
   public Tuple(params object[] items) { this.items=items; }
 
   #region ISequence Members
-  public object __add__(object obj)
-  { Tuple tup = obj as Tuple;
-    if(tup==null) throw Ops.TypeError("cannot concatenate tuple to {0}", Ops.GetDynamicType(obj).__name__);
+  public object __add__(object o)
+  { Tuple tup = o as Tuple;
+    if(tup==null) throw Ops.TypeError("cannot concatenate tuple to {0}", Ops.GetDynamicType(o).__name__);
     object[] arr = new object[items.Length+tup.items.Length];
     items.CopyTo(arr, 0);
     tup.items.CopyTo(arr, items.Length);
@@ -35,14 +35,14 @@ public class Tuple : ISequence, ICollection, IComparable
   #endregion
 
   #region IComparable Members
-  public int CompareTo(object obj)
-  { Tuple tup = obj as Tuple;
-    if(tup!=null) return Ops.CompareArrays(items, items.Length, tup.items, tup.items.Length);
+  public int CompareTo(object o)
+  { Tuple tup = o as Tuple;
+    if(tup!=null) return ArrayOps.Compare(items, items.Length, tup.items, tup.items.Length);
     else return -1; // FIXME: compare by type name
   }
   #endregion
 
-  public override bool Equals(object obj) { return CompareTo(obj)==0; }
+  public override bool Equals(object o) { return CompareTo(o)==0; }
 
   public override int GetHashCode() // TODO: improve hashing
   { int ret = 0, inc = Math.Max(items.Length/10, 1); // limit to 10 items (bad idea?)
@@ -65,7 +65,7 @@ public class Tuple : ISequence, ICollection, IComparable
 
   public static readonly Tuple Empty = new Tuple();
   
-  object[] items;
+  internal object[] items;
 }
 
 } // namespace Boa.Runtime

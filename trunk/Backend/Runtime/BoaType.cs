@@ -61,7 +61,6 @@ public abstract class BoaType : DynamicType, IDynamicObject, ICallable, IHasAttr
 
   protected Dict dict;
 
-  ICallable cons;
   Type type;
 }
 

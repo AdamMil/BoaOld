@@ -134,6 +134,21 @@
                     BuildAction = "Compile"
                 />
                 <File
+                    RelPath = "Modules\__builtin__.cs"
+                    SubType = "Code"
+                    BuildAction = "Compile"
+                />
+                <File
+                    RelPath = "Runtime\ArrayOps.cs"
+                    SubType = "Code"
+                    BuildAction = "Compile"
+                />
+                <File
+                    RelPath = "Runtime\BoaFile.cs"
+                    SubType = "Code"
+                    BuildAction = "Compile"
+                />
+                <File
                     RelPath = "Runtime\BoaType.cs"
                     SubType = "Code"
                     BuildAction = "Compile"
@@ -190,6 +205,11 @@
                 />
                 <File
                     RelPath = "Runtime\Reflection.cs"
+                    SubType = "Code"
+                    BuildAction = "Compile"
+                />
+                <File
+                    RelPath = "Runtime\StringOps.cs"
                     SubType = "Code"
                     BuildAction = "Compile"
                 />
