@@ -21,9 +21,10 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 // TODO: make use of 'readonly' attribute
 // TODO: make use of 'sealed' attribute
-// TODO: unify variable names
+// TODO: make parameter names more consistent
 
 using System;
+using Boa.AST;
 
 namespace Boa
 {
@@ -31,6 +32,7 @@ namespace Boa
 public sealed class Misc
 { private Misc() { }
   
+  public static string BodyToDocString(Statement body)  { Suite suite = body as Suite;    if(suite!=null && suite.Statements[0] is ExpressionStatement) // TODO: strip uniform whitespace after second line    { ExpressionStatement es = (ExpressionStatement)suite.Statements[0];      if(es.Expression is ConstantExpression) return ((ConstantExpression)es.Expression).Value as string;    }    return null;  }
   public static Type[] MakeTypeArray(Type type, int length)
   { Type[] arr = new Type[length];
     for(int i=0; i<length; i++) arr[i] = type;

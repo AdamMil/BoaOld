@@ -771,7 +771,8 @@ public class ExpressionStatement : Statement
 { public ExpressionStatement(Expression expr) { Expression=expr; SetLocation(expr); }
 
   public override void Emit(CodeGenerator cg)
-  { if(!Options.Debug && Expression.IsConstant) return; // TODO: don't return if it's at the top level
+  { // optimize away expressions that do nothing
+    if(!Options.Debug && Expression.IsConstant && !Options.Interactive) return;
     Expression.Emit(cg);
     if(Options.Interactive)
     { Slot temp = cg.AllocLocalTemp(typeof(object));

@@ -46,11 +46,21 @@ public sealed class ModuleGenerator
       icg.ILG.Emit(OpCodes.Ldarg_0);
       tg.ModuleField.EmitSet(icg);
       icg.ILG.Emit(OpCodes.Ldarg_1);
-      icg.ILG.Emit(OpCodes.Dup);
       ns.FrameSlot.EmitSet(icg);
+
+      icg.ILG.Emit(OpCodes.Ldarg_1);
       icg.EmitString("__name__");
       icg.EmitString(name);
       icg.EmitCall(typeof(Boa.Runtime.Frame), "SetGlobal");
+
+      string docstring = Misc.BodyToDocString(body);
+      if(docstring!=null)
+      { icg.ILG.Emit(OpCodes.Ldarg_1);
+        icg.EmitString("__doc__");
+        icg.EmitString(docstring);
+        icg.EmitCall(typeof(Boa.Runtime.Frame), "SetGlobal");
+      }
+
       body.Emit(icg);
       icg.ILG.Emit(OpCodes.Ret);
 

@@ -1009,9 +1009,15 @@ public sealed class Ops
   }
 
   public static string Str(object o)
-  { if(Convert.GetTypeCode(o)==TypeCode.Object)
-    { object ret;
-      if(TryInvoke(o, "__str__", out ret)) return Ops.ToString(ret);
+  { switch(Convert.GetTypeCode(o))
+    { case TypeCode.Boolean: return (bool)o ? "true" : "false";
+      case TypeCode.Empty: return "null";
+      case TypeCode.Object:
+      { object ret;
+        if(TryInvoke(o, "__str__", out ret)) return Ops.ToString(ret);
+        break;
+      }
+      case TypeCode.String: return (string)o;
     }
     return o.ToString();
   }
@@ -1101,8 +1107,12 @@ public sealed class Ops
   }
 
   public static string ToString(object o)
-  { if(o is string) return (string)o;
-    return o.ToString();
+  { if(o==null) throw Ops.TypeError("'null' could not be converted to string");
+    try
+    { if(o is string) return (string)o;
+      return o.ToString();
+    }
+    catch { throw Ops.TypeError("'{0}' could not be converted to string", TypeName(o)); }
   }
 
   public static TypeErrorException TooFewArgs(string name, int expected, int got)

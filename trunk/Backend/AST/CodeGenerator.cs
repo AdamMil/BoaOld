@@ -81,7 +81,7 @@ public class CodeGenerator
     else if(value is bool) EmitFieldGet(typeof(Ops), (bool)value ? "TRUE" : "FALSE");
     else
     { string s = value as string;
-      if(s!=null) EmitString(s);
+      if(s!=null) EmitString(s); // TODO: should strings be passed to TypeGenerator as well (and stored in one place?)
       else TypeGenerator.GetConstant(value).EmitGet(this);
     }
   }
@@ -125,7 +125,7 @@ public class CodeGenerator
 			case  7: op=OpCodes.Ldc_I4_7; break;
 			case  8: op=OpCodes.Ldc_I4_8; break;
 			default:
-				if(value>=-128 && value<=127) ILG.Emit(OpCodes.Ldc_I4_S, value);
+				if(value>=-128 && value<=127) ILG.Emit(OpCodes.Ldc_I4_S, (byte)value);
 				else ILG.Emit(OpCodes.Ldc_I4, value);
 				return;
 		}

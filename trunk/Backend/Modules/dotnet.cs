@@ -148,13 +148,22 @@ public sealed class dotnet
 
   public static void unlink(string path) { remove(path); }
 
-  public static Dict environ = new Dict(Environment.GetEnvironmentVariables());
   public const int F_OK=1, R_OK=2, W_OK=4, X_OK=8;
 
-  static OSErrorException NotFound(string path)
+  public static string altsep = System.IO.Path.AltDirectorySeparatorChar.ToString();
+  public static string curdir = ".";
+  public static string defpath = ".";
+  public static Dict environ = new Dict(Environment.GetEnvironmentVariables());
+  public static string extsep = ".";
+  public static string linesep = "\n";
+  public static string pardir = "..";
+  public static string pathsep = ";";
+  public static string sep = System.IO.Path.DirectorySeparatorChar.ToString();
+
+  internal static OSErrorException NotFound(string path)
   { return Ops.OSError("no such file or directory {0}", Ops.Repr(path));
   }
-  static OSErrorException Invalid(string path)
+  internal static OSErrorException Invalid(string path)
   { return Ops.OSError("invalid component in path {0}", Ops.Repr(path));
   }
 }
