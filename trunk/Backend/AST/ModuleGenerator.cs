@@ -48,7 +48,7 @@ public sealed class ModuleGenerator
     bool interactive = Options.Interactive;
     Options.Interactive = false;
     try
-    { TypeGenerator tg = ag.DefineType(name, typeof(Runtime.Module));
+    { TypeGenerator tg = ag.DefineType(TypeAttributes.Public|TypeAttributes.Sealed, name, typeof(Runtime.Module));
 
       CodeGenerator icg = tg.DefineMethod(MethodAttributes.Virtual|MethodAttributes.Public|MethodAttributes.HideBySig,
                                           "Run", typeof(void), new Type[] { typeof(Frame) });

@@ -11,7 +11,7 @@ namespace Boa.Runtime
 
 // FIXME: this doesn't work properly for derived classes (or does it?)
 #region FunctionWrapper
-public class FunctionWrapper : IHasAttributes
+public abstract class FunctionWrapper : IHasAttributes
 { public FunctionWrapper(IFancyCallable func) { this.func = func; }
 
   protected internal IFancyCallable func;
@@ -24,7 +24,7 @@ public class FunctionWrapper : IHasAttributes
 #endregion
 
 #region ClassWrapper
-public class ClassWrapper : FunctionWrapper, IDescriptor, IFancyCallable
+public sealed class ClassWrapper : FunctionWrapper, IDescriptor, IFancyCallable
 { public ClassWrapper(IFancyCallable func, BoaType type) : base(func) { this.type=type; }
 
   public object __get__(object instance)
@@ -55,7 +55,7 @@ public class ClassWrapper : FunctionWrapper, IDescriptor, IFancyCallable
 #endregion
 
 #region MethodWrapper
-public class MethodWrapper : FunctionWrapper, IDescriptor, IFancyCallable
+public sealed class MethodWrapper : FunctionWrapper, IDescriptor, IFancyCallable
 { public MethodWrapper(IFancyCallable func) : base(func) { }
   public MethodWrapper(IFancyCallable func, object instance) : base(func) { this.instance=instance; }
 
