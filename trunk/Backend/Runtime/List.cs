@@ -13,6 +13,7 @@ public class List : IMutableSequence, IList, IComparable, ICloneable, IRepresent
   public List(ICollection c) : this(c.Count) { c.CopyTo(items, 0); size=c.Count; }
   public List(IEnumerator e) : this() { while(e.MoveNext()) append(e.Current); }
   public List(object o) : this(Ops.GetEnumerator(o)) { }
+  internal List(object[] arr, int length) { data=arr; size=length; }
 
   public void append(object item)
   { ResizeTo(size+1);

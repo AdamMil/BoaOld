@@ -235,9 +235,9 @@ public sealed class StringOps
   }
   
   public static string Multiply(string str, object times)
-  { int times = Ops.ToInt(times);
-    StringBuilder sb = new StringBuilder(str.Length*times);
-    while(times-->0) sb.Append(str);
+  { int n = Ops.ToInt(times);
+    StringBuilder sb = new StringBuilder(str.Length*n);
+    while(n-->0) sb.Append(str);
     return sb.ToString();
   }
 

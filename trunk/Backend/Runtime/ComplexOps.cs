@@ -6,10 +6,10 @@ namespace Boa.Runtime
 public sealed class ComplexOps
 { ComplexOps() { }
 
-  public Complex Add(Complex a, object b)
+  public static Complex Add(Complex a, object b)
   { if(b is Complex) return a + (Complex)b;
     switch(Convert.GetTypeCode(b))
-    { case TypeCode.Boolean: return a + (bool)b ? 1 : 0;
+    { case TypeCode.Boolean: return (bool)b ? a+1 : a;
       case TypeCode.Byte: return a + (byte)b;
       case TypeCode.Decimal:
         return a + ((IConvertible)b).ToDouble(System.Globalization.NumberFormatInfo.InvariantInfo);
@@ -19,7 +19,7 @@ public sealed class ComplexOps
       case TypeCode.Int64: return a + (long)b;
       case TypeCode.Object:
         IConvertible ic = b as IConvertible;
-        return ic!=null ? a + ic.ToDouble(System.Globalization.NumberFormatInfo.InvariantInfo)
+        return ic!=null ? (object)(a + ic.ToDouble(System.Globalization.NumberFormatInfo.InvariantInfo))
                         : Ops.Invoke(b, "__radd__", a);
       case TypeCode.SByte: return a + (sbyte)b;
       case TypeCode.Single: return a + (float)b;
@@ -30,14 +30,14 @@ public sealed class ComplexOps
     throw Ops.TypeError("invalid operand types for +: '{0}' and '{1}'", Ops.TypeName(a), Ops.TypeName(b));
   }
 
-  public int Compare(Complex a, object b)
+  public static int Compare(Complex a, object b)
   { throw Ops.TypeError("cannot compare complex numbers except for equality/inequality");
   }
 
-  public Complex Divide(Complex a, object b)
+  public static Complex Divide(Complex a, object b)
   { if(b is Complex) return a / (Complex)b;
     switch(Convert.GetTypeCode(b))
-    { case TypeCode.Boolean: return a / (bool)b ? 1 : 0;
+    { case TypeCode.Boolean: return a / ((bool)b ? 1 : 0);
       case TypeCode.Byte: return a / (byte)b;
       case TypeCode.Decimal:
         return a / ((IConvertible)b).ToDouble(System.Globalization.NumberFormatInfo.InvariantInfo);
@@ -48,7 +48,7 @@ public sealed class ComplexOps
       case TypeCode.Object:
         IConvertible ic = b as IConvertible;
         object ret;
-        return ic!=null ? a / ic.ToDouble(System.Globalization.NumberFormatInfo.InvariantInfo)
+        return ic!=null ? (object)(a / ic.ToDouble(System.Globalization.NumberFormatInfo.InvariantInfo))
                         : Ops.TryInvoke(b, "__rtruediv__", out ret, a) ? ret : Ops.Invoke(b, "__rdiv__", a);
       case TypeCode.SByte: return a / (sbyte)b;
       case TypeCode.Single: return a / (float)b;
@@ -59,10 +59,10 @@ public sealed class ComplexOps
     throw Ops.TypeError("invalid operand types for /: '{0}' and '{1}'", Ops.TypeName(a), Ops.TypeName(b));
   }
 
-  public Complex Multiply(Complex a, object b)
+  public static Complex Multiply(Complex a, object b)
   { if(b is Complex) return a * (Complex)b;
     switch(Convert.GetTypeCode(b))
-    { case TypeCode.Boolean: return a * (bool)b ? 1 : 0;
+    { case TypeCode.Boolean: return (bool)b ? a : new Complex(0);
       case TypeCode.Byte: return a * (byte)b;
       case TypeCode.Decimal:
         return a * ((IConvertible)b).ToDouble(System.Globalization.NumberFormatInfo.InvariantInfo);
@@ -72,7 +72,7 @@ public sealed class ComplexOps
       case TypeCode.Int64: return a * (long)b;
       case TypeCode.Object:
         IConvertible ic = b as IConvertible;
-        return ic!=null ? a * ic.ToDouble(System.Globalization.NumberFormatInfo.InvariantInfo)
+        return ic!=null ? (object)(a * ic.ToDouble(System.Globalization.NumberFormatInfo.InvariantInfo))
                         : Ops.Invoke(b, "__rmul__", a);
       case TypeCode.SByte: return a * (sbyte)b;
       case TypeCode.Single: return a * (float)b;
@@ -83,9 +83,9 @@ public sealed class ComplexOps
     throw Ops.TypeError("invalid operand types for *: '{0}' and '{1}'", Ops.TypeName(a), Ops.TypeName(b));
   }
 
-  public bool NonZero(Complex a) { return a.real!=0 && a.imag!=0; }
+  public static bool NonZero(Complex a) { return a.real!=0 && a.imag!=0; }
 
-  public Complex Power(Complex a, object b)
+  public static Complex Power(Complex a, object b)
   { if(b is Complex) return a.Pow((Complex)b);
 
     switch(Convert.GetTypeCode(b))
@@ -109,11 +109,15 @@ public sealed class ComplexOps
     }
     throw Ops.TypeError("invalid operand types for **: '{0}' and '{1}'", Ops.TypeName(a), Ops.TypeName(b));
   }
+  
+  public static Complex PowerMod(Complex a, object b, object c)
+  { throw Ops.TypeError("complex modulus not supported");
+  }
 
-  public Complex Subtract(Complex a, object b)
+  public static Complex Subtract(Complex a, object b)
   { if(b is Complex) return a - (Complex)b;
     switch(Convert.GetTypeCode(b))
-    { case TypeCode.Boolean: return a - (bool)b ? 1 : 0;
+    { case TypeCode.Boolean: return (bool)b ? a-1 : a;
       case TypeCode.Byte: return a - (byte)b;
       case TypeCode.Decimal:
         return a - ((IConvertible)b).ToDouble(System.Globalization.NumberFormatInfo.InvariantInfo);
@@ -123,7 +127,7 @@ public sealed class ComplexOps
       case TypeCode.Int64: return a - (long)b;
       case TypeCode.Object:
         IConvertible ic = b as IConvertible;
-        return ic!=null ? a - ic.ToDouble(System.Globalization.NumberFormatInfo.InvariantInfo)
+        return ic!=null ? (object)(a - ic.ToDouble(System.Globalization.NumberFormatInfo.InvariantInfo))
                         : Ops.Invoke(b, "__rsub__", a);
       case TypeCode.SByte: return a - (sbyte)b;
       case TypeCode.Single: return a - (float)b;
