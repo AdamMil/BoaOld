@@ -4,7 +4,7 @@ also called Boa. This implementation is both interpreted and compiled,
 targeting the Microsoft .NET Framework.
 
 http://www.adammil.net/
-Copyright (C) 2004 Adam Milazzo
+Copyright (C) 2004-2005 Adam Milazzo
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License
