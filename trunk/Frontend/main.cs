@@ -203,7 +203,7 @@ public class Text
 
     if(!Options.NoStdLib) top.__setattr__("__builtins__", Importer.Import("__builtin__"));
     top.__setattr__("__name__", "__main__");
-    Importer.Import("string");
+    Importer.ImportStandardModules();
     return topFrame;
   }
   

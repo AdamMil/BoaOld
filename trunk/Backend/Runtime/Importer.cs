@@ -52,7 +52,11 @@ public sealed class Importer
 
   public static object ImportTop(string name) { return Import(name, true, true); }
   public static object ImportTop(string name, bool throwOnError) { return Import(name, throwOnError, true); }
-  
+
+  public static void ImportStandardModules()
+  { Import("string");
+  }
+
   static object Load(string name)
   { object ret = LoadBuiltin(name);
     if(ret!=null) return ret;
