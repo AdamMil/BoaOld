@@ -1192,45 +1192,114 @@ public sealed class Ops
 
   public static int ToInt(object o)
   { if(o is int) return (int)o;
-    try { return (int)Convert.ToDouble(o); } // TODO: this may not be efficient, but it truncates rather than rounds, which is what we want
-    catch(OverflowException) { throw ValueError("too big for int"); } // TODO: allow conversion to long integer?
+
+    try
+    { switch(Convert.GetTypeCode(o))
+      { case TypeCode.Boolean: return (bool)o ? 1 : 0;
+        case TypeCode.Byte: return (byte)o;
+        case TypeCode.Char: return (char)o;
+        case TypeCode.Decimal: return (int)(Decimal)o;
+        case TypeCode.Double: return checked((int)(double)o);
+        case TypeCode.Int16: return (short)o;
+        case TypeCode.Int64: return checked((int)(long)o);
+        case TypeCode.SByte: return (sbyte)o;
+        case TypeCode.Single: return checked((int)(float)o);
+        case TypeCode.String:
+          try { return int.Parse((string)o); }
+          catch(FormatException) { ValueError("string does not contain a valid int"); break; }
+        case TypeCode.UInt16: return (int)(ushort)o;
+        case TypeCode.UInt32: return checked((int)(uint)o);
+        case TypeCode.UInt64: return checked((int)(ulong)o);
+        default: return checked((int)Convert.ToSingle(o)); // we do it this way so it truncates
+      }
+    }
+    catch(OverflowException) { goto toobig; }
     catch(InvalidCastException) { throw TypeError("expected int, but got {0}", TypeName(o)); }
+    toobig: throw ValueError("too big for int");
   }
 
   public static uint ToUInt(object o)
-  { if(o is int) return (uint)(int)o;
-    if(o is uint) return (uint)o;
-    if(o is long)
-    { long lv = (long)o;
-      if(lv<0 || lv>uint.MaxValue) throw ValueError("too big for uint");
-      return (uint)lv;
+  { try
+    { switch(Convert.GetTypeCode(o))
+      { case TypeCode.Boolean: return (bool)o ? (uint)1 : (uint)0;
+        case TypeCode.Byte: return (byte)o;
+        case TypeCode.Char: return (char)o;
+        case TypeCode.Decimal: return (uint)(Decimal)o;
+        case TypeCode.Double: return checked((uint)(double)o);
+        case TypeCode.Int16: return checked((uint)(short)o);
+        case TypeCode.Int32: return checked((uint)(int)o);
+        case TypeCode.Int64: return checked((uint)(long)o);
+        case TypeCode.SByte: return checked((uint)(sbyte)o);
+        case TypeCode.Single: return checked((uint)(float)o);
+        case TypeCode.String:
+          try { return uint.Parse((string)o); }
+          catch(FormatException) { ValueError("string does not contain a value uint"); goto default; }
+        case TypeCode.UInt16: return (uint)(ushort)o;
+        case TypeCode.UInt32: return (uint)o;
+        case TypeCode.UInt64: return checked((uint)(ulong)o);
+        default: return checked((uint)Convert.ToSingle(o));
+      }
     }
-    try { return (uint)Convert.ToDouble(o); }
     catch(OverflowException) { throw ValueError("too big for uint"); } // TODO: allow conversion to long integer?
     catch(InvalidCastException) { throw TypeError("expected uint, but got {0}", TypeName(o)); }
   }
 
   public static long ToLong(object o)
-  { if(o is long) return (long)o;
-    try { return (long)Convert.ToDouble(o); }
+  { try
+    { switch(Convert.GetTypeCode(o))
+      { case TypeCode.Boolean: return (bool)o ? 1 : 0;
+        case TypeCode.Byte: return (byte)o;
+        case TypeCode.Char: return (char)o;
+        case TypeCode.Decimal: return (long)(Decimal)o;
+        case TypeCode.Double: return checked((long)(double)o);
+        case TypeCode.Int16: return (short)o;
+        case TypeCode.Int32: return (int)o;
+        case TypeCode.Int64: return (long)o;
+        case TypeCode.SByte: return (sbyte)o;
+        case TypeCode.Single: return checked((long)(float)o);
+        case TypeCode.String:
+          try { return long.Parse((string)o); }
+          catch(FormatException) { ValueError("string does not contain a valid long"); goto default; }
+        case TypeCode.UInt16: return (long)(ushort)o;
+        case TypeCode.UInt32: return (long)(uint)o;
+        case TypeCode.UInt64: return checked((long)(ulong)o);
+        default: return checked((long)Convert.ToSingle(o));
+      }
+    }
     catch(OverflowException) { throw ValueError("too big for long"); } // TODO: allow conversion to long integer?
     catch(InvalidCastException) { throw TypeError("expected long, but got {0}", TypeName(o)); }
   }
 
   public static ulong ToULong(object o)
-  { if(o is long) return (ulong)(long)o;
-    if(o is ulong) return (ulong)o;
-    try { return (ulong)Convert.ToDouble(o); }
+  { try
+    { switch(Convert.GetTypeCode(o))
+      { case TypeCode.Boolean: return (bool)o ? (ulong)1 : (ulong)0;
+        case TypeCode.Byte: return (byte)o;
+        case TypeCode.Char: return (char)o;
+        case TypeCode.Decimal: return (ulong)(Decimal)o;
+        case TypeCode.Double: return checked((ulong)(double)o);
+        case TypeCode.Int16: return checked((ulong)(short)o);
+        case TypeCode.Int32: return checked((ulong)(int)o);
+        case TypeCode.Int64: return checked((ulong)(long)o);
+        case TypeCode.SByte: return checked((ulong)(sbyte)o);
+        case TypeCode.Single: return checked((ulong)(float)o);
+        case TypeCode.String:
+          try { return ulong.Parse((string)o); }
+          catch(FormatException) { ValueError("string does not contain a valid ulong"); goto default; }
+        case TypeCode.UInt16: return (ushort)o;
+        case TypeCode.UInt32: return (uint)o;
+        case TypeCode.UInt64: return (ulong)o;
+        default: return checked((ulong)Convert.ToSingle(o));
+      }
+    }
     catch(OverflowException) { throw ValueError("too big for ulong"); } // TODO: allow conversion to long integer?
     catch(InvalidCastException) { throw TypeError("expected ulong, but got {0}", TypeName(o)); }
   }
 
   public static string ToString(object o)
-  { if(o==null) throw Ops.TypeError("'null' could not be converted to string");
-    try
-    { if(o is string) return (string)o;
-      return o.ToString();
-    }
+  { if(o is string) return (string)o;
+    if(o==null) throw Ops.TypeError("'null' can not be converted to string");
+    try { return o.ToString(); }
     catch { throw Ops.TypeError("'{0}' could not be converted to string", TypeName(o)); }
   }
 
