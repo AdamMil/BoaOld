@@ -11,7 +11,7 @@ public abstract class DynamicType
 
   public object GetAttr(object self, string name)
   { object value;
-    if(GetAttr(self, name, out value)) return ret;
+    if(GetAttr(self, name, out value)) return value;
     throw Ops.AttributeError("'{0}' object has no attribute '{1}'", __name__, name);
   }
 

@@ -44,7 +44,7 @@ public class AndExpression : BinaryExpression
 
 #region AttrExpression
 public class AttrExpression : Expression
-{ public AttrExpression(Expression obj, string attr) { Object=obj; Attribute=attr; }
+{ public AttrExpression(Expression o, string attr) { Object=o; Attribute=attr; }
 
   public override void Assign(object value, Frame frame) { Ops.SetAttr(value, Object.Evaluate(frame), Attribute); }
   public override void Emit(CodeGenerator cg)
