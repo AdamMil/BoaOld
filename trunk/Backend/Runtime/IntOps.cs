@@ -144,7 +144,7 @@ public sealed class IntOps
       case TypeCode.Empty: return 1;
       case TypeCode.Int16: return a - (short)b;
       case TypeCode.Int32: return a - (int)b;
-      case TypeCode.Int64: return (int)(a - (long)b);
+      case TypeCode.Int64: return (int)((a - (long)b)>>32);
       case TypeCode.Object:
         if(b is Integer)
         { Integer v = (Integer)b;

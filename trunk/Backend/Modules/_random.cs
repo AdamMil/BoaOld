@@ -35,8 +35,11 @@ public sealed class _random
   public class Random
   { public unsafe object getrandbits(int bits)
     { if(bits<=0)  throw Ops.ValueError("getrandbits(): number of bits must be greater than zero");
-      if(bits<=32) return genrand_int32();
-      if(bits<=64) return ((ulong)genrand_int32()<<32) | genrand_int32();
+      if(bits<=32) return genrand_int32() >> (32-bits);
+      if(bits<=64)
+      { int diff = 64-bits;
+        return ((ulong)genrand_int32()<<(32-diff)) | (genrand_int32() >> diff);
+      }
 
       int chunks = ((bits-1)/32 + 1);
       uint[] arr = new uint[chunks];

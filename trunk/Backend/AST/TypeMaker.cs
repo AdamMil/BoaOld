@@ -24,6 +24,7 @@ using System.Collections;
 using System.Collections.Specialized;
 using System.Reflection;
 using System.Reflection.Emit;
+using System.Text.RegularExpressions;
 using Boa.Runtime;
 
 namespace Boa.AST
@@ -37,7 +38,7 @@ public sealed class TypeMaker
   { Type baseType = FindBaseType(bases), type = (Type)types[baseType];
     if(type!=null) return type;
 
-    TypeGenerator typeGen = SnippetMaker.Assembly.DefineType("Boa.Types."+baseType.FullName.Replace("+", @"\+"),
+    TypeGenerator typeGen = SnippetMaker.Assembly.DefineType("Boa.Types."+namere.Replace(baseType.FullName, @"\+"),
                                                              baseType);
     CodeGenerator cg;
     Slot classField, dictField;
@@ -131,6 +132,7 @@ public sealed class TypeMaker
   }
 
   static HybridDictionary types = new HybridDictionary();
+  static Regex namere = new Regex(@"(?<!\\)\+", RegexOptions.Singleline);
 }
 
 } // namespace Boa.AST

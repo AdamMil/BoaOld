@@ -110,9 +110,9 @@ public sealed class IntegerOps
   public static int Compare(Integer a, object b)
   { switch(Convert.GetTypeCode(b))
     { case TypeCode.Boolean: return a.CompareTo((bool)b ? 1 : 0);
-      case TypeCode.Byte: return a.CompareTo((byte)b);
+      case TypeCode.Byte: return a.CompareTo((uint)(byte)b);
       case TypeCode.Empty: return 1;
-      case TypeCode.Int16: return a.CompareTo((short)b);
+      case TypeCode.Int16: return a.CompareTo((int)(short)b);
       case TypeCode.Int32: return a.CompareTo((int)b);
       case TypeCode.Int64: return a.CompareTo((long)b);
       case TypeCode.Object:
@@ -120,9 +120,9 @@ public sealed class IntegerOps
         IConvertible ic = b as IConvertible;
         return ic!=null ? a.CompareTo(ic.ToInt64(NumberFormatInfo.InvariantInfo))
                         : -Ops.ToInt(Ops.Invoke(b, "__cmp__", a));
-      case TypeCode.SByte: return a.CompareTo((sbyte)b);
+      case TypeCode.SByte: return a.CompareTo((int)(sbyte)b);
       case TypeCode.String: return -1;
-      case TypeCode.UInt16: return a.CompareTo((ushort)b);
+      case TypeCode.UInt16: return a.CompareTo((uint)(ushort)b);
       case TypeCode.UInt32: return a.CompareTo((uint)b);
       case TypeCode.UInt64: return a.CompareTo((ulong)b);
     }
