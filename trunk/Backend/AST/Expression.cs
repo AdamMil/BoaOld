@@ -780,10 +780,9 @@ public class SliceExpression : Expression
   public override void Emit(CodeGenerator cg)
   { if(IsConstant) cg.EmitConstant(GetValue());
     else
-    { Start.Emit(cg);
-      Stop.Emit(cg);
-      if(Step==null) cg.ILG.Emit(OpCodes.Ldnull);
-      else Step.Emit(cg);
+    { cg.EmitExpression(Start);
+      cg.EmitExpression(Stop);
+      cg.EmitExpression(Step);
       cg.EmitNew(typeof(Slice), new Type[] { typeof(object), typeof(object), typeof(object) });
     }
   }
@@ -793,13 +792,13 @@ public class SliceExpression : Expression
   }
 
   public override void Optimize()
-  { IsConstant = Start.IsConstant && Stop.IsConstant && Step==null || Step.IsConstant;
+  { IsConstant = Start==null || Start.IsConstant && Stop==null || Stop.IsConstant && Step==null || Step.IsConstant;
   }
 
   public override void ToCode(System.Text.StringBuilder sb, int indent)
   { Start.ToCode(sb, 0);
     sb.Append(':');
-    Stop.ToCode(sb, 0);
+    if(Stop!=null) Stop.ToCode(sb, 0);
     if(Step!=null)
     { sb.Append(':');
       Step.ToCode(sb, 0);
@@ -808,8 +807,8 @@ public class SliceExpression : Expression
   
   public override void Walk(IWalker w)
   { if(w.Walk(this))
-    { Start.Walk(w);
-      Stop.Walk(w);
+    { if(Start!=null) Start.Walk(w);
+      if(Stop!=null) Stop.Walk(w);
       if(Step!=null) Step.Walk(w);
     }
     w.PostWalk(this);

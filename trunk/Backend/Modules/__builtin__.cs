@@ -149,8 +149,8 @@ sequences or when many of a range's elements are never used.")]
   }
   #endregion
 
-  public static string __repr__() { return __str__(); }
-  public static string __str__() { return "<module '__builtin__' (built-in)>"; }
+  public static string __repr__() { return "<module '__builtin__' (built-in)>"; }
+  public static string __str__() { return __repr__(); }
 
   [DocString(@"abs(object) -> object
 
@@ -514,9 +514,9 @@ For example, on a 32-bit machine, hex(-1) yields '0xffffffff'. When
 evaluated on a machine with the same word size, this literal is evaluated
 as -1; at a different word size, it may turn up as a large positive number
 or raise an OverflowError exception.")]
-  public static object hex(object o)
+  public static object hex(object o) // TODO: should this be implemented this way? or using Ops.ToInt() ?
   { if(o is int) return "0x" + ((int)o).ToString("x");
-    if(o is long) return "0x" + ((int)o).ToString("x") + "L";
+    if(o is long) return "0x" + ((long)o).ToString("x") + "L";
     return Ops.Invoke(o, "__hex__");
   }
 
@@ -735,6 +735,15 @@ OverflowError exception.")]
     return Ops.Invoke(o, "__oct__");
   }
 
+  [DocString(@"open(filename[, mode[, bufsize]])
+This function has been superceded by the file object constructor.
+See the documentation for 'file'.")]
+  public static BoaFile open(string filename) { return new BoaFile(filename); }
+  public static BoaFile open(string filename, string mode) { return new BoaFile(filename, mode); }
+  public static BoaFile open(string filename, string mode, int bufsize)
+  { return new BoaFile(filename, mode, bufsize);
+  }
+
   [DocString(@"ord(char) -> int
 
 Return the ASCII value of a string of one character. Eg, ord('a') returns
@@ -951,6 +960,7 @@ runtime.")]
   public static readonly object LookupError = ReflectedType.FromType(typeof(LookupErrorException));
   public static readonly object NameError = ReflectedType.FromType(typeof(NameErrorException));
   //public static readonly object NotImplementedError = ReflectedType.FromType(typeof(NotImplementedErrorException));
+  public static readonly object OSError = ReflectedType.FromType(typeof(OSErrorException));
   //public static readonly object OverflowError = ReflectedType.FromType(typeof(OverflowErrorException));
   public static readonly object RuntimeError = ReflectedType.FromType(typeof(RuntimeException));
   public static readonly object StopIteration = ReflectedType.FromType(typeof(StopIterationException));

@@ -1,6 +1,5 @@
 using System;
 using System.Collections;
-using System.Text.RegularExpressions;
 
 // TODO: investigate python's changes to the division operator
 
@@ -173,7 +172,7 @@ public sealed class Ops
     
     object[] positional = num==0 ? null : new object[num];
     for(int i=0; i<ai; i++)
-      if(args[i].Type==null) positional[pi++] = args[ai].Value;
+      if(args[i].Type==null) positional[pi++] = args[i].Value;
       else if(args[i].Type==CallArg.ListType)
       { ICollection col = args[i].Value as ICollection;
         if(col!=null) { col.CopyTo(positional, pi); pi += col.Count; }
@@ -240,7 +239,7 @@ public sealed class Ops
               while(e.MoveNext())
               { Tuple tup = e.Current as Tuple;
                 if(tup==null || tup.items.Length!=2)
-                  throw Ops.TypeError("dict expansion: itemiter()'s iterator should return (key,value)");
+                  throw TypeError("dict expansion: itemiter()'s iterator should return (key,value)");
                 names[pi] = Ops.Str(tup.items[0]);
                 values[pi] = tup.items[1];
                 pi++;
@@ -252,7 +251,7 @@ public sealed class Ops
               { while(true)
                 { Tuple tup = Ops.Call(next) as Tuple;
                   if(tup==null || tup.items.Length!=2)
-                    throw Ops.TypeError("dict expansion: itemiter()'s iterator should return (key,value)");
+                    throw TypeError("dict expansion: itemiter()'s iterator should return (key,value)");
                   names[pi] = Ops.Str(tup.items[0]);
                   values[pi] = tup.items[1];
                   pi++;
@@ -298,21 +297,25 @@ public sealed class Ops
 
   public static int Compare(object a, object b)
   { if(a==b) return 0;
+
+    if(a is double && b is int) return ((double)a).CompareTo((double)(int)b);
+    if(a is int && b is double) return -((double)b).CompareTo((double)(int)a);
+
     IComparable c = a as IComparable;
     if(c!=null)
       try { return c.CompareTo(b); }
       catch(ArgumentException) { }
-    throw Ops.TypeError("can't compare {0} to {1}", GetDynamicType(a).__name__, GetDynamicType(b).__name__);
+    throw TypeError("can't compare {0} to {1}", GetDynamicType(a).__name__, GetDynamicType(b).__name__);
   }
 
   public static object ConvertTo(object o, Type type)
   { switch(ConvertTo(o==null ? null : o.GetType(), type))
     { case Conversion.Identity: case Conversion.Reference: return o;
-      case Conversion.None: throw Ops.TypeError("object cannot be converted to '{0}'", type);
+      case Conversion.None: throw TypeError("object cannot be converted to '{0}'", type);
       default:
         if(type==typeof(bool)) return FromBool(IsTrue(o));
         try { return Convert.ChangeType(o, type); }
-        catch(OverflowException) { throw Ops.ValueError("large value caused overflow"); }
+        catch(OverflowException) { throw ValueError("large value caused overflow"); }
     }
   }
   
@@ -367,6 +370,7 @@ public sealed class Ops
   public static object Divide(object a, object b)
   { if(a is int && b is int) return (int)a/(int)b;
     if(a is double && b is double) return (double)a/(double)b;
+    if(a is double && b is int) return (double)a/(int)b;
     throw TypeError("unsupported operand type(s) for /: '{0}' and '{1}'", GetDynamicType(a).__name__, GetDynamicType(b).__name__);
   }
 
@@ -585,7 +589,7 @@ public sealed class Ops
   public static object Modulus(object a, object b)
   { if(a is int && b is int) return (int)a%(int)b;
     if(a is double && b is double) { return Math.IEEERemainder((double)a, (double)b); }
-    if(a is string) return PrintF((string)a, b);
+    if(a is string) return StringOps.PrintF((string)a, b);
     throw TypeError("unsupported operand type(s) for %: '{0}' and '{1}'", GetDynamicType(a).__name__, GetDynamicType(b).__name__);
   }
 
@@ -624,6 +628,10 @@ public sealed class Ops
   { return new NotImplementedException(string.Format(format, args));
   }
 
+  public static OSErrorException OSError(string format, params object[] args)
+  { return new OSErrorException(string.Format(format, args));
+  }
+
   public static object Power(object value, object power)
   { if(value is int && power is int) return (int)Math.Pow((int)value, (int)power);
     if(value is double && power is double) return Math.Pow((double)value, (double)power);
@@ -631,8 +639,7 @@ public sealed class Ops
   }
   public static object PowerMod(object value, object power, object mod) { return Modulus(Power(value, power), mod); }
 
-  public static void Print(object o) { Console.Write(o); }
-  public static string PrintF(string format, object args) { return new StringFormatter(format, args).Format(); }
+  public static void Print(object o) { Console.Write(Str(o)); }
   public static void PrintNewline() { Console.WriteLine(); }
 
   public static string Repr(object o)
@@ -645,6 +652,7 @@ public sealed class Ops
     if(ir!=null) return ir.__repr__();
 
     if(o is bool) return (bool)o ? "true" : "false";
+    if(o is double) return ((double)o).ToString("R");
     if(o is long) return ((long)o).ToString() + "L";
 
     Array a = o as Array;
@@ -695,7 +703,7 @@ public sealed class Ops
       if(slice!=null) seq.__setitem__(slice, value);
       else seq.__setitem__(Ops.ToInt(index), value);
     }
-    else Ops.Invoke(obj, "__setitem__", index);
+    else Ops.Invoke(obj, "__setitem__", index, value);
   }
 
   public static string Str(object o)
@@ -727,15 +735,40 @@ public sealed class Ops
   public static double ToFloat(object o)
   { if(o is double) return (double)o;
     try { return Convert.ToDouble(o); }
-    catch(OverflowException) { throw Ops.ValueError("too big for float"); }
-    catch(InvalidCastException) { throw Ops.TypeError("expected float, found {0}", GetDynamicType(o).__name__); }
+    catch(OverflowException) { throw ValueError("too big for float"); }
+    catch(InvalidCastException) { throw TypeError("expected float, found {0}", GetDynamicType(o).__name__); }
   }
 
   public static int ToInt(object o)
   { if(o is int) return (int)o;
     try { return Convert.ToInt32(o); }
-    catch(OverflowException) { throw Ops.ValueError("too big for int"); } // TODO: allow conversion to long integer?
-    catch(InvalidCastException) { throw Ops.TypeError("expected int, found {0}", GetDynamicType(o).__name__); }
+    catch(OverflowException) { throw ValueError("too big for int"); } // TODO: allow conversion to long integer?
+    catch(InvalidCastException) { throw TypeError("expected int, found {0}", GetDynamicType(o).__name__); }
+  }
+  public static uint ToUInt(object o)
+  { if(o is int) return (uint)(int)o;
+    if(o is uint) return (uint)o;
+    if(o is long)
+    { long lv = (long)o;
+      if(lv>uint.MaxValue || lv<uint.MinValue) throw ValueError("too big for uint");
+      return (uint)lv;
+    }
+    try { return (uint)Convert.ToInt32(o); }
+    catch(OverflowException) { throw ValueError("too big for uint"); } // TODO: allow conversion to long integer?
+    catch(InvalidCastException) { throw TypeError("expected uint, found {0}", GetDynamicType(o).__name__); }
+  }
+  public static long ToLong(object o)
+  { if(o is long) return (long)o;
+    try { return Convert.ToInt64(o); }
+    catch(OverflowException) { throw ValueError("too big for long"); } // TODO: allow conversion to long integer?
+    catch(InvalidCastException) { throw TypeError("expected long, found {0}", GetDynamicType(o).__name__); }
+  }
+  public static ulong ToULong(object o)
+  { if(o is long) return (ulong)(long)o;
+    if(o is ulong) return (ulong)o;
+    try { return (ulong)Convert.ToInt64(o); }
+    catch(OverflowException) { throw ValueError("too big for ulong"); } // TODO: allow conversion to long integer?
+    catch(InvalidCastException) { throw TypeError("expected ulong, found {0}", GetDynamicType(o).__name__); }
   }
 
   public static string ToString(object o)
@@ -783,112 +816,6 @@ public sealed class Ops
 
   public static readonly object FALSE=false, TRUE=true;
 
-  #region StringFormatter
-  sealed class StringFormatter
-  { public StringFormatter(string source, object args) { this.source=source; this.args=args; tup=args as Tuple; }
-
-    public string Format()
-    { MatchCollection matches = Ops.printfre.Matches(source);
-      Code[] formats = new Code[matches.Count];
-
-      int argwant=0, arggot, pos=0;
-      bool dict=false, nodict=false;
-      for(int i=0; i<formats.Length; i++)
-      { formats[i] = new Code(matches[i]);
-        argwant += formats[i].Args;
-        if(formats[i].Key==null) nodict=true;
-        else if(formats[i].Length==-2 || formats[i].Precision==-2) nodict=true;
-        else dict=true;
-      }
-      if(dict && nodict) throw Ops.TypeError("keyed format codes and non-keyed format codes (or codes with a "+
-                                             "length/precision of '#') mixed in format string");
-
-      arggot = tup==null ? 1 : tup.items.Length;
-      if(tup==null && dict) getitem = Ops.GetAttr(args, "__getitem__");
-      else if(dict) throw Ops.TypeError("format requires a mapping");
-      else if(argwant!=arggot) throw Ops.TypeError("incorrect number of arguments for string formatting "+
-                                                   "(expected {0}, but got {1})", argwant, arggot);
-
-      System.Text.StringBuilder sb = new System.Text.StringBuilder();
-      for(int fi=0; fi<formats.Length; fi++)
-      { Code f = formats[fi];
-        if(f.Match.Index>pos) sb.Append(source.Substring(pos, f.Match.Index-pos));
-        pos = f.Match.Index+f.Match.Length;        
-
-        if(f.Length==-2) f.Length = Ops.ToInt(NextArg());
-        if(f.Precision==-2) f.Precision = Ops.ToInt(NextArg());
-        
-        switch(f.Type) // TODO: support long integers
-        { case 'd': case 'i': case 'u':
-          { int i = Ops.ToInt(GetArg(f.Key));
-            string s;
-            bool neg, prefix=false;
-            if(f.Type=='u') { s=((uint)i).ToString(); neg=false; }
-            else { s=i.ToString(); neg=prefix=i<0; }
-
-            int ptype = f.HasFlag('+') ? 1 : f.HasFlag(' ') ? 2 : 0;
-            if(!neg && ptype!=0) { s=(ptype==1 ? '+' : ' ') + s; prefix=true; }
-            if(f.Length>0 && s.Length<f.Length)
-            { if(f.HasFlag('-')) s = s.PadRight(f.Length, ' ');
-              else if(f.HasFlag('0'))
-              { if(prefix) s = s[0] + s.Substring(1).PadLeft(f.Length-1, '0');
-                else s = s.PadLeft(f.Length, '0');
-              }
-              else s = s.PadLeft(f.Length, ' ');
-            }
-            sb.Append(s);
-            break;
-          }
-
-          case 'o': throw new NotImplementedException();
-          case 'x': case 'X': throw new NotImplementedException();
-          case 'e': case 'E': case 'f': case 'F': case 'g': case 'G': throw new NotImplementedException();
-          case 'c':
-          { object c = GetArg(f.Key);
-            string s = c as string;
-            sb.Append(s==null ? (char)Ops.ToInt(c) : s[0]);
-            break;
-          }
-          case 'r': sb.Append(Ops.Repr(GetArg(f.Key))); break;
-          case 's': sb.Append(Ops.Str(GetArg(f.Key))); break;
-          case '%': sb.Append('%'); break;
-          default: throw Ops.ValueError("unsupported format character '{0}' (0x{1:X})", f.Type, (int)f.Type);
-        }
-      }
-      if(pos<source.Length) sb.Append(source.Substring(pos));
-      return sb.ToString();
-    }
-    
-    #region Code
-    struct Code
-    { public Code(Match m)
-      { Match     = m;
-        Length    = m.Groups[3].Success ? m.Groups[3].Value=="*" ? -2 : Ops.ToInt(m.Groups[3].Value) : -1;
-        Precision = m.Groups[4].Success ? m.Groups[4].Value=="*" ? -2 : Ops.ToInt(m.Groups[4].Value) : -1;
-      }
-
-      public int    Args  { get { return 1 + (Length==-2 ? 1 : 0) + (Precision==-2 ? 1 : 0); } }
-      public string Flags { get { return Match.Groups[2].Value; } }
-      public string Key   { get { return Match.Groups[1].Success ? Match.Groups[1].Value : null; } }
-      public char   Type  { get { return Match.Groups[5].Value[0]; } }
-      
-      public bool HasFlag(char c) { return Flags.IndexOf(c)!=-1; }
-
-      public Match Match;
-      public int   Length, Precision;
-    }
-    #endregion
-    
-    object GetArg(string name) { return name==null ? NextArg() : Ops.Call(getitem, name); }
-    object NextArg() { return tup==null ? args : tup.items[argi++]; }
-
-    string source;
-    int argi;
-    Tuple tup;
-    object args, getitem;
-  }
-  #endregion
-
   static bool IsIn(Type[] typeArr, Type type)
   { for(int i=0; i<typeArr.Length; i++) if(typeArr[i]==type) return true;
     return false;
@@ -917,10 +844,6 @@ public sealed class Ops
       typeof(long), typeof(ulong)
     }
   };
-
-  static readonly Regex printfre =
-    new Regex(@"%(\([^)]\))?([#0 +-]*)(\d+|\*)?(?:.(\d+|\*))?[hlL]?(.)",
-              RegexOptions.Compiled|RegexOptions.Singleline);
 }
 
 } // namespace Boa.Runtime

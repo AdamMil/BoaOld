@@ -45,16 +45,7 @@ public class ArraySetItem : IDescriptor, ICallable
   public object Call(params object[] args)
   { if(args.Length<2) return Ops.TooFewArgs("System.Array.__setitem__()", 2, args.Length);
     if(instance==null) throw Ops.MethodCalledWithoutInstance("System.Array.__setitem__()");
-    switch(args.Length)
-    { case 2: instance.SetValue(args[0], Ops.ToInt(args[1])); break;
-      case 3: instance.SetValue(args[0], Ops.ToInt(args[1]), Ops.ToInt(args[2])); break;
-      case 4: instance.SetValue(args[0], Ops.ToInt(args[1]), Ops.ToInt(args[2]), Ops.ToInt(args[3])); break;
-      default:
-        int[] indices = new int[args.Length-1];
-        for(int i=1; i<args.Length; i++) indices[i-1] = Ops.ToInt(args[i]);
-        instance.SetValue(args[0], indices);
-        break;
-    }
+    instance.SetValue(Ops.ConvertTo(args[1], instance.GetType().GetElementType()), Ops.ToInt(args[0]));
     return null;
   }
 
@@ -350,13 +341,13 @@ public abstract class ReflectedMethodBase : ReflectedMember, IFancyCallable
 
   struct Match
   { public Match(Conversion conv, ParameterInfo[] parms, int last, byte apa, bool pa)
-    { Conv=conv; Parms=parms; Last=last; APA=apa; PA=pa;;
+    { Conv=conv; Parms=parms; Last=last; APA=apa; PA=pa;
     }
 
-    public static bool operator<(Match a, Match b) { return a.Conv<b.Conv || a.APA<b.APA || a.PA && !b.PA; }
-    public static bool operator>(Match a, Match b) { return a.Conv>b.Conv || a.APA>b.APA || !a.PA && b.PA; }
-    public static bool operator==(Match a, Match b) { return a.Conv==b.Conv && a.APA==b.APA && a.PA==b.PA; }
-    public static bool operator!=(Match a, Match b) { return a.Conv!=b.Conv || a.APA!=b.APA || a.PA!=b.PA; }
+    public static bool operator<(Match a, Match b) { return a.Conv<b.Conv || a.PA && (!b.PA || a.APA<b.APA); }
+    public static bool operator>(Match a, Match b) { return a.Conv>b.Conv || b.PA && (!a.PA || a.APA>b.APA); }
+    public static bool operator==(Match a, Match b) { return a.Conv==b.Conv && a.PA==b.PA && a.APA==b.APA; }
+    public static bool operator!=(Match a, Match b) { return a.Conv!=b.Conv || a.PA!=b.PA || a.APA!=b.APA; }
     
     public override bool Equals(object obj) { return  obj is Match ? this==(Match)obj : false; }
     public override int GetHashCode() { throw new NotSupportedException(); }
@@ -422,7 +413,7 @@ public abstract class ReflectedMethodBase : ReflectedMember, IFancyCallable
       }
     }
 
-    if(paramArray) // TODO: allow tuples and possibly lists as well to be used here
+    if(paramArray)
     { if(args.Length==parms.Length) // check if the last argument is an array already
       { Conversion conv = Ops.ConvertTo(types[lastRP], parms[lastRP].ParameterType);
         if(conv==Conversion.Identity || conv==Conversion.Reference)
@@ -533,6 +524,7 @@ public class ReflectedProperty : ReflectedMember, IDataDescriptor
 #endregion
 
 // TODO: add sequence methods (including slicing) to lists and mapping methods to dictionaries
+// TODO: add string methods
 // TODO: special case Array slicing?
 #region ReflectedType
 public class ReflectedType : BoaType
@@ -625,6 +617,8 @@ public class ReflectedType : BoaType
     else if(type==typeof(string)) // strings
     { dict["__repr__"] = new SpecialAttr.StringRepr();
       dict["__getitem__"] = new SpecialAttr.StringGetItem();
+      dict["lower"] = dict["ToLower"];
+      dict["upper"] = dict["ToUpper"];
     }
 
     if(!dict.Contains("__doc__")) // add doc strings

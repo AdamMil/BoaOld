@@ -8,8 +8,8 @@ namespace Boa.Modules
 public sealed class @operator
 { @operator() { }
 
-  public static string __repr__() { return __str__(); }
-  public static string __str__() { return "<module 'operator' (built-in)>"; }
+  public static string __repr__() { return "<module 'operator' (built-in)>"; }
+  public static string __str__() { return __repr__(); }
 
   // boolean
   /*public static object contains(object a, object b) { return Ops.In(a, b); }*/ // TODO: implement this

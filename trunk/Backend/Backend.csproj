@@ -154,6 +154,11 @@
                     BuildAction = "Compile"
                 />
                 <File
+                    RelPath = "Modules\dotnet.cs"
+                    SubType = "Code"
+                    BuildAction = "Compile"
+                />
+                <File
                     RelPath = "Modules\operator.cs"
                     SubType = "Code"
                     BuildAction = "Compile"
@@ -165,6 +170,11 @@
                 />
                 <File
                     RelPath = "Modules\string.cs"
+                    SubType = "Code"
+                    BuildAction = "Compile"
+                />
+                <File
+                    RelPath = "Modules\struct.cs"
                     SubType = "Code"
                     BuildAction = "Compile"
                 />

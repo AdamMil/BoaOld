@@ -14,28 +14,31 @@ public sealed class re
 
   #region Support classes
   public class FindEnumerator : IEnumerator
-  { public FindEnumerator(Regex regex, string str) { this.regex=regex; this.str=str; pos=-1; }
+  { public FindEnumerator(Regex regex, string str) { this.regex=regex; this.str=str; state=State.BOF; }
   
     public object Current
     { get
-      { if(pos<0) throw new InvalidOperationException();
+      { if(state!=State.IN) throw new InvalidOperationException();
         return match;
       }
     }
     
     public bool MoveNext()
-    { if(pos==-2) return false;
-      if(pos==-1) { pos=0; match=regex.Match(str); }
+    { if(state==State.EOF) return false;
+      if(state==State.BOF) { match=regex.Match(str); state=State.IN; }
       else match=match.NextMatch();
-      if(!match.Success) { pos=-2; return false; }
+      if(!match.Success) { state=State.EOF; return false; }
       return true;
     }
 
-    public void Reset() { pos=-1; match=null; }
+    public void Reset() { state=State.BOF; }
+
+    enum State { BOF, IN, EOF };
 
     Regex regex;
     string str;
     Match match;
+    State state;
   }
 
   public class regex : Regex, IRepresentable
@@ -131,8 +134,8 @@ It is never an error if a string contains no match for a pattern.")]
   }
   #endregion
 
-  public static string __repr__() { return __str__(); }
-  public static string __str__() { return "<module 're' (built-in)>"; }
+  public static string __repr__() { return "<module 're' (built-in)>"; }
+  public static string __str__() { return __repr__(); }
 
   [DocString(@"compile(pattern[, flags]) -> regex
 

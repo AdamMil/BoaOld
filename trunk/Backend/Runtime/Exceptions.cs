@@ -60,6 +60,10 @@ public class NameErrorException : RuntimeException
 { public NameErrorException(string message) : base(message) { }
 }
 
+public class OSErrorException : RuntimeException
+{ public OSErrorException(string message) : base(message) { }
+}
+
 public class RuntimeException : BoaException
 { public RuntimeException() { }
   public RuntimeException(string message) : base(message) { }

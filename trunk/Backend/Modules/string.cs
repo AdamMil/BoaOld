@@ -10,8 +10,8 @@ namespace Boa.Modules
 public sealed class @string
 { @string() { }
 
-  public static string __repr__() { return __str__(); }
-  public static string __str__() { return "<module 'string' (built-in)>"; }
+  public static string __repr__() { return "<module 'string' (built-in)>"; }
+  public static string __str__() { return __repr__(); }
 
   public static string capitalize(string word)
   { if(word.Length==0) return word;
@@ -215,7 +215,7 @@ public sealed class @string
   public static string zfill(string s, int width)
   { if(s.Length>=width) return s;
     string pad = new string('0', width-s.Length);
-    return s[0]=='-' || s[0]=='+' ? s[0].ToString()+pad+s.Substring(1) : pad+s;
+    return char.IsDigit(s[0]) ? pad+s : s[0]+pad+s.Substring(1);
   }
 
   public static string ascii_lowercase = "abcdefghijklmnopqrstuvwxyz";

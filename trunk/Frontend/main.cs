@@ -11,7 +11,8 @@ namespace Boa.Frontend
 public class Text
 { static void DoInteractive()
   { Options.Interactive = true;
-    sys.path.append("");
+Options.Debug = false;
+sys.path[1] = "c:/code/Boa/Backend/lib";
 
     Module top = new Module();
     Frame topFrame = new Frame(top);
@@ -26,7 +27,7 @@ public class Text
         Console.Write(sys.ps1);
         string source = Console.ReadLine();
         if(source==null) break;
-
+        
         try { stmt = Parser.FromString(source).Parse(); }
         catch(SyntaxErrorException e)
         { if(e.Message.IndexOf("expected indent")==-1 && e.Message.IndexOf("expecting 'except'")==-1) throw;
@@ -39,7 +40,6 @@ public class Text
           }
           stmt = Parser.FromString(source).Parse();
         }
-
         #if COMPILED
         stmt.PostProcessForCompile();
         SnippetMaker.Generate(stmt).Run(topFrame);

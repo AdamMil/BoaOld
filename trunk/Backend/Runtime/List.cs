@@ -34,7 +34,6 @@ public class List : IMutableSequence, IList, IComparable, ICloneable, IRepresent
   }
 
   public override bool Equals(object o) { return CompareTo(o)==0; }
-  public override int GetHashCode() { throw Ops.TypeError("list objects are unhashable"); }
 
   public int index(object item) { return IndexOrError(IndexOf(item, 0, size)); }
   public int index(object item, int start)
@@ -187,7 +186,7 @@ public class List : IMutableSequence, IList, IComparable, ICloneable, IRepresent
   #region ICollection Members
   public bool IsSynchronized { get { return false; } }
   public int Count { get { return size; } }
-  public void CopyTo(Array array, int index) { items.CopyTo(array, index); }
+  public void CopyTo(Array array, int index) { Array.Copy(items, 0, array, index, size); }
   public object SyncRoot { get { return this; } }
   #endregion
 

@@ -35,8 +35,8 @@ public sealed class codecs
   }
   #endregion
   
-  public static string __repr__() { return __str__(); }
-  public static string __str__() { return "<module 'codecs' (built-in)>"; }
+  public static string __repr__() { return "<module 'codecs' (built-in)>"; }
+  public static string __str__() { return __repr__(); }
   
   public static byte[] convert(Encoding from, Encoding to, byte[] bytes)
   { return Encoding.Convert(from, to, bytes);

@@ -12,10 +12,12 @@ public sealed class sys
 { sys() { }
   static sys()
   { modules["__builtin__"] = Importer.Import("__builtin__");
+    if(Options.Interactive) path.append("");
+    path.append(System.IO.Path.GetFullPath("../lib"));
   }
 
-  public static string __repr__() { return __str__(); }
-  public static string __str__() { return "<module 'sys' (built-in)>"; }
+  public static string __repr__() { return "<module 'sys' (built-in)>"; }
+  public static string __str__() { return __repr__(); }
 
   public static void exit() { exit(0); }
   public static void exit(object obj) { throw new SystemExitException(obj); }
@@ -32,7 +34,7 @@ public sealed class sys
 
   public static readonly List argv    = new List();
   public static readonly Tuple builtin_module_names =
-    new Tuple("__builtin__", "codecs", "operator", "re", "string", "sys");
+    new Tuple("__builtin__", "codecs", "operator", "os", "re", "string", "struct", "sys");
 
   #if BIGENDIAN
   public static string byteorder = "big";
