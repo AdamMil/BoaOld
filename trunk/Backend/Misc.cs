@@ -42,8 +42,7 @@ public sealed class Misc
     fixed(byte* bp=bytes)
       for(int i=0,len=bytes.Length; i<len; i++)
       { byte b = bp[i];
-        sb.Append(hp[b>>4]);
-        sb.Append(hp[b&0xF]);
+        sb.Append(hp[b>>4]).Append(hp[b&0xF]);
       }
     return sb.ToString();
   }

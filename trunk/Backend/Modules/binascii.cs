@@ -49,8 +49,7 @@ public sealed class binascii
     byte[] output = new byte[(data.Length*5+7)/8];
     data = data.ToUpper();
 
-    fixed(byte* cp=b32d)
-    fixed(byte* op=output)
+    fixed(byte* cp=b32d, op=output)
     fixed(char* dp=data)
     { byte* o=op;
       char* p=dp, e=dp+data.Length;
@@ -117,8 +116,7 @@ public sealed class binascii
   { if(data.Length==0) return string.Empty;
     char[] output = new char[(data.Length+4)/5*8 + data.Length/72];
 
-    fixed(char* cp=b32e)
-    fixed(char* op=output)
+    fixed(char* cp=b32e, op=output)
     fixed(byte* dp=data)
     { char* o=op;
       byte* p=dp, e=dp+data.Length-4;
@@ -205,8 +203,7 @@ public sealed class binascii
   { if(data.Length==0) return new byte[0];
     byte[] output = new byte[(data.Length*3+3)/4];
     
-    fixed(byte* cp=b64d)
-    fixed(byte* op=output)
+    fixed(byte* cp=b64d, op=output)
     fixed(char* dp=data)
     { byte* o=op;
       char* p=dp, e=dp+data.Length;
@@ -257,8 +254,7 @@ public sealed class binascii
   { if(data.Length==0) return "\n";
     char[] output = new char[(data.Length+2)/3*4 + data.Length/76];
 
-    fixed(char* cp=b64e)
-    fixed(char* op=output)
+    fixed(char* cp=b64e, op=output)
     fixed(byte* dp=data)
     { char* o=op;
       byte* p=dp, e=dp+data.Length-2;
@@ -350,8 +346,7 @@ public sealed class binascii
   { char[] output = new char[data.Length*2];
     
     fixed(byte* dp=data)
-    fixed(char* op=output)
-    fixed(char* cp=hexe)
+    fixed(char* op=output, cp=hexe)
     { byte* p=dp, e=p+data.Length;
       char* o=op;
       byte  b;
@@ -540,8 +535,7 @@ public sealed class binascii
     byte[] output = new byte[len];
     if(len==0) return output;
 
-    fixed(byte* cp=uud)
-    fixed(byte* op=output)
+    fixed(byte* cp=uud, op=output)
     fixed(char* dp=data)
     { byte* o = op;
       char* p = dp+1, e=p+(len-left);

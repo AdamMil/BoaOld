@@ -29,44 +29,53 @@ public sealed class IntegerOps
 { IntegerOps() { }
 
   public static object Add(Integer a, object b)
-  { switch(Convert.GetTypeCode(b))
-    { case TypeCode.Boolean: return (bool)b ? a+1 : a;
-      case TypeCode.Byte: return a + (byte)b;
+  { Integer ret;
+    switch(Convert.GetTypeCode(b))
+    { case TypeCode.Boolean: ret = (bool)b ? a+1 : a; break;
+      case TypeCode.Byte: ret = a + (byte)b; break;
       case TypeCode.Double: return a.ToDouble() + (double)b;
       case TypeCode.Decimal: return a.ToDecimal() + (Decimal)b;
-      case TypeCode.Int16: return a + (short)b;
-      case TypeCode.Int32: return a + (int)b;
-      case TypeCode.Int64: return a + (long)b;
+      case TypeCode.Int16: ret = a + (short)b; break;
+      case TypeCode.Int32: ret = a + (int)b; break;
+      case TypeCode.Int64: ret = a + (long)b; break;
       case TypeCode.Object:
-        if(b is Integer) return a + (Integer)b;
-        IConvertible ic = b as IConvertible;
-        return ic!=null ? a + ic.ToInt64(NumberFormatInfo.InvariantInfo) : Ops.Invoke(b, "__radd__", a);
-      case TypeCode.SByte: return a + (sbyte)b;
+        if(b is Integer) { ret = a + (Integer)b; break; }
+        else if(b is Complex) return a.ToDouble() + (Complex)b;
+        else
+        { IConvertible ic = b as IConvertible;
+          return ic!=null ? a + ic.ToInt64(NumberFormatInfo.InvariantInfo) : Ops.Invoke(b, "__radd__", a);
+        }
+      case TypeCode.SByte: ret = a + (sbyte)b; break;
       case TypeCode.Single: return a.ToSingle() + (float)b;
-      case TypeCode.UInt16: return a + (ushort)b;
-      case TypeCode.UInt32: return a + (uint)b;
-      case TypeCode.UInt64: return a + (ulong)b;
+      case TypeCode.UInt16: ret = a + (ushort)b; break;
+      case TypeCode.UInt32: ret = a + (uint)b; break;
+      case TypeCode.UInt64: ret = a + (ulong)b; break;
+      default: throw Ops.TypeError("invalid operand types for +: '{0}' and '{1}'", Ops.TypeName(a), Ops.TypeName(b));
     }
-    throw Ops.TypeError("invalid operand types for +: '{0}' and '{1}'", Ops.TypeName(a), Ops.TypeName(b));
+    return Reduce(ret);
   }
 
   public static object BitwiseAnd(Integer a, object b)
-  { switch(Convert.GetTypeCode(b))
+  { Integer ret;
+    switch(Convert.GetTypeCode(b))
     { case TypeCode.Boolean: return (bool)b ? (a&1).ToInt32() : 0;
-      case TypeCode.Byte: return a & (byte)b;
-      case TypeCode.Int16: return a & (short)b;
-      case TypeCode.Int32: return a & (int)b;
-      case TypeCode.Int64: return a & (long)b;
+      case TypeCode.Byte: ret = a & (byte)b; break;
+      case TypeCode.Int16: ret = a & (short)b; break;
+      case TypeCode.Int32: ret = a & (int)b; break;
+      case TypeCode.Int64: ret = a & (long)b; break;
       case TypeCode.Object:
-        if(b is Integer) return a & (Integer)b;
-        IConvertible ic = b as IConvertible;
-        return ic!=null ? a & ic.ToInt64(NumberFormatInfo.InvariantInfo) : Ops.Invoke(b, "__rand__", a);
-      case TypeCode.SByte: return a & (sbyte)b;
-      case TypeCode.UInt16: return a & (ushort)b;
-      case TypeCode.UInt32: return a & (uint)b;
-      case TypeCode.UInt64: return a & (ulong)b;
+        if(b is Integer) { ret = a & (Integer)b; break; }
+        else
+        { IConvertible ic = b as IConvertible;
+          return ic!=null ? a & ic.ToInt64(NumberFormatInfo.InvariantInfo) : Ops.Invoke(b, "__rand__", a);
+        }
+      case TypeCode.SByte: ret = a & (sbyte)b; break;
+      case TypeCode.UInt16: ret = a & (ushort)b; break;
+      case TypeCode.UInt32: ret = a & (uint)b; break;
+      case TypeCode.UInt64: ret = a & (ulong)b; break;
+      default: throw Ops.TypeError("invalid operand types for &: '{0}' and '{1}'", Ops.TypeName(a), Ops.TypeName(b));
     }
-    throw Ops.TypeError("invalid operand types for &: '{0}' and '{1}'", Ops.TypeName(a), Ops.TypeName(b));
+    return Reduce(ret);
   }
 
   public static object BitwiseOr(Integer a, object b)
@@ -140,6 +149,7 @@ public sealed class IntegerOps
       case TypeCode.Int64: bv = new Integer((long)b); break;
       case TypeCode.Object:
         if(b is Integer) bv = (Integer)b;
+        else if(b is Complex) return a.ToDouble() / (Complex)b;
         else
         { IConvertible ic = b as IConvertible;
           if(ic!=null) bv = new Integer(ic.ToInt64(NumberFormatInfo.InvariantInfo));
@@ -156,7 +166,9 @@ public sealed class IntegerOps
       default: throw Ops.TypeError("invalid operand types for /: '{0}' and '{1}'", Ops.TypeName(a), Ops.TypeName(b));
     }
     if(bv.Sign==0) throw Ops.DivideByZeroError("long division by zero");
-    return a.DivisibleBy(bv) ? (object)(a/bv) : (object)(a.ToDouble()/bv.ToDouble());
+
+    Integer res = a/bv;
+    return res*bv==a ? Reduce(res) : (object)(a.ToDouble()/bv.ToDouble());
   }
 
   public static object FloorDivide(Integer a, object b)
@@ -183,7 +195,7 @@ public sealed class IntegerOps
       default: throw Ops.TypeError("invalid operand types for /: '{0}' and '{1}'", Ops.TypeName(a), Ops.TypeName(b));
     }
     if(bv.Sign==0) throw Ops.DivideByZeroError("long floor division by zero");
-    return (a<0 ? (a-bv+bv.Sign) : a) / bv;
+    return Reduce((a.Sign==-1 ? (a-bv+bv.Sign) : a) / bv);
   }
 
   public static object LeftShift(Integer a, object b)
@@ -219,27 +231,31 @@ public sealed class IntegerOps
   }
 
   public static object Modulus(Integer a, object b)
-  { switch(Convert.GetTypeCode(b))
-    { case TypeCode.Boolean: return a % ((bool)b ? 1 : 0);
-      case TypeCode.Byte: return a % (byte)b;
+  { Integer ret;
+    switch(Convert.GetTypeCode(b))
+    { case TypeCode.Boolean: ret = a % ((bool)b ? 1 : 0); break;
+      case TypeCode.Byte: ret = a % (byte)b; break;
       case TypeCode.Decimal:
         return Math.IEEERemainder(a.ToDouble(), ((IConvertible)b).ToDouble(NumberFormatInfo.InvariantInfo));
       case TypeCode.Double: return Math.IEEERemainder(a.ToDouble(), (double)b);
-      case TypeCode.Int16: return a % (short)b;
-      case TypeCode.Int32: return a % (int)b;
-      case TypeCode.Int64: return a % (long)b;
+      case TypeCode.Int16: ret = a % (short)b; break;
+      case TypeCode.Int32: ret = a % (int)b; break;
+      case TypeCode.Int64: ret = a % (long)b; break;
       case TypeCode.Object:
-        if(b is Integer) return a % (Integer)b;
-        IConvertible ic = b as IConvertible;
-        return ic!=null ? a % ic.ToInt64(NumberFormatInfo.InvariantInfo)
-                        : Ops.Invoke(b, "__rmod__", a);
-      case TypeCode.SByte: return a % (sbyte)b;
+        if(b is Integer) { ret = a % (Integer)b; break; }
+        else
+        { IConvertible ic = b as IConvertible;
+          return ic!=null ? a % ic.ToInt64(NumberFormatInfo.InvariantInfo)
+                          : Ops.Invoke(b, "__rmod__", a);
+        }
+      case TypeCode.SByte: ret = a % (sbyte)b; break;
       case TypeCode.Single: return Math.IEEERemainder(a.ToDouble(), (float)b);
-      case TypeCode.UInt16: return a % (ushort)b;
-      case TypeCode.UInt32: return a % (uint)b;
-      case TypeCode.UInt64: return a % (ulong)b;
+      case TypeCode.UInt16: ret = a % (ushort)b; break;
+      case TypeCode.UInt32: ret = a % (uint)b; break;
+      case TypeCode.UInt64: ret = a % (ulong)b; break;
+      default: throw Ops.TypeError("invalid operand types for %: '{0}' and '{1}'", Ops.TypeName(a), Ops.TypeName(b));
     }
-    throw Ops.TypeError("invalid operand types for %: '{0}' and '{1}'", Ops.TypeName(a), Ops.TypeName(b));
+    return Reduce(ret);
   }
 
   public static object Multiply(Integer a, object b)
@@ -251,6 +267,7 @@ public sealed class IntegerOps
       case TypeCode.Int64: return a * (long)b;
       case TypeCode.Object:
         if(b is Integer) return a * (Integer)b;
+        if(b is Complex) return a.ToDouble() * (Complex)b;
         IConvertible ic = b as IConvertible;
         return ic!=null ? a * ic.ToInt64(NumberFormatInfo.InvariantInfo) : Ops.Invoke(b, "__rmul__", a);
       case TypeCode.SByte: return a * (sbyte)b;
@@ -356,60 +373,76 @@ public sealed class IntegerOps
 
     if(bv<0) throw Ops.ValueError("the exponent cannot be negative for ternary pow");
     if(bv>uint.MaxValue) throw Ops.ValueError("exponent too big to fit into uint");
-    return a.Pow((uint)bv, c);
+    return Reduce(a.Pow((uint)bv, c));
   }
 
   public static object Subtract(Integer a, object b)
-  { switch(Convert.GetTypeCode(b))
-    { case TypeCode.Boolean: return (bool)b ? a-1 : a;
-      case TypeCode.Byte: return a - (byte)b;
+  { Integer ret;
+    switch(Convert.GetTypeCode(b))
+    { case TypeCode.Boolean: ret = (bool)b ? a-1 : a; break;
+      case TypeCode.Byte: ret = a - (byte)b; break;
       case TypeCode.Double: return a.ToDouble() - (double)b;
       case TypeCode.Decimal: return a.ToDecimal() - (Decimal)b;
-      case TypeCode.Int16: return a - (short)b;
-      case TypeCode.Int32: return a - (int)b;
-      case TypeCode.Int64: return a - (long)b;
+      case TypeCode.Int16: ret = a - (short)b; break;
+      case TypeCode.Int32: ret = a - (int)b; break;
+      case TypeCode.Int64: ret = a - (long)b; break;
       case TypeCode.Object:
-        if(b is Integer) return a - (Integer)b;
-        IConvertible ic = b as IConvertible;
-        return ic!=null ? a - ic.ToInt64(NumberFormatInfo.InvariantInfo) : Ops.Invoke(b, "__rsub__", a);
-      case TypeCode.SByte: return a - (sbyte)b;
+        if(b is Integer) { ret = a - (Integer)b; break; }
+        else if(b is Complex) return a.ToDouble() - (Complex)b;
+        else
+        { IConvertible ic = b as IConvertible;
+          return ic!=null ? a - ic.ToInt64(NumberFormatInfo.InvariantInfo) : Ops.Invoke(b, "__rsub__", a);
+        }
+      case TypeCode.SByte: ret = a - (sbyte)b; break;
       case TypeCode.Single: return a.ToSingle() - (float)b;
-      case TypeCode.UInt16: return a - (ushort)b;
-      case TypeCode.UInt32: return a - (uint)b;
-      case TypeCode.UInt64: return a - (ulong)b;
+      case TypeCode.UInt16: ret = a - (ushort)b; break;
+      case TypeCode.UInt32: ret = a - (uint)b; break;
+      case TypeCode.UInt64: ret = a - (ulong)b; break;
+      default: throw Ops.TypeError("invalid operand types for -: '{0}' and '{1}'", Ops.TypeName(a), Ops.TypeName(b));
     }
-    throw Ops.TypeError("invalid operand types for -: '{0}' and '{1}'", Ops.TypeName(a), Ops.TypeName(b));
+    return Reduce(ret);
   }
 
   public static object RightShift(Integer a, object b)
-  { switch(Convert.GetTypeCode(b))
-    { case TypeCode.Boolean: return (bool)b ? a>>1 : a;
-      case TypeCode.Byte: return a >> (byte)b;
-      case TypeCode.Int16: return a >> (short)b;
-      case TypeCode.Int32: return a >> (int)b;
+  { Integer ret;
+    switch(Convert.GetTypeCode(b))
+    { case TypeCode.Boolean: ret = (bool)b ? a>>1 : a; break;
+      case TypeCode.Byte: ret = a >> (byte)b; break;
+      case TypeCode.Int16: ret = a >> (short)b; break;
+      case TypeCode.Int32: ret = a >> (int)b; break;
       case TypeCode.Int64:
       { long lv = (long)b;
         if(lv>int.MaxValue || lv<int.MinValue) throw Ops.OverflowError("long int too large to convert to int");
-        return a >> (int)lv;
+        ret = a >> (int)lv;
+        break;
       }
       case TypeCode.Object:
-        if(b is Integer) return a >> ((Integer)b).ToInt32();
-        IConvertible ic = b as IConvertible;
-        return ic!=null ? a >> ic.ToInt32(NumberFormatInfo.InvariantInfo) : Ops.Invoke(b, "__rrshift__", a);
-      case TypeCode.SByte: return a >> (sbyte)b;
-      case TypeCode.UInt16: return a >> (ushort)b;
+        if(b is Integer) { ret = a >> ((Integer)b).ToInt32(); break; }
+        else
+        { IConvertible ic = b as IConvertible;
+          return ic!=null ? a >> ic.ToInt32(NumberFormatInfo.InvariantInfo) : Ops.Invoke(b, "__rrshift__", a);
+        }
+      case TypeCode.SByte: ret = a >> (sbyte)b; break;
+      case TypeCode.UInt16: ret = a >> (ushort)b; break;
       case TypeCode.UInt32:
       { uint ui = (uint)b;
         if(ui>int.MaxValue) throw Ops.OverflowError("long int too large to convert to int");
-        return a >> (int)ui;
+        ret = a >> (int)ui;
+        break;
       }
       case TypeCode.UInt64:
       { ulong ul = (uint)b;
         if(ul>int.MaxValue) throw Ops.OverflowError("long int too large to convert to int");
-        return a >> (int)ul;
+        ret = a >> (int)ul;
+        break;
       }
+      default: throw Ops.TypeError("invalid operand types for >>: '{0}' and '{1}'", Ops.TypeName(a), Ops.TypeName(b));
     }
-    throw Ops.TypeError("invalid operand types for >>: '{0}' and '{1}'", Ops.TypeName(a), Ops.TypeName(b));
+    return Reduce(ret);
+  }
+  
+  internal static object Reduce(Integer ret)
+  { return ret.length>1 ? ret : ret.length==0 ? 0 : (object)ret.ToInt64();
   }
 }
 
