@@ -8,13 +8,9 @@ namespace Boa.AST
 {
 
 // TODO: add versions optimized for System.Array ?
-// TODO: implement generator expressions: http://python.org/peps/pep-0289.html
 // TODO: implement decimal: http://python.org/peps/pep-0327.html
 // TODO: implement other stuff here: http://python.org/2.4/highlights.html
-// TODO: support multiple 'for' clauses in generator statement
 // TODO: implement sets
-// TODO: implement privately scoped names
-// TODO: make the names in list comprehensions and generator expressions private
 // TODO: make sure generator functions/expressions and list comprehensions can access closed variables
 
 #region Expression
@@ -689,7 +685,11 @@ public class ListCompExpression : ListGenExpression
     { Slot list = cg.AllocLocalTemp(typeof(List), true);
       cg.EmitNew(typeof(List), Type.EmptyTypes);
       list.EmitSet(cg);
+      cg.ILG.BeginExceptionBlock();
       EmitFors(cg, list);
+      cg.ILG.BeginCatchBlock(typeof(StopIterationException));
+      cg.ILG.Emit(OpCodes.Pop);
+      cg.ILG.EndExceptionBlock();
       list.EmitGet(cg);
       cg.FreeLocalTemp(list);
     }
@@ -697,7 +697,7 @@ public class ListCompExpression : ListGenExpression
 
   public override object Evaluate(Frame frame)
   { List list = new List();
-    EvaluateFor(frame, list, 0);
+    try { EvaluateFor(frame, list, 0); } catch(StopIterationException) { }
     return list;
   }
 

@@ -5,19 +5,8 @@ namespace Boa.Runtime
 
 // TODO: don't duplicate exceptions that already exist (NotImplemented, IOError, etc...)
 
-public abstract class BoaException : Exception
-{ public BoaException() { }
-  public BoaException(string message) : base(message) { }
-
-  public void SetPosition(Boa.AST.Node node) { SourceFile=node.Source; Line=node.Line; Column=node.Column; }
-  public void SetPosition(string source, int line, int column) { SourceFile=source; Line=line; Column=column; }
-
-  public override string Message
-  { get { return string.Format("{0}({1},{2}): {3}", SourceFile, Line, Column, base.Message); }
-  }
-
-  public string SourceFile;
-  public int Line, Column;
+public class ArithmeticErrorException : RuntimeException
+{ public ArithmeticErrorException(string message) : base(message) { }
 }
 
 public class AssertionErrorException : RuntimeException
@@ -28,27 +17,27 @@ public class AttributeErrorException : RuntimeException
 { public AttributeErrorException(string message) : base(message) { }
 }
 
-public abstract class CompileTimeException : BoaException
+public abstract class CompileTimeException : StandardErrorException
 { public CompileTimeException(string message) : base(message) { }
 }
 
-public class EOFErrorException : IOErrorException
-{ public EOFErrorException(string message) : base(message) { }
+public class EnvironmentErrorException : RuntimeException
+{ public EnvironmentErrorException(string message) : base(message) { }
+}
+
+public class FloatingPointErrorException : RuntimeException
+{ public FloatingPointErrorException(string message) : base(message) { }
 }
 
 public class ImportErrorException : RuntimeException
 { public ImportErrorException(string message) : base(message) { }
 }
 
-public class IndexErrorException : RuntimeException
+public class IndexErrorException : LookupErrorException
 { public IndexErrorException(string message) : base(message) { }
 }
 
-public class IOErrorException : RuntimeException
-{ public IOErrorException(string message) : base(message) { }
-}
-
-public class KeyErrorException : RuntimeException
+public class KeyErrorException : LookupErrorException
 { public KeyErrorException(string message) : base(message) { }
 }
 
@@ -64,12 +53,17 @@ public class OSErrorException : RuntimeException
 { public OSErrorException(string message) : base(message) { }
 }
 
-public class RuntimeException : BoaException
+public class RuntimeException : StandardErrorException
 { public RuntimeException() { }
   public RuntimeException(string message) : base(message) { }
 }
 
-public class StopIterationException : RuntimeException { }
+public class StandardErrorException : SystemException
+{ public StandardErrorException() { }
+  public StandardErrorException(string message) : base(message) { }
+}
+
+public class StopIterationException : ApplicationException { }
 
 public class SyntaxErrorException : CompileTimeException
 { public SyntaxErrorException(string message) : base(message) { }

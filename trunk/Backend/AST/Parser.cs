@@ -5,7 +5,6 @@ using System.IO;
 using System.Text;
 using Boa.Runtime;
 
-// TODO: give in and change 'null', 'false', and 'true' to 'None', 'False', and 'True' ?
 // TODO: implement backtick operator: `o` == repr(o)
 // TODO: raise OverflowError or ValueError for invalid literals
 // TODO: add switch?
@@ -15,6 +14,7 @@ using Boa.Runtime;
 // TODO: add support for complex numbers: 5j == complex(0, 5)
 // TODO: add parsing for numbers without whole parts: (eg, .5)
 // TODO: implement sets
+// TODO: make sure x < y < z works as expected
 namespace Boa.AST
 {
 
@@ -31,7 +31,7 @@ enum Token
   BitAnd, BitOr, BitNot, BitXor, LogAnd, LogOr, LogNot,
   
   // keywords
-  Def, Print, Return, And, Or, Not, While, If, Elif, Else, Pass, Break, Continue, Global, Import, From, For, In,
+  Def, Print, Return, While, If, Elif, Else, Pass, Break, Continue, Global, Import, From, For, In, Not,
   Lambda, Try, Except, Finally, Raise, Class, Assert, Is, Del, Yield, Exec,
   
   // abstract
@@ -54,12 +54,14 @@ public class Parser
   static Parser()
   { stringTokens = new Hashtable();
     Token[] tokens =
-    { Token.Def, Token.Print, Token.Return, Token.And, Token.Or, Token.Not, Token.While, Token.Import, Token.From,
+    { Token.Def, Token.Print, Token.Return, Token.While, Token.Import, Token.From,
       Token.For, Token.If,  Token.Elif, Token.Else, Token.Pass, Token.Break, Token.Continue, Token.Global, Token.In,
       Token.Lambda, Token.Try, Token.Except, Token.Finally, Token.Raise, Token.Class, Token.Assert, Token.Is,
-      Token.Del, Token.Yield, Token.Exec
+      Token.Del, Token.Yield, Token.Exec, Token.Not,
     };
     foreach(Token token in tokens) stringTokens.Add(Enum.GetName(typeof(Token), token).ToLower(), token);
+    stringTokens.Add("and", Token.LogAnd);
+    stringTokens.Add("or",  Token.LogOr);
   }
 
   public static Parser FromFile(string filename) { return new Parser(filename, new StreamReader(filename), true); }
@@ -79,11 +81,10 @@ public class Parser
     return stmts.Count==0 ? new PassStatement() : (Statement)new Suite((Statement[])stmts.ToArray(typeof(Statement)));
   }
 
-  // expression := <lowlogand> ('or' <lowlogand>)* | <lambda> (',' <expression>)?
+  // expression := <typelow> | <lambda> (',' <expression>)?
   public Expression ParseExpression()
   { if(token==Token.Lambda) return ParseLambda();
-    Expression expr = ParseLowLogAnd();
-    while(TryEat(Token.Or)) expr = AP(new OrExpression(expr, ParseLowLogAnd()));
+    Expression expr = ParseTypeLow();
     if(bareTuples && token==Token.Comma)
     { ArrayList exprs = new ArrayList();
       exprs.Add(expr);
@@ -334,7 +335,7 @@ public class Parser
       ass.RHS = lhs;
       return ass;
     }
-    else return AP(new ExpressionStatement(lhs));
+    else return new ExpressionStatement(lhs);
   }
 
   // factor    := <power> (<factor_op> <power>)*
@@ -491,19 +492,6 @@ public class Parser
     return expr;
   }
 
-  // lowlogand := <lowlognot> ("and" <lowlognot>)*
-  Expression ParseLowLogAnd()
-  { Expression expr = ParseLowLogNot();
-    while(TryEat(Token.And)) expr = AP(new AndExpression(expr, ParseLowLogNot()));
-    return expr;
-  }
-
-  // lowlognot := "not" <lowlognot> | <typelow>
-  Expression ParseLowLogNot()
-  { if(TryEat(Token.Not)) return AP(new UnaryExpression(ParseLowLogNot(), UnaryOperator.LogicalNot));
-    return ParseTypeLow();
-  }
-  
   // primary := LITERAL | <ident> | '(' <expression> ')' | '[' <array_list> ']' | '{' <hash_list> '}' |
   //            '[' <list_comprehension> ']' | <tuple of <expression>>
   // tuple of T := '(' (<T> ',')+ <T>? ')'
@@ -824,11 +812,11 @@ public class Parser
   }
 
   // unary     := <unary_op> <unary>
-  // unary_op  := '!' | '~' | '-' | '+'
+  // unary_op  := '!' | 'not' | '~' | '-' | '+'
   Expression ParseUnary()
   { UnaryOperator op=null;
     switch(token)
-    { case Token.LogNot: op = UnaryOperator.LogicalNot; break;
+    { case Token.LogNot: case Token.Not: op = UnaryOperator.LogicalNot; break;
       case Token.Minus:  op = UnaryOperator.UnaryMinus; break;
       case Token.BitNot: op = UnaryOperator.BitwiseNot; break;
       case Token.Plus:   NextToken(); return ParseUnary();
@@ -922,9 +910,9 @@ public class Parser
         lastChar = c;
 
         string s = sb.ToString();
-        if(s=="null")  { value=null;  return Token.Literal; }
-        if(s=="true")  { value=true;  return Token.Literal; }
-        if(s=="false") { value=false; return Token.Literal; }
+        if(s=="null"  || s=="None") { value=null;  return Token.Literal; }
+        if(s=="true"  || s=="True")  { value=true;  return Token.Literal; }
+        if(s=="false" || s=="False") { value=false; return Token.Literal; }
         value = stringTokens[s];
         if(value!=null) return (Token)value;
         
@@ -1048,9 +1036,7 @@ public class Parser
   #endregion
 
   void SyntaxError(string format, params object[] args)
-  { BoaException e = Ops.SyntaxError(format, args);
-    e.SetPosition(sourceFile, line, column);
-    throw e;
+  { throw Ops.SyntaxError("{0}({1},{2}): {3}", sourceFile, line, column, string.Format(format, args));
   }
 
   bool TryEat(Token type)

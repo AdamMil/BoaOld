@@ -3,7 +3,9 @@ using System.Collections;
 using System.Collections.Specialized;
 
 // TODO: don't allow __repr__ to go into an infinite loop with circular references
-
+// TODO: make IDictionary.GetEnumerator() (returns DictionaryEntry) different from
+//       IEnumerator.GetEnumerator() (returns keys), if possible
+// TODO: make objects that boa considers equal be the same key
 namespace Boa.Runtime
 {
 
