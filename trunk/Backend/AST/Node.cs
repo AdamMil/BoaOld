@@ -21,10 +21,10 @@ public class ExceptClause : Node
 
   public override void ToCode(System.Text.StringBuilder sb, int indent)
   { sb.Append(Type==null ? "except" : "except ");
-    if(Type!=null) Type.ToCode(sb, indent);
+    if(Type!=null) Type.ToCode(sb, 0);
     if(Target!=null)
     { sb.Append(", ");
-      Target.ToCode(sb, indent);
+      Target.ToCode(sb, 0);
     }
     sb.Append(": ");
     Body.ToCode(sb, indent+Options.IndentSize);
@@ -106,12 +106,26 @@ public abstract class Node
   NodeFlag Flags;
 }
 
+public enum ParamType { Required, Optional, List, Dict }
+
 public struct Parameter
-{ public Parameter(Name name) { Name=name; }
-  public Parameter(string name) { Name=new Name(name, Scope.Local); }
+{ public Parameter(string name) : this(name, ParamType.Required) { }
+  public Parameter(string name, Expression defaultValue) : this(name, ParamType.Optional) { Default=defaultValue; }
+  public Parameter(string name, ParamType type) { Name=new Name(name, Scope.Local); Type=type; Default=null; }
+  public Parameter(Name name, Expression defaultValue, ParamType type) { Name=name; Default=defaultValue; Type=type; }
+
   public override int GetHashCode() { return Name.GetHashCode(); }
-  public void ToCode(System.Text.StringBuilder sb) { sb.Append(Name.String); }
+
+  public void ToCode(System.Text.StringBuilder sb)
+  { if(Type==ParamType.List) sb.Append('*');
+    else if(Type==ParamType.Dict) sb.Append("**");
+    sb.Append(Name.String);
+    if(Default!=null) { sb.Append('='); Default.ToCode(sb, 0); }
+  }
+
   public Name Name;
+  public Expression Default;
+  public ParamType Type;
 }
 
 } // namespace Boa.AST

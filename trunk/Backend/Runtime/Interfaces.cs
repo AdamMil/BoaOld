@@ -8,6 +8,9 @@ namespace Boa.Runtime
 public interface ICallable
 { object Call(params object[] args);
 }
+public interface IFancyCallable : ICallable
+{ object Call(object[] positional, string[] names, object[] values);
+}
 
 public interface IContainer
 { int __len__();

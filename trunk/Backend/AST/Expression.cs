@@ -49,9 +49,9 @@ public class AndExpression : BinaryExpression
   }
 
   public override void ToCode(System.Text.StringBuilder sb, int indent)
-  { LHS.ToCode(sb, indent);
+  { LHS.ToCode(sb, 0);
     sb.Append(" && ");
-    RHS.ToCode(sb, indent);
+    RHS.ToCode(sb, 0);
   }
 }
 #endregion
@@ -85,7 +85,7 @@ public class AttrExpression : Expression
   public override object Evaluate(Frame frame) { return Ops.GetAttr(Object.Evaluate(frame), Attribute); }
 
   public override void ToCode(System.Text.StringBuilder sb, int indent)
-  { Object.ToCode(sb, indent);
+  { Object.ToCode(sb, 0);
     sb.Append('.');
     sb.Append(Attribute);
   }
@@ -127,9 +127,9 @@ public class BinaryOpExpression : BinaryExpression
   public override object Evaluate(Frame frame) { return Op.Evaluate(LHS.Evaluate(frame), RHS.Evaluate(frame)); }
 
   public override void ToCode(System.Text.StringBuilder sb, int indent)
-  { LHS.ToCode(sb, indent);
+  { LHS.ToCode(sb, 0);
     sb.Append(Op.ToString());
-    RHS.ToCode(sb, indent);
+    RHS.ToCode(sb, 0);
   }
 
   BinaryOperator Op;
@@ -158,7 +158,7 @@ public class CallExpression : Expression
   }
 
   public override void ToCode(System.Text.StringBuilder sb, int indent)
-  { Target.ToCode(sb, indent);
+  { Target.ToCode(sb, 0);
     sb.Append('(');
     for(int i=0; i<Arguments.Length; i++)
     { if(i!=0) sb.Append(", ");
@@ -234,9 +234,9 @@ public class HashExpression : Expression
   { sb.Append('{');
     for(int i=0; i<Entries.Length; i++)
     { if(i!=0) sb.Append(", ");
-      ((Expression)Entries[i].Key).ToCode(sb, indent);
+      ((Expression)Entries[i].Key).ToCode(sb, 0);
       sb.Append(':');
-      ((Expression)Entries[i].Value).ToCode(sb, indent);
+      ((Expression)Entries[i].Value).ToCode(sb, 0);
     }
     sb.Append('}');
   }
@@ -280,9 +280,9 @@ public class IndexExpression : Expression
   public override void Optimize() { IsConstant = Object.IsConstant && Index.IsConstant; }
 
   public override void ToCode(System.Text.StringBuilder sb, int indent)
-  { Object.ToCode(sb, indent);
+  { Object.ToCode(sb, 0);
     sb.Append('[');
-    Index.ToCode(sb, indent);
+    Index.ToCode(sb, 0);
     sb.Append(']');
   }
   
@@ -325,10 +325,10 @@ public class LambdaExpression : Expression
     { Suite suite = (Suite)Function.Body;
       for(int i=0; i<suite.Statements.Length; i++)
       { if(i!=0) sb.Append("; ");
-        suite.Statements[i].ToCode(sb, indent);
+        suite.Statements[i].ToCode(sb, 0);
       }
     }
-    else Function.Body.ToCode(sb, indent);
+    else Function.Body.ToCode(sb, 0);
   }
 
   public override void Walk(IWalker w) { Function.Walk(w); }
@@ -374,7 +374,7 @@ public class ListExpression : Expression
   { sb.Append('[');
     for(int i=0; i<Expressions.Length; i++)
     { if(i!=0) sb.Append(", ");
-      Expressions[i].ToCode(sb, indent);
+      Expressions[i].ToCode(sb, 0);
     }
     sb.Append(']');
   }
@@ -449,14 +449,14 @@ public class ListCompExpression : Expression
 
   public override void ToCode(System.Text.StringBuilder sb, int indent)
   { sb.Append('[');
-    Item.ToCode(sb, indent);
+    Item.ToCode(sb, 0);
     sb.Append(" for ");
-    Names.ToCode(sb, indent);
+    Names.ToCode(sb, 0);
     sb.Append(" in ");
-    List.ToCode(sb, indent);
+    List.ToCode(sb, 0);
     if(Test!=null)
     { sb.Append(" if ");
-      Test.ToCode(sb, indent);
+      Test.ToCode(sb, 0);
     }
     sb.Append(']');
   }
@@ -515,11 +515,9 @@ public class OrExpression : BinaryExpression
   }
 
   public override void ToCode(System.Text.StringBuilder sb, int indent)
-  { sb.Append('(');
-    LHS.ToCode(sb, indent);
+  { LHS.ToCode(sb, 0);
     sb.Append(" || ");
-    RHS.ToCode(sb, indent);
-    sb.Append(')');
+    RHS.ToCode(sb, 0);
   }
 }
 #endregion
@@ -538,7 +536,7 @@ public class ParenExpression : Expression
 
   public override void ToCode(System.Text.StringBuilder sb, int indent)
   { sb.Append('(');
-    Expression.ToCode(sb, indent);
+    Expression.ToCode(sb, 0);
     sb.Append(')');
   }
 
@@ -577,12 +575,12 @@ public class SliceExpression : Expression
   }
 
   public override void ToCode(System.Text.StringBuilder sb, int indent)
-  { Start.ToCode(sb, indent);
+  { Start.ToCode(sb, 0);
     sb.Append(':');
-    Stop.ToCode(sb, indent);
+    Stop.ToCode(sb, 0);
     if(Step!=null)
     { sb.Append(':');
-      Step.ToCode(sb, indent);
+      Step.ToCode(sb, 0);
     }
   }
   
@@ -633,11 +631,11 @@ public class TernaryExpression : Expression
   }
 
   public override void ToCode(System.Text.StringBuilder sb, int indent)
-  { Test.ToCode(sb, indent);
+  { Test.ToCode(sb, 0);
     sb.Append(" ? ");
-    IfTrue.ToCode(sb, indent);
+    IfTrue.ToCode(sb, 0);
     sb.Append(" : ");
-    IfFalse.ToCode(sb, indent);
+    IfFalse.ToCode(sb, 0);
   }
 
   public override void Walk(IWalker w)
@@ -700,7 +698,7 @@ public class TupleExpression : Expression
   { sb.Append('(');
     for(int i=0; i<Expressions.Length; i++)
     { if(i!=0) sb.Append(", ");
-      Expressions[i].ToCode(sb, indent);
+      Expressions[i].ToCode(sb, 0);
     }
     if(Expressions.Length==1) sb.Append(',');
     sb.Append(')');
@@ -728,7 +726,7 @@ public class UnaryExpression : Expression
 
   public override void ToCode(System.Text.StringBuilder sb, int indent)
   { sb.Append(Op.ToString());
-    Expression.ToCode(sb, indent);
+    Expression.ToCode(sb, 0);
   }
 
   public override void Walk(IWalker w)

@@ -5,10 +5,10 @@ using System.Text;
 using Boa.Runtime;
 
 // TODO: allow nonparenthesized tuples
-// TODO: allow chained assignment (eg, a = b = c)
 // TODO: implement string literal concatenation
 // TODO: implement implicit and explicit line joining
 // TODO: implement 'exec'
+// TODO: check for duplicate keyword arguments
 namespace Boa.AST
 {
 
@@ -553,16 +553,37 @@ public class Parser
     return (Name[])list.ToArray(typeof(Name));
   }
 
-  // param_list := (<identifier> (',' <identifier>)*)?
+  // param_list := <required_params>? <pcomma> <optional_params>? <pcomma> ('*' <identifier>)? <pcomma>
+  //               ('**' <identifier>)?
+  // required_params := <identifier> (',' <identifier>)
+  // optional_params := <optional_param> (',' <optional_param>)*
+  // optional_param  := <identifier> '=' <expression>
+  // pcomma := ','?    (comma required to separate argument/parameter groups)
   Parameter[] ParseParamList(Token end)
   { if(token==end) return new Parameter[0];
     ArrayList parms = new ArrayList();
-    while(true)
-    { parms.Add(new Parameter(ParseIdentifier()));
-      if(token==end) break;
+    string ident;
+    while(true) // required identifiers
+    { ident = ParseIdentifier();
+      if(TryEat(Token.Assign)) break;
+      parms.Add(new Parameter(ident));
       Eat(Token.Comma);
     }
-    return (Parameter[])parms.ToArray(typeof(Parameter));
+    while(true) // positional parameters
+    { parms.Add(new Parameter(ident, ParseExpression()));
+      if(TryEat(Token.Asterisk)) break;
+      if(token==end) goto done;
+      Eat(Token.Comma);
+      ident = ParseIdentifier();
+      Eat(Token.Assign);
+    }
+    if(token==Token.Identifier) parms.Add(new Parameter(ParseIdentifier(), ParamType.List));
+    if(token==end) goto done;
+    Eat(Token.Comma);
+    Eat(Token.Asterisk);
+    Eat(Token.Asterisk);
+    parms.Add(new Parameter(ParseIdentifier(), ParamType.Dict));
+    done: return (Parameter[])parms.ToArray(typeof(Parameter));
   }
 
   // power := <unary> ('**' <unary>)*
