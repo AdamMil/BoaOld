@@ -955,15 +955,19 @@ public class Parser
   Token ReadToken() { return ReadToken(ref value); }
   Token ReadToken(ref object value)
   { char c;
+
     while(true)
     { if(token==Token.EOL)
-      { indent=0; c=ReadChar();
+      { c=ReadChar();
         if(wantEOL)
-          while(c!=0 && char.IsWhiteSpace(c))
+        { indent=0;
+          while(c!=0 && (char.IsWhiteSpace(c) || c=='#'))
           { if(c=='\n') indent=0;
+            else if(c=='#') { do c = ReadChar(); while(c!='\n' && c!=0); indent=0; }
             else indent++;
             c=ReadChar();
           }
+        }
         else while(c!=0 && char.IsWhiteSpace(c)) c=ReadChar();
       }
       else do c=ReadChar(); while(c!='\n' && c!=0 && char.IsWhiteSpace(c));

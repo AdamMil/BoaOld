@@ -652,13 +652,6 @@ public sealed class Ops
     else return Ops.Invoke(obj, "__getitem__", index);
   }
 
-  public static void Import(Module module, string[] names, string[] asNames)
-  { for(int i=0; i<names.Length; i++)
-    { string dname = asNames[i]!=null ? asNames[i] : names[i].IndexOf('.')==-1 ? names[i] : names[i].Split('.')[0];
-      module.__setattr__(dname, asNames[i]==null ? Importer.ImportTop(names[i]) : Importer.Import(names[i]));
-    }
-  }
-
   public static ImportErrorException ImportError(string format, params object[] args)
   { return new ImportErrorException(string.Format(format, args));
   }
@@ -670,9 +663,17 @@ public sealed class Ops
     { IHasAttributes mod = (IHasAttributes)Importer.Import(moduleName);
       ISequence exports = mod.__getattr__("__all__") as ISequence;
       if(exports==null && mod is Module) return;
-      for(int i=0; i<names.Length; i++)
-        if(exports==null || exports.__contains__(names[i]))
-          module.__setattr__(asNames[i]==null ? names[i] : asNames[i], mod.__getattr__(names[i]));
+
+      if(mod is ReflectedType)
+      { ReflectedType rmod = (ReflectedType)mod;
+        for(int i=0; i<names.Length; i++)
+          if(exports==null || exports.__contains__(names[i]))
+            module.__setattr__(asNames[i]==null ? names[i] : asNames[i], rmod.GetRawAttr(names[i]));
+      }
+      else
+        for(int i=0; i<names.Length; i++)
+          if(exports==null || exports.__contains__(names[i]))
+            module.__setattr__(asNames[i]==null ? names[i] : asNames[i], mod.__getattr__(names[i]));
     }
   }
 
@@ -680,7 +681,17 @@ public sealed class Ops
   { IHasAttributes mod = (IHasAttributes)Importer.Import(moduleName);
     ISequence exports = mod.__getattr__("__all__") as ISequence;
     if(exports==null && mod is Module) return;
-    if(exports==null) foreach(string name in mod.__attrs__()) module.__setattr__(name, mod.__getattr__(name));
+
+    if(mod is ReflectedType)
+    { ReflectedType rmod = (ReflectedType)mod;
+      if(exports==null) foreach(string name in mod.__attrs__()) module.__setattr__(name, rmod.GetRawAttr(name));
+      else
+        for(int i=0,len=exports.__len__(); i<len; i++)
+        { string name = (string)exports.__getitem__(i);
+          module.__setattr__(name, rmod.GetRawAttr(name));
+        }
+    }
+    else if(exports==null) foreach(string name in mod.__attrs__()) module.__setattr__(name, mod.__getattr__(name));
     else
       for(int i=0,len=exports.__len__(); i<len; i++)
       { string name = (string)exports.__getitem__(i);

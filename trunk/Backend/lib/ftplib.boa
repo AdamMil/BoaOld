@@ -35,9 +35,6 @@ boa ftplib.boa -d localhost -l -p -l
 # Modified by Adam Milazzo to work with Boa
 #
 
-import os
-import re
-import sys
 import socket
 
 __all__ = ["FTP"]
@@ -630,6 +627,7 @@ def ftpcp(source, sourcename, target, targetname = '', type = 'I'):
     target.voidresp()
 
 def test():
+    import sys
     '''Test program.
     Usage: ftp [-d] [-r[file]] host [-l[dir]] [-d[dir]] [-p] [file] ...'''
 
