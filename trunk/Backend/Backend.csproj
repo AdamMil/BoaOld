@@ -173,7 +173,23 @@
                     BuildAction = "None"
                 />
                 <File
+                    RelPath = "lib\BaseHTTPServer.boa"
+                    BuildAction = "None"
+                />
+                <File
                     RelPath = "lib\bisect.boa"
+                    BuildAction = "None"
+                />
+                <File
+                    RelPath = "lib\cgi.boa"
+                    BuildAction = "None"
+                />
+                <File
+                    RelPath = "lib\dummy_thread.boa"
+                    BuildAction = "None"
+                />
+                <File
+                    RelPath = "lib\dummy_threading.boa"
                     BuildAction = "None"
                 />
                 <File
@@ -189,6 +205,10 @@
                     BuildAction = "None"
                 />
                 <File
+                    RelPath = "lib\mimetools.boa"
+                    BuildAction = "None"
+                />
+                <File
                     RelPath = "lib\os.boa"
                     BuildAction = "None"
                 />
@@ -201,12 +221,24 @@
                     BuildAction = "Content"
                 />
                 <File
+                    RelPath = "lib\random.boa"
+                    BuildAction = "None"
+                />
+                <File
                     RelPath = "lib\re.boa"
                     SubType = "Form"
                     BuildAction = "None"
                 />
                 <File
                     RelPath = "lib\rfc822.boa"
+                    BuildAction = "None"
+                />
+                <File
+                    RelPath = "lib\shutil.boa"
+                    BuildAction = "None"
+                />
+                <File
+                    RelPath = "lib\SimpleHTTPServer.boa"
                     BuildAction = "None"
                 />
                 <File
@@ -226,7 +258,23 @@
                     BuildAction = "None"
                 />
                 <File
+                    RelPath = "lib\StringIO.boa"
+                    BuildAction = "None"
+                />
+                <File
+                    RelPath = "lib\tempfile.boa"
+                    BuildAction = "None"
+                />
+                <File
                     RelPath = "lib\time.boa"
+                    BuildAction = "None"
+                />
+                <File
+                    RelPath = "lib\urllib.boa"
+                    BuildAction = "None"
+                />
+                <File
+                    RelPath = "lib\urlparse.boa"
                     BuildAction = "None"
                 />
                 <File
