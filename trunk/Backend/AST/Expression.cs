@@ -200,9 +200,15 @@ public class CallExpression : Expression
     Target.Emit(cg);
     if(numlist==0 && numdict==0)
     { if(numnamed==0)
-      { if(Arguments.Length==0) cg.EmitFieldGet(typeof(Misc), "EmptyArray");
-        else EmitRun(cg, Arguments.Length, 0, Arguments.Length);
-        cg.EmitCall(typeof(Ops), "Call", new Type[] { typeof(object), typeof(object[]) });
+      { if(Arguments.Length==0) cg.EmitCall(typeof(Ops), "Call0", new Type[] { typeof(object) });
+        else if(Arguments.Length==1)
+        { Arguments[0].Expression.Emit(cg);
+          cg.EmitCall(typeof(Ops), "Call1", new Type[] { typeof(object), typeof(object) });
+        }
+        else
+        { EmitRun(cg, Arguments.Length, 0, Arguments.Length);
+          cg.EmitCall(typeof(Ops), "Call", new Type[] { typeof(object), typeof(object[]) });
+        }
       }
       else
       { EmitRun(cg, Arguments.Length-numnamed, 0, Arguments.Length);
@@ -416,7 +422,7 @@ public class CallExpression : Expression
         cg.ILG.Emit(OpCodes.Stelem_Ref);
       }
   }
-  
+
   void EvaluateNamed(Frame frame, int num, out string[] names, out object[] values)
   { names = new string[num];
     values = new object[num];

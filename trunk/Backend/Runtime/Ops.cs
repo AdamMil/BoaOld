@@ -478,18 +478,17 @@ public sealed class Ops
   }
 
   public static object Divide(object a, object b)
-  { FIXME; // FloatOps.Divide() returns a float, but most of these should return ints!
-    switch(Convert.GetTypeCode(a))
-    { case TypeCode.Boolean: return FloatOps.Divide((bool)a ? 1 : 0, b);
-      case TypeCode.Byte:    return FloatOps.Divide((byte)a, b);
+  { switch(Convert.GetTypeCode(a))
+    { case TypeCode.Boolean: return (bool)a ? IntOps.Divide(1, b) : 0;
+      case TypeCode.Byte:    return IntOps.Divide((byte)a, b);
       case TypeCode.Decimal:
         if(b is Decimal) return (Decimal)a / (Decimal)b;
         try { return (Decimal)a / Convert.ToDecimal(b); }
-        catch { break; }
+        catch { goto default; }
       case TypeCode.Double:  return FloatOps.Divide((double)a, b);
-      case TypeCode.Int16: return FloatOps.Divide((short)a, b);
-      case TypeCode.Int32: return FloatOps.Divide((int)a, b);
-      case TypeCode.Int64: return FloatOps.Divide((long)a, b);
+      case TypeCode.Int16: return IntOps.Divide((short)a, b);
+      case TypeCode.Int32: return IntOps.Divide((int)a, b);
+      case TypeCode.Int64: return LongOps.Divide((long)a, b);
       case TypeCode.Object:
         if(a is Integer) return IntegerOps.Divide((Integer)a, b);
         if(a is Complex) return ComplexOps.Divide((Complex)a, b);
@@ -497,13 +496,13 @@ public sealed class Ops
         return TryInvoke(a, "__truediv__",  out ret, b) ? ret :
                TryInvoke(b, "__rtruediv__", out ret, a) ? ret :
                TryInvoke(a, "__div__", out ret, b)      ? ret : Invoke(b, "__rdiv__", a);
-      case TypeCode.SByte: return FloatOps.Divide((int)(sbyte)a, b);
+      case TypeCode.SByte: return IntOps.Divide((sbyte)a, b);
       case TypeCode.Single: return FloatOps.Divide((float)a, b);
-      case TypeCode.UInt16: return FloatOps.Divide((int)(short)a, b);
-      case TypeCode.UInt32: return FloatOps.Divide((uint)a, b);
-      case TypeCode.UInt64: return FloatOps.Divide((ulong)a, b);
+      case TypeCode.UInt16: return IntOps.Divide((short)a, b);
+      case TypeCode.UInt32: return LongOps.Divide((uint)a, b);
+      case TypeCode.UInt64: return IntegerOps.Divide(new Integer((ulong)a), b);
+      default: throw TypeError("unsupported operand types for /: '{0}' and '{1}'", TypeName(a), TypeName(b));
     }
-    throw TypeError("unsupported operand types for /: '{0}' and '{1}'", TypeName(a), TypeName(b));
   }
 
   public static DivideByZeroException DivideByZeroError(string format, params object[] args)
@@ -551,19 +550,19 @@ public sealed class Ops
 
   public static object FloorDivide(object a, object b)
   { switch(Convert.GetTypeCode(a))
-    { case TypeCode.Boolean: return IntOps.FloorDivide((bool)a ? 1 : 0, b);
-      case TypeCode.Byte:    return IntOps.FloorDivide((int)(byte)a, b);
+    { case TypeCode.Boolean: return (bool)a ? IntOps.FloorDivide(1, b) : 0;
+      case TypeCode.Byte:    return IntOps.FloorDivide((byte)a, b);
       case TypeCode.Double:  return FloatOps.FloorDivide((double)a, b);
-      case TypeCode.Int16: return IntOps.FloorDivide((int)(short)a, b);
+      case TypeCode.Int16: return IntOps.FloorDivide((short)a, b);
       case TypeCode.Int32: return IntOps.FloorDivide((int)a, b);
       case TypeCode.Int64: return LongOps.FloorDivide((long)a, b);
       case TypeCode.Object:
         if(a is Integer) return IntegerOps.FloorDivide((Integer)a, b);
         object ret;
         return TryInvoke(a, "__floordiv__", out ret, b) ? ret : Invoke(b, "__rfloordiv__", a);
-      case TypeCode.SByte: return IntOps.FloorDivide((int)(sbyte)a, b);
+      case TypeCode.SByte: return IntOps.FloorDivide((sbyte)a, b);
       case TypeCode.Single: return FloatOps.FloorDivide((float)a, b);
-      case TypeCode.UInt16: return IntOps.FloorDivide((int)(short)a, b);
+      case TypeCode.UInt16: return IntOps.FloorDivide((short)a, b);
       case TypeCode.UInt32: 
       { uint v = (uint)a;
         return v<=int.MaxValue ? IntOps.FloorDivide((int)v, b) : LongOps.FloorDivide((long)v, b);
@@ -1194,6 +1193,7 @@ public sealed class Ops
   public static double ToFloat(object o)
   { if(o is double) return (double)o;
     try { return Convert.ToDouble(o); }
+    catch(FormatException) { throw ValueError("string does not contain a valid float"); }
     catch(OverflowException) { throw ValueError("too big for float"); }
     catch(InvalidCastException) { throw TypeError("expected float, but got {0}", TypeName(o)); }
   }
@@ -1221,6 +1221,7 @@ public sealed class Ops
         default: return checked((int)Convert.ToSingle(o)); // we do it this way so it truncates
       }
     }
+    catch(FormatException) { throw ValueError("string does not contain a valid int"); }
     catch(OverflowException) { goto toobig; }
     catch(InvalidCastException) { throw TypeError("expected int, but got {0}", TypeName(o)); }
     toobig: throw ValueError("too big for int");
@@ -1248,6 +1249,7 @@ public sealed class Ops
         default: return checked((uint)Convert.ToSingle(o));
       }
     }
+    catch(FormatException) { throw ValueError("string does not contain a valid uint"); }
     catch(OverflowException) { throw ValueError("too big for uint"); } // TODO: allow conversion to long integer?
     catch(InvalidCastException) { throw TypeError("expected uint, but got {0}", TypeName(o)); }
   }
@@ -1274,6 +1276,7 @@ public sealed class Ops
         default: return checked((long)Convert.ToSingle(o));
       }
     }
+    catch(FormatException) { throw ValueError("string does not contain a valid long"); }
     catch(OverflowException) { throw ValueError("too big for long"); } // TODO: allow conversion to long integer?
     catch(InvalidCastException) { throw TypeError("expected long, but got {0}", TypeName(o)); }
   }
@@ -1300,6 +1303,7 @@ public sealed class Ops
         default: return checked((ulong)Convert.ToSingle(o));
       }
     }
+    catch(FormatException) { throw ValueError("string does not contain a valid ulong"); }
     catch(OverflowException) { throw ValueError("too big for ulong"); } // TODO: allow conversion to long integer?
     catch(InvalidCastException) { throw TypeError("expected ulong, but got {0}", TypeName(o)); }
   }

@@ -114,13 +114,7 @@ public sealed class FloatOps
     }
     if(bv==0) throw Ops.DivideByZeroError("float division by zero");
 
-    if(floor)
-    { double ret = Math.Floor(a/bv);
-      FIXME; // 'ret' could be greater than an int can hold!
-      int iret = (int)ret;
-      return iret==ret ? (object)iret : (object)ret;
-    }
-    else return a/bv;
+    return floor ? Math.Floor(a/bv) : a/bv;
   }
 
   public static object FloorDivide(double a, object b) { return Divide(a, b, true); }

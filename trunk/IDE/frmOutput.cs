@@ -33,8 +33,7 @@ public class OutputForm : System.Windows.Forms.Form
       }
 
       bool end = box.SelectionStart==box.TextLength;
-      if(box.TextLength==box.MaxLength) box.Text = box.Text.Substring(box.TextLength/2);
-      box.Text += value;
+      box.AppendText(value.ToString());
       if(end)
       { box.SelectionStart = box.TextLength;
         box.SelectionLength = 0;
@@ -52,10 +51,7 @@ public class OutputForm : System.Windows.Forms.Form
       }
 
       bool end = box.SelectionStart==box.TextLength;
-      if(value.Length>box.MaxLength) value = value.Substring(0, box.MaxLength);
-      int remove = box.TextLength+value.Length - box.MaxLength;
-      if(remove>0) box.Text = box.Text.Substring(Math.Max(box.TextLength/2, remove));
-      box.Text += value;
+      box.AppendText(value);
       if(end)
       { box.SelectionStart = box.TextLength;
         box.SelectionLength = 0;

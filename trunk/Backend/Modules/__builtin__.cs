@@ -251,13 +251,6 @@ magnitude is returned.")]
     }
   }
 
-  [DocString(@"bool([x]) -> bool
-
-Convert a value to a Boolean, using the standard truth testing procedure.
-If x is false or omitted, this returns false; otherwise it returns true.")]
-  public static object @bool() { return Ops.FALSE; }
-  public static object @bool(object o) { return Ops.FromBool(Ops.IsTrue(o)); }
-
   [DocString(@"callable(object) -> bool
 
 Return true if the object argument appears callable, false if not. If this
@@ -504,18 +497,6 @@ Note that filter(function, list) is equivalent to
     }
   }
 
-  [DocString(@"float([value]) -> float
-
-Convert a string or a number to floating point. If the argument is a string,
-it must contain a possibly signed decimal or floating point number, possibly
-embedded in whitespace. Otherwise, the argument may be a plain or long
-integer or a floating point number, and a floating point number with the same
-value (within Boa's floating point precision) is returned. If no argument is
-given, returns 0.")]
-  public static double @float() { return 0.0; }
-  public static double @float(string s) { return double.Parse(s); }
-  public static double @float(object o) { return Ops.ToFloat(o); }
-
   [DocString(@"getattr(object, name[, default]) -> object
 
 Return the value of the named attribute of an object. The name must be a
@@ -595,32 +576,6 @@ read, EOFError is raised.")]
     return line;
   }
 
-  [DocString(@"int([value[, radix]) -> int
-
-Convert a string or number to a plain integer. If the argument is a string,
-it must contain a possibly signed decimal number representable as a Boa
-integer, possibly embedded in whitespace. The radix parameter gives the base
-for the conversion, or zero. If radix is zero, the proper radix is guessed
-based on the contents of string; the interpretation is the same as for
-integer literals. If radix is specified and x is not a string, TypeError is
-raised. Otherwise, the argument may be a plain or long integer or a floating
-point number. Conversion of floating point numbers to integers truncates
-(towards zero). If the argument is outside the integer range a long object
-will be returned instead. If no arguments are given, returns 0.")]
-  public static int @int() { return 0; }
-  public static int @int(string s) { return int.Parse(s); }
-  public static int @int(object o) { return Ops.ToInt(o); }
-  public static int @int(string s, int radix)
-  { if(radix==0)
-    { s = s.ToLower();
-      if(s.IndexOf('.')!=-1 || s.IndexOf('e')!=-1) radix=10;
-      else if(s.StartsWith("0x")) { radix=16; s=s.Substring(2); }
-      else if(s.StartsWith("0")) radix=8;
-      else radix=10;
-    }
-    return Convert.ToInt32(s, radix);
-  }
-
   [DocString(@"intern(string) -> str
 
 Enters the given string into the 'interned' string table. Interned strings
@@ -652,23 +607,6 @@ be checked. In any other case, a TypeError exception is raised.")]
     if(tup==null) return type.IsSubclassOf(parentType);
     for(int i=0; i<tup.items.Length; i++) if(issubclass(type, tup.items[i])) return true;
     return false;
-  }
-
-  [DocString(@"iter(object[, sentinel]) -> iter
-
-Return an iterator object. The first argument is interpreted very differently
-depending on the presence of the second argument. Without a second argument,
-the first argument must be a collection object which supports the iteration
-protocol (the __iter__() method), or it must support the sequence protocol
-(the __getitem__()  method with integer arguments starting at 0). If it does
-not support either of those protocols, TypeError is raised. If the second
-argument, sentinel, is given, then the object must be callable. The iterator
-created in this case will call the object with no arguments for each call to
-its next() method; if the value returned is equal to sentinel, StopIteration
-will be raised, otherwise the value will be returned.")]
-  public static IEnumerator iter(object o) { return Ops.GetEnumerator(o); }
-  public static IEnumerator iter(object o, object sentinel)
-  { return new SentinelEnumerator(Ops.GetEnumerator(o), sentinel);
   }
 
   [DocString(@"len(object) -> int
@@ -1011,13 +949,13 @@ cannot be altered at runtime.")]
   // TODO: figure out how to handle these types that collide with the functions
   // (perhaps by modifying ReflectedType.cons)
   #region Data types
-  //public static readonly ReflectedType @bool   = ReflectedType.FromType(typeof(bool));
+  public static readonly ReflectedType @bool   = ReflectedType.FromType(typeof(bool));
   public static readonly ReflectedType complex = ReflectedType.FromType(typeof(Complex));
   public static readonly ReflectedType dict    = ReflectedType.FromType(typeof(Dict));
   public static readonly ReflectedType file    = ReflectedType.FromType(typeof(BoaFile));
-  //public static readonly ReflectedType @float  = ReflectedType.FromType(typeof(double));
-  //public static readonly ReflectedType @int    = ReflectedType.FromType(typeof(int));
-  //public static readonly ReflectedType iter    = ReflectedType.FromType(typeof(IEnumerator));
+  public static readonly ReflectedType @float  = ReflectedType.FromType(typeof(double));
+  public static readonly ReflectedType @int    = ReflectedType.FromType(typeof(int));
+  public static readonly ReflectedType iter    = ReflectedType.FromType(typeof(IEnumerator));
   public static readonly ReflectedType list    = ReflectedType.FromType(typeof(List));
   public static readonly ReflectedType @long   = ReflectedType.FromType(typeof(Integer));
   public static readonly ReflectedType @object = ReflectedType.FromType(typeof(object));
@@ -1057,7 +995,70 @@ cannot be altered at runtime.")]
   public static readonly ReflectedType ZeroDivisionError = ReflectedType.FromType(typeof(DivideByZeroException));
   #endregion
 
+  [DocString(@"bool([x]) -> bool
+
+Convert a value to a Boolean, using the standard truth testing procedure.
+If x is false or omitted, this returns false; otherwise it returns true.")]
+  internal static object _bool() { return Ops.FALSE; }
+  internal static object _bool(object o) { return Ops.FromBool(Ops.IsTrue(o)); }
+
+  [DocString(@"float([value]) -> float
+
+Convert a string or a number to floating point. If the argument is a string,
+it must contain a possibly signed decimal or floating point number, possibly
+embedded in whitespace. Otherwise, the argument may be a plain or long
+integer or a floating point number, and a floating point number with the same
+value (within Boa's floating point precision) is returned. If no argument is
+given, returns 0.")]
+  internal static double _float() { return 0.0; }
+  internal static double _float(object o) { return Ops.ToFloat(o); }
+
+  [DocString(@"int([value[, radix]) -> int
+
+Convert a string or number to a plain integer. If the argument is a string,
+it must contain a possibly signed decimal number representable as a Boa
+integer, possibly embedded in whitespace. The radix parameter gives the base
+for the conversion, or zero. If radix is zero, the proper radix is guessed
+based on the contents of string; the interpretation is the same as for
+integer literals. If radix is specified and x is not a string, TypeError is
+raised. Otherwise, the argument may be a plain or long integer or a floating
+point number. Conversion of floating point numbers to integers truncates
+(towards zero). If the argument is outside the integer range a long object
+will be returned instead. If no arguments are given, returns 0.")]
+  internal static int _int() { return 0; }
+  internal static int _int(object o) { return Ops.ToInt(o); }
+  internal static int _int(string s, int radix)
+  { if(radix==0)
+    { s = s.ToLower();
+      if(s.IndexOf('.')!=-1 || s.IndexOf('e')!=-1) radix=10;
+      else if(s.StartsWith("0x")) { radix=16; s=s.Substring(2); }
+      else if(s.StartsWith("0")) radix=8;
+      else radix=10;
+    }
+    try { return Convert.ToInt32(s, radix); }
+    catch(FormatException) { throw Ops.ValueError("string does not contain a valid int"); }
+    catch(OverflowException) { throw Ops.ValueError("too big for int"); }
+  }
+
+  [DocString(@"iter(object[, sentinel]) -> iter
+
+Return an iterator object. The first argument is interpreted very differently
+depending on the presence of the second argument. Without a second argument,
+the first argument must be a collection object which supports the iteration
+protocol (the __iter__() method), or it must support the sequence protocol
+(the __getitem__()  method with integer arguments starting at 0). If it does
+not support either of those protocols, TypeError is raised. If the second
+argument, sentinel, is given, then the object must be callable. The iterator
+created in this case will call the object with no arguments for each call to
+its next() method; if the value returned is equal to sentinel, StopIteration
+will be raised, otherwise the value will be returned.")]
+  internal static IEnumerator _iter(object o) { return Ops.GetEnumerator(o); }
+  internal static IEnumerator _iter(object o, object sentinel)
+  { return new SentinelEnumerator(Ops.GetEnumerator(o), sentinel);
+  }
+
   internal static string helptext(object o) { return helptext(o, new System.Text.StringBuilder()); }
+
   static string helptext(object o, System.Text.StringBuilder sb)
   { object doc;
     string docstr;

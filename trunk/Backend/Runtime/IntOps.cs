@@ -20,6 +20,7 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 
 using System;
+using System.Collections;
 using System.Globalization;
 
 namespace Boa.Runtime
@@ -162,68 +163,60 @@ public sealed class IntOps
     throw Ops.TypeError("cannot compare '{0}' and '{1}'", Ops.TypeName(a), Ops.TypeName(b));
   }
 
-  public static object FloorDivide(int a, object b)
+  public static object Divide(int a, object b) { return Divide(a, b, false); }
+  public static object Divide(int a, object b, bool floor)
   { int bv;
     if(b is int) bv = (int)b;
     else switch(Convert.GetTypeCode(b))
     { case TypeCode.Boolean: bv = (bool)b ? 1 : 0; break;
       case TypeCode.Byte: bv = (byte)b; break;
-      case TypeCode.Double: return Math.Floor(a/(double)b);
-      case TypeCode.Int16: bv = (short)b; break;
-      case TypeCode.Int64:
-      { long lv = (long)b;
-        if(lv<0)
-        { if(a<0 && lv<a) return 0;
-          else if(a>=0 && lv<=-a) return -1;
-        }
-        else if(a>=0 && lv>a/2) return 1;
-        else if(a<0 && lv>=-(long)a) return -1;
-        bv = (int)lv;
-        break;
+      case TypeCode.Double:
+      { double dv = a/(double)b;
+        return floor ? Math.Floor(dv) : dv;
       }
+      case TypeCode.Int16: bv = (short)b; break;
+      case TypeCode.Int64: return LongOps.Divide(a, b, floor);
       case TypeCode.Object:
       { if(b is Integer)
-        { Integer iv = (Integer)b;
-          if(iv.Sign<0)
-          { if(a<0 && iv<a) return 0;
-            else if(a>=0 && iv<=-a) return -1;
+        { if(floor)
+          { Integer iv = (Integer)b;
+            return IntegerOps.Reduce(a<0 ? (a-iv+iv.Sign)/iv : a/iv);
           }
-          else if(a>=0 && iv>a/2) return 1;
-          else if(a<0 && iv>=-(long)a) return -1;
-          bv = iv.ToInt32();
+          else return IntegerOps.Divide(new Integer(a), b);
         }
         else
         { IConvertible ic = b as IConvertible;
           if(ic==null) return Ops.Invoke(b, "__rfloordiv__", a);
           long lv = ic.ToInt64(NumberFormatInfo.InvariantInfo);
-          if(lv>int.MaxValue || lv<int.MinValue) return LongOps.FloorDivide(a, b);
+          if(lv>int.MaxValue || lv<int.MinValue) return LongOps.Divide(a, b, floor);
           bv = (int)lv;
         }
         break;
       }
       case TypeCode.SByte: bv=(sbyte)b; break;
-      case TypeCode.Single: return Math.Floor(a/(float)b);
+      case TypeCode.Single:
+      { double dv = a/(float)b;
+        return floor ? Math.Floor(dv) : dv;
+      }
       case TypeCode.UInt16: bv = (ushort)b; break;
       case TypeCode.UInt32:
-      { uint ui = (uint)b;
-        if(a>=0 && ui>(uint)a/2) return 1;
-        else if(a<0 && ui>=(uint)-(long)a) return -1;
-        else bv = (int)ui;
-        break;
+      { uint v = (uint)b;
+        if(v>int.MaxValue) return LongOps.Divide(a, b, floor);
+        else { bv = (int)v; break; }
       }
       case TypeCode.UInt64:
-      { ulong ul = (ulong)b;
-        if(a>=0 && ul>(uint)a/2) return 1;
-        else if(a<0 && ul>=(ulong)-(long)a) return -1;
-        else bv = (int)ul;
-        break;
-      }
-      default:
-        throw Ops.TypeError("invalid operand types for //: '{0}' and '{1}'", Ops.TypeName(a), Ops.TypeName(b));
+        return floor ? IntegerOps.FloorDivide(new Integer(a), b) : IntegerOps.Divide(new Integer(a), b);
+      default: throw Ops.TypeError("invalid operand types for //: '{0}' and '{1}'", Ops.TypeName(a), Ops.TypeName(b));
     }
     if(bv==0) throw Ops.DivideByZeroError("floor division by zero");
-    return (a<0 ? (a-bv+Math.Sign(bv)) : a) / bv;
+    if(floor) return (a<0 ? (a-bv+Math.Sign(bv)) : a) / bv;
+    else
+    { int rem, ret=Math.DivRem(a, bv, out rem);
+      return rem==0 ? (object)ret : (double)a/bv;
+    }
   }
+
+  public static object FloorDivide(int a, object b) { return Divide(a, b, true); }
 
   public static object LeftShift(int a, object b)
   { int shift;
@@ -342,11 +335,13 @@ public sealed class IntOps
         case TypeCode.Object:
           if(b is Integer) return a * (Integer)b;
           if(b is Complex) return a * (Complex)b;
+          if(b is ICollection || b is ISequence) return ArrayOps.Multiply(b, a);
           IConvertible ic = b as IConvertible;
           return ic!=null ? checked(a * ic.ToInt32(NumberFormatInfo.InvariantInfo))
                           : Ops.Invoke(b, "__rmul__", a);
         case TypeCode.SByte: return checked(a * (sbyte)b);
         case TypeCode.Single: return a * (float)b;
+        case TypeCode.String: return StringOps.Multiply((string)b, a);
         case TypeCode.UInt16: return checked(a * (ushort)b);
         case TypeCode.UInt32: return checked(a * (uint)b);
         case TypeCode.UInt64:
@@ -355,8 +350,8 @@ public sealed class IntOps
           if(bv>int.MaxValue) return LongOps.Multiply(a, b);
           return checked(a * (long)b);
         }
+        default: throw Ops.TypeError("invalid operand types for *: '{0}' and '{1}'", Ops.TypeName(a), Ops.TypeName(b));
       }
-      throw Ops.TypeError("invalid operand types for *: '{0}' and '{1}'", Ops.TypeName(a), Ops.TypeName(b));
     }
     catch(OverflowException) { return LongOps.Multiply(a, b); }
   }
@@ -461,8 +456,8 @@ public sealed class IntOps
           if(bv>int.MaxValue) return LongOps.Subtract(a, b);
           return checked(a - (long)b);
         }
+        default: throw Ops.TypeError("invalid operand types for -: '{0}' and '{1}'", Ops.TypeName(a), Ops.TypeName(b));
       }
-      throw Ops.TypeError("invalid operand types for -: '{0}' and '{1}'", Ops.TypeName(a), Ops.TypeName(b));
     }
     catch(OverflowException) { return LongOps.Subtract(a, b); }
   }

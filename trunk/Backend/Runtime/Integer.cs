@@ -78,8 +78,28 @@ public struct Integer : IConvertible, IRepresentable, IComparable, ICloneable
 
   public Integer(string s) : this(s, 10) { }
   public Integer(string s, int radix)
-  { const string charSet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-    FIXME; // implement this
+  { if(s==null) throw Ops.ValueError("Cannot convert null to Integer");
+    if(radix<2 || radix>36) throw Ops.ValueError("radix must be from 2 to 36");
+    string charSet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ".Substring(radix);
+
+    Integer val = Zero;
+    int i=0;
+    char c;
+    bool neg=false;
+    while(i<s.Length && char.IsWhiteSpace(s[i])) i++;
+    if(i<s.Length)
+    { if(s[i]=='-') { neg=true; i++; }
+      else if(s[i]=='+') i++;
+    }
+    while(i<s.Length && char.IsWhiteSpace(s[i])) i++;
+    
+    if(i==s.Length || charSet.IndexOf(c=char.ToUpper(s[i]))==-1) throw Ops.ValueError("String does not contain a valid integer");
+    while(true)
+    { val = val*radix + (c>'9' ? c-'A'+10 : c-'0');
+      if(++i==s.Length || charSet.IndexOf(c=char.ToUpper(c))==-1) break;
+    }
+
+    sign=neg ? (short)-val.sign : val.sign; data=val.data; length=val.length;
   }
 
   public Integer(double d)
@@ -135,7 +155,7 @@ public struct Integer : IConvertible, IRepresentable, IComparable, ICloneable
     uint[] data = (uint[])this.data.Clone();
     int    len  = this.length-1;
     while(true)
-    { sb.Append(charSet[divideInPlace(data, len, (uint)radix)]);
+    { sb.Append(charSet[divideInPlace(data, len+1, (uint)radix)]);
       while(data[len]==0) if(len--==0) goto done;
     }
     done:
@@ -219,34 +239,51 @@ public struct Integer : IConvertible, IRepresentable, IComparable, ICloneable
   #region Arithmetic and bitwise operators
   #region Addition
   public static Integer operator+(Integer a, Integer b)
-  { int c = a.AbsCompareTo(b);
-    if(c==0) return Integer.Zero;
+  { int c = a.absCompareTo(b);
     if(a.sign==b.sign) // addition
-    { if(c>0) return new Integer(a.sign, add(a.data, a.length, b.data, b.length));
+    { if(c>=0) return new Integer(a.sign, add(a.data, a.length, b.data, b.length));
       else return new Integer(b.sign, add(b.data, b.length, a.data, a.length));
     }
     else // subtraction
     { if(c>0) return new Integer(a.sign, sub(a.data, a.length, b.data, b.length));
+      else if(c==0) return Zero;
       else return new Integer(b.sign, sub(b.data, b.length, a.data, a.length));
     }
   }
-  public static Integer operator+(Integer a, int b)   { return a + new Integer(b); }
-  public static Integer operator+(Integer a, uint b)  { return a + new Integer(b); }
+  public static Integer operator+(Integer a, int b)
+  { uint ub=intToUint(b);
+    short bsign=(short)Math.Sign(b);
+    if(a.sign==bsign) return new Integer((short)bsign, add(a.data, a.length, ub));
+    else
+    { int c=a.absCompareTo(ub);
+      if(c>0) return new Integer(a.sign, sub(a.data, a.length, ub));
+      else if(c==0) return Zero;
+      else return new Integer(bsign, sub(ub, a.data, a.length));
+    }
+  }
+  public static Integer operator+(Integer a, uint b)
+  { if(a.sign==-1) 
+    { int c=a.absCompareTo(b);
+      if(c>0) return new Integer(a.sign, sub(a.data, a.length, b));
+      else if(c==0) return Zero;
+      else return new Integer(1, sub(b, a.data, a.length));
+    }
+    else return new Integer((short)1, add(a.data, a.length, b));
+  }
   public static Integer operator+(Integer a, long b)  { return a + new Integer(b); }
   public static Integer operator+(Integer a, ulong b) { return a + new Integer(b); }
-  public static Integer operator+(int a, Integer b)   { return new Integer(a) + b; }
-  public static Integer operator+(uint a, Integer b)  { return new Integer(a) + b; }
+  public static Integer operator+(int a, Integer b)   { return b+a; }
+  public static Integer operator+(uint a, Integer b)  { return b+a; }
   public static Integer operator+(long a, Integer b)  { return new Integer(a) + b; }
   public static Integer operator+(ulong a, Integer b) { return new Integer(a) + b; }
   #endregion
   
   #region Subtraction
   public static Integer operator-(Integer a, Integer b)
-  { int c = a.AbsCompareTo(b);
-    if(c==0) return Integer.Zero;
-    
+  { int c = a.absCompareTo(b);
     if(a.sign==b.sign) // subtraction
     { if(c>0) return new Integer(a.sign, sub(a.data, a.length, b.data, b.length));
+      else if(c==0) return Zero;
       else return new Integer((short)-b.sign, sub(b.data, b.length, a.data, a.length));
     }
     else // addition
@@ -254,12 +291,48 @@ public struct Integer : IConvertible, IRepresentable, IComparable, ICloneable
       else return new Integer((short)-b.sign, add(b.data, b.length, a.data, a.length));
     }
   }
-  public static Integer operator-(Integer a, int b)   { return a - new Integer(b); }
-  public static Integer operator-(Integer a, uint b)  { return a - new Integer(b); }
+  public static Integer operator-(Integer a, int b)
+  { uint ub=intToUint(b);
+    int   c=a.absCompareTo(ub);
+    short bsign=(short)Math.Sign(b);
+    if(a.sign==bsign)
+    { if(c>0) return new Integer(a.sign, sub(a.data, a.length, ub));
+      else if(c==0) return Zero;
+      else return new Integer((short)-bsign, sub(ub, a.data, a.length));
+    }
+    else return new Integer(c>0 ? a.sign : (short)-bsign, add(a.data, a.length, ub));
+  }
+  public static Integer operator-(Integer a, uint b)
+  { int c=a.absCompareTo(b);
+    if(a.sign==-1) return new Integer(c>0 ? a.sign : (short)-1, add(a.data, a.length, b));
+    else
+    { if(c>0) return new Integer(a.sign, sub(a.data, a.length, b));
+      else if(c==0) return Zero;
+      else return new Integer((short)-1, sub(b, a.data, a.length));
+    }
+  }
   public static Integer operator-(Integer a, long b)  { return a - new Integer(b); }
   public static Integer operator-(Integer a, ulong b) { return a - new Integer(b); }
-  public static Integer operator-(int a, Integer b)   { return new Integer(a) - b; }
-  public static Integer operator-(uint a, Integer b)  { return new Integer(a) - b; }
+  public static Integer operator-(int a, Integer b)
+  { uint ua=intToUint(a);
+    int   c=-b.absCompareTo(ua);
+    short asign=(short)Math.Sign(a);
+    if(asign==b.sign) // subtraction
+    { if(c>0) return new Integer(asign, sub(ua, b.data, b.length));
+      else if(c==0) return Zero;
+      else return new Integer((short)-b.sign, sub(b.data, b.length, ua));
+    }
+    else return new Integer((short)(c>0 ? asign : -b.sign), add(b.data, b.length, ua)); // addition
+  }
+  public static Integer operator-(uint a, Integer b)
+  { if(b.sign==-1) return new Integer((short)1, add(b.data, b.length, a)); // addition
+    else
+    { int c=-b.absCompareTo(a);
+      if(c>0) return new Integer((short)1, sub(a, b.data, b.length));
+      else if(c==0) return Zero;
+      else return new Integer((short)-b.sign, sub(b.data, b.length, a));
+    }
+  }
   public static Integer operator-(long a, Integer b)  { return new Integer(a) - b; }
   public static Integer operator-(ulong a, Integer b) { return new Integer(a) - b; }
   #endregion
@@ -308,7 +381,7 @@ public struct Integer : IConvertible, IRepresentable, IComparable, ICloneable
   
   #region Unary
   public static Integer operator-(Integer i) { return new Integer((short)-i.sign, i.data); }
-  public static Integer operator~(Integer i) { return -(i+Integer.One); }
+  public static Integer operator~(Integer i) { return -(i+One); }
   #endregion
   
   #region Bitwise And
@@ -401,36 +474,39 @@ public struct Integer : IConvertible, IRepresentable, IComparable, ICloneable
   public int CompareTo(int i)
   { int osign = i>0 ? 1 : i<0 ? -1 : 0;
     if(sign!=osign) return sign-osign;
-    if(length>1) return sign;
-    if(length==0) return 0;
-    return (data[0]&0x80000000)==0 ? (int)data[0]*sign-i : sign;
+    switch(length)
+    { case 1: return uintCompare(data[0], intToUint(i));
+      case 0: return 0; // 'i' can't be nonzero here because the 'sign!=osign' check above would have caught it
+      default: return sign;
+    }
   }
 
   public int CompareTo(uint i)
-  { int osign = i>0 ? 1 : 0;
+  { int osign = i==0 ? 0 : 1;
     if(sign!=osign) return sign-osign;
-    if(length>1) return 1;
-    if(length==0) return 0;
-    return (int)(data[0]-i);
+    return length==1 ? uintCompare(data[0], i) : length;
   }
-  
+
   public int CompareTo(long i)
   { int osign = i>0 ? 1 : i<0 ? -1 : 0;
     if(sign!=osign) return sign-osign;
-    if(length>2) return sign;
-    if(length==0) return 0;
-    if(length==1) Math.Sign((int)data[0]*sign-i);
-    return (data[1]&0x80000000)==0 ? (int)((long)((ulong)data[1]<<32 | data[0])*sign-i) : sign;
+    switch(length)
+    { case 2: return ulongCompare(((ulong)data[1]<<32) | data[0], longToUlong(i));
+      case 1: return ((ulong)i>>32)==0 ? uintCompare(data[0], (uint)(ulong)i) : -sign;
+      case 0: return 0;
+      default: return sign;
+    }
   }
 
   public int CompareTo(ulong i)
-  { int osign = i>0 ? 1 : 0;
+  { int osign = i==0 ? 0 : 1;
     if(sign!=osign) return sign-osign;
-    if(length>2) return 1;
-    if(length==1) return Math.Sign((long)(i-data[0]));
-    if(length==0) return 0;
-    uint v = (uint)(i>>32);
-    return (int)(data[1]==v ? data[0]-(uint)i : data[1]-v);
+    switch(length)
+    { case 2: return ulongCompare(((ulong)data[1]<<32) | data[0], i);
+      case 1: return (i>>32)==0 ? uintCompare(data[0], (uint)i) : -sign;
+      case 0: return 0;
+      default: return sign;
+    }
   }
   #endregion
 
@@ -569,12 +645,12 @@ public struct Integer : IConvertible, IRepresentable, IComparable, ICloneable
 
   #region Pow
   internal Integer Pow(uint power)
-  { if(power==0) return Integer.One;
+  { if(power==0) return One;
     if(power==2) return squared();
     if(power<0) throw new ArgumentOutOfRangeException("power", power, "power must be >= 0");
 
     Integer factor = this;
-    Integer result = Integer.One;
+    Integer result = One;
     while(power!=0)
     { if((power&1)!=0) result *= factor;
       factor = factor.squared();
@@ -591,11 +667,19 @@ public struct Integer : IConvertible, IRepresentable, IComparable, ICloneable
   internal Integer Pow(Integer power, object mod) { return Pow(power.ToUInt32(), mod); }
   #endregion
 
-  int AbsCompareTo(Integer o)
+  int absCompareTo(Integer o)
   { int len=length, olen=o.length;
     if(len!=olen) return len-olen;
     for(int i=len-1; i>=0; i--) if(data[i]!=o.data[i]) return (int)(data[i]-o.data[i]);
     return 0;
+  }
+
+  int absCompareTo(uint i)
+  { switch(length)
+    { case 1: return uintCompare(data[0], i);
+      case 0: return i==0 ? 0 : -1;
+      default: return 1;
+    }
   }
 
   Integer squared() { return this*this; } // TODO: this can be optimized much better
@@ -604,26 +688,41 @@ public struct Integer : IConvertible, IRepresentable, IComparable, ICloneable
   internal ushort length;
   short sign;
 
-  static uint[] add(uint[] a, int alen, uint[] b, int blen) // assumes alen >= blen
-  { uint[] n = new uint[alen];
-    ulong sum = 0;
-    int i=0;
-    for(; i<blen; i++)
-    { sum = sum + a[i] + b[i];
-      n[i] = (uint)sum;
-      sum >>= 32;
+  static unsafe uint[] add(uint[] a, int alen, uint b)
+  { uint[] d = new uint[alen+1];
+    fixed(uint* ab=a, db=d)
+    { ulong sum=b;
+      int i=0;
+      for(; i<alen && (uint)sum!=0; i++)
+      { sum += ab[i];
+        db[i] = (uint)sum;
+        sum >>= 32;
+      }
+      if((uint)sum!=0) db[alen] = (uint)sum;
+      else for(; i<alen; i++) db[i]=ab[i];
     }
-    for(; i<alen && sum!=0; i++)
-    { sum = sum + a[i];
-      n[i] = (uint)sum;
-      sum >>= 32;
+    return d;
+  }
+
+  static unsafe uint[] add(uint[] a, int alen, uint[] b, int blen) // assumes alen >= blen
+  { uint[] d = new uint[alen+1];
+    fixed(uint* ab=a, bb=b, db=d)
+    { ulong sum=0;
+      int i=0;
+      for(; i<blen; i++)
+      { sum  += ab[i] + bb[i];
+        db[i] = (uint)sum;
+        sum >>= 32;
+      }
+      for(; i<alen && (uint)sum!=0; i++)
+      { sum  += ab[i];
+        db[i] = (uint)sum;
+        sum >>= 32;
+      }
+      if((uint)sum!=0) db[alen] = (uint)sum;
+      else for(; i<alen; i++) db[i]=ab[i];
     }
-    if(sum!=0)
-    { n = resize(n, alen+1);
-      n[i] = (uint)sum;
-    }
-    else for(; i<alen; i++) n[i]=a[i];
-    return n;
+    return d;
   }
 
   static uint[] bitand(uint[] a, int alen, uint b)
@@ -881,10 +980,26 @@ public struct Integer : IConvertible, IRepresentable, IComparable, ICloneable
 
   static uint getOne(bool neg, uint value, ref bool snz) { return neg ? extend(value, ref snz) : value; }
 
+  static uint intToUint(int i)
+  { if(i>=0) return (uint)i;
+    else
+    { uint ui = (uint)-i;
+      return ui==0 ? (uint)2147483648 : ui;
+    }
+  }
+
+  static ulong longToUlong(long i)
+  { if(i>=0) return (ulong)i;
+    else
+    { ulong ul = (ulong)-i;
+      return ul==0 ? (ulong)9223372036854775808 : ul;
+    }
+  }
+
   static unsafe uint[] lshift(uint[] a, int alen, int n) // assumes n>0
   { int whole=n>>5, nlen=alen+whole+1;
     uint[] d = new uint[nlen];
-    n &= 32;
+    n &= 31;
 
     fixed(uint* ab=a, db=d)
     { if(n==0) for(int i=0; i<nlen; i++) db[i+whole] = ab[i];
@@ -946,7 +1061,7 @@ public struct Integer : IConvertible, IRepresentable, IComparable, ICloneable
   static unsafe uint[] rshift(uint[] a, int alen, int n) // assumes n>0
   { int whole=n>>5, nlen=alen-whole;
     uint[] d = new uint[nlen+1];
-    n &= 32;
+    n &= 31;
 
     fixed(uint* ab=a, db=d)
     { if(n==0) while(nlen-- != 0) db[nlen] = ab[nlen+whole];
@@ -963,33 +1078,47 @@ public struct Integer : IConvertible, IRepresentable, IComparable, ICloneable
     return d;
   }
 
-  static uint[] sub(uint[] a, int alen, uint[] b, int blen)
-  { uint[] n = new uint[alen];
-    int  i=0;
-    uint ai, bi;
-    bool borrow=false;
+  static unsafe uint[] sub(uint a, uint[] b, int blen) { return new uint[1] { a-b[0] }; } // assumes avalue >= bvalue
 
-    for(i=0; i<blen; i++)
-    { ai=a[i]; bi=b[i];
-      if(borrow)
-      { if(ai==0) ai=0xffffffff;
-        else borrow = bi > --ai;
-      }
-      else if(bi>ai) borrow = true;
-      n[i] = ai-bi;
+  static unsafe uint[] sub(uint[] a, int alen, uint b) // assumes avalue >= bvalue
+  { uint[] d = (uint[])a.Clone();
+    fixed(uint* db=d)
+    { bool borrow = b>db[0];
+      db[0] -= b;
+      if(borrow) for(int i=1; i<alen; i++) if(db[i]--!=0) break;
     }
-
-    if(borrow)
-      for(; i<alen; i++)
-      { ai = a[i];
-        n[i] = ai-1;
-        if(ai!=0) { i++; break; }
-      }
-    for(; i<alen; i++) n[i] = a[i];
-    return n;
+    return d;
   }
-  
-  private static unsafe uint[] twosComplement(uint[] d)
+
+  static unsafe uint[] sub(uint[] a, int alen, uint[] b, int blen) // assumes avalue >= bvalue
+  { uint[] d = new uint[alen];
+    fixed(uint* ab=a, bb=b, db=d)
+    { int  i=0;
+      uint ai, bi;
+      bool borrow=false;
+
+      for(; i<blen; i++)
+      { ai=ab[i]; bi=bb[i];
+        if(borrow)
+        { if(ai==0) ai=0xffffffff;
+          else borrow = bi > --ai;
+        }
+        else if(bi>ai) borrow = true;
+        db[i] = ai-bi;
+      }
+
+      if(borrow)
+        for(; i<alen; i++)
+        { ai = ab[i];
+          db[i] = ai-1;
+          if(ai!=0) { i++; break; }
+        }
+      for(; i<alen; i++) db[i] = ab[i];
+    }
+    return d;
+  }
+
+  static unsafe uint[] twosComplement(uint[] d)
   { fixed(uint* db=d)
     { int i=0, length=d.Length;
       uint v=0;
@@ -1005,6 +1134,9 @@ public struct Integer : IConvertible, IRepresentable, IComparable, ICloneable
     }
     return d;
   }
+
+  static int uintCompare(uint a, uint b) { return a>b ? 1 : a<b ? -1 : 0; }
+  static int ulongCompare(ulong a, ulong b) { return a>b ? 1 : a<b ? -1 : 0; }
 }
 
 } // namespace Boa.Runtime
