@@ -478,7 +478,8 @@ public sealed class Ops
   }
 
   public static object Divide(object a, object b)
-  { switch(Convert.GetTypeCode(a))
+  { FIXME; // FloatOps.Divide() returns a float, but most of these should return ints!
+    switch(Convert.GetTypeCode(a))
     { case TypeCode.Boolean: return FloatOps.Divide((bool)a ? 1 : 0, b);
       case TypeCode.Byte:    return FloatOps.Divide((byte)a, b);
       case TypeCode.Decimal:

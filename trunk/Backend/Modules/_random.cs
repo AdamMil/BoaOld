@@ -51,7 +51,7 @@ public sealed class _random
           *p = r;
         }
       
-      return new Integer(chunks==1 && arr[0]==0 ? 0 : 1, arr);
+      return new Integer((short)1, arr);
     }
 
     public Tuple getstate()

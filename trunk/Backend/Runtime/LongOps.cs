@@ -29,7 +29,8 @@ public sealed class LongOps
 { LongOps() { }
 
   public static object Add(long a, object b)
-  { try
+  { FIXME; // make these and others (including in other files) use Reduce()
+    try
     { if(b is long) return checked(a+(long)b); // TODO: make sure this is worthwhile
       switch(Convert.GetTypeCode(b))
       { case TypeCode.Boolean: return (bool)b ? checked(a+1) : a;
@@ -42,7 +43,8 @@ public sealed class LongOps
         case TypeCode.Int32: return checked(a + (int)b);
         case TypeCode.Int64: return checked(a + (long)b);
         case TypeCode.Object:
-          if(b is Integer) return (Integer)b + a;
+          if(b is Integer) return IntegerOps.Reduce(a + (Integer)b);
+          if(b is Complex) return a + (Complex)b;
           IConvertible ic = b as IConvertible;
           return ic!=null ? checked(a + ic.ToInt64(NumberFormatInfo.InvariantInfo))
                           : Ops.Invoke(b, "__radd__", a);
@@ -70,7 +72,7 @@ public sealed class LongOps
       case TypeCode.Int32: return a & (int)b;
       case TypeCode.Int64: return a & (long)b;
       case TypeCode.Object:
-        if(b is Integer) return (Integer)b & a;
+        if(b is Integer) return IntegerOps.Reduce((Integer)b & a);
         IConvertible ic = b as IConvertible;
         if(ic==null) return Ops.Invoke(b, "__rand__", a);
         return a & ic.ToInt64(NumberFormatInfo.InvariantInfo);
@@ -143,10 +145,7 @@ public sealed class LongOps
       case TypeCode.Int32: return (int)((a - (int)b)>>32);
       case TypeCode.Int64: return (int)((a - (long)b)>>32);
       case TypeCode.Object:
-        if(b is Integer)
-        { Integer v = (Integer)b;
-          return v>a ? -1 : v<a ? 1 : 0;
-        }
+        if(b is Integer) return -((Integer)b).CompareTo(a);
         IConvertible ic = b as IConvertible;
         return ic==null ? (int)(a - ic.ToInt64(NumberFormatInfo.InvariantInfo))
                         : -Ops.ToInt(Ops.Invoke(b, "__cmp__", a));
@@ -183,9 +182,11 @@ public sealed class LongOps
           else if(a<0 && iv>=-(long)a) return -1;
           bv = iv.ToInt64();
         }
-        IConvertible ic = b as IConvertible;
-        if(ic==null) return Ops.Invoke(b, "__rfloordiv__", a);
-        bv = ic.ToInt64(NumberFormatInfo.InvariantInfo);
+        else
+        { IConvertible ic = b as IConvertible;
+          if(ic==null) return Ops.Invoke(b, "__rfloordiv__", a);
+          bv = ic.ToInt64(NumberFormatInfo.InvariantInfo);
+        }
         break;
       case TypeCode.SByte: bv=(sbyte)b; break;
       case TypeCode.Single: return Math.Floor(a/(float)b);
@@ -220,7 +221,6 @@ public sealed class LongOps
         break;
       }
       case TypeCode.Object:
-        if(b is Integer) shift = ((Integer)b).ToInt32();
         IConvertible ic = b as IConvertible;
         if(ic==null) return Ops.Invoke(b, "__rlshift__", a);
         shift = ic.ToInt32(NumberFormatInfo.InvariantInfo);
@@ -271,9 +271,11 @@ public sealed class LongOps
           else if(a<0 && -iv<=a) return iv+a;
           bv = iv.ToInt64();
         }
-        IConvertible ic = b as IConvertible;
-        if(ic==null) return Ops.Invoke(b, "__rmod__", a);
-        bv = ic.ToInt64(NumberFormatInfo.InvariantInfo);
+        else
+        { IConvertible ic = b as IConvertible;
+          if(ic==null) return Ops.Invoke(b, "__rmod__", a);
+          bv = ic.ToInt64(NumberFormatInfo.InvariantInfo);
+        }
         break;
       case TypeCode.SByte: bv = (sbyte)b; break;
       case TypeCode.Single: return Math.IEEERemainder(a, (float)b);
@@ -305,7 +307,8 @@ public sealed class LongOps
         case TypeCode.Int32: return checked(a * (int)b);
         case TypeCode.Int64: return checked(a * (long)b);
         case TypeCode.Object:
-          if(b is Integer) return (Integer)b * a;
+          if(b is Integer) return a * (Integer)b;
+          if(b is Complex) return a * (Complex)b;
           IConvertible ic = b as IConvertible;
           return ic!=null ? checked(a * ic.ToInt64(NumberFormatInfo.InvariantInfo))
                           : Ops.Invoke(b, "__rmul__", a);
@@ -341,9 +344,11 @@ public sealed class LongOps
           if(iv<0 || iv>long.MaxValue) return new Integer(a).Pow(iv);
           bv = iv.ToInt64(null);
         }
-        IConvertible ic = b as IConvertible;
-        if(ic==null) return Ops.Invoke(b, "__rpow__", a);
-        bv = ic.ToInt64(NumberFormatInfo.InvariantInfo);
+        else
+        { IConvertible ic = b as IConvertible;
+          if(ic==null) return Ops.Invoke(b, "__rpow__", a);
+          bv = ic.ToInt64(NumberFormatInfo.InvariantInfo);
+        }
         break;
       case TypeCode.SByte: bv = (sbyte)b; break;
       case TypeCode.Single: return Math.Pow(a, (float)b);
@@ -382,7 +387,7 @@ public sealed class LongOps
 
     object pow = Power(a, b);
     if(pow is long) return (long)pow % mod;
-    if(pow is Integer) return (Integer)pow % mod;
+    if(pow is Integer) return IntegerOps.Reduce((Integer)pow % mod);
     throw Ops.TypeError("ternary pow() requires that the base and exponent be integers");
   }
 
@@ -399,7 +404,8 @@ public sealed class LongOps
         case TypeCode.Int32: return checked(a - (int)b);
         case TypeCode.Int64: return checked(a - (long)b);
         case TypeCode.Object:
-          if(b is Integer) return (Integer)b - a;
+          if(b is Integer) return IntegerOps.Reduce(a - (Integer)b);
+          if(b is Complex) return a - (Complex)b;
           IConvertible ic = b as IConvertible;
           return ic!=null ? checked(a - ic.ToInt64(NumberFormatInfo.InvariantInfo))
                           : Ops.Invoke(b, "__rsub__", a);
@@ -433,7 +439,6 @@ public sealed class LongOps
         break;
       }
       case TypeCode.Object:
-        if(b is Integer) shift = ((Integer)b).ToInt32();
         IConvertible ic = b as IConvertible;
         if(ic==null) return Ops.Invoke(b, "__rlshift__", a);
         shift = ic.ToInt32(NumberFormatInfo.InvariantInfo);
@@ -458,6 +463,8 @@ public sealed class LongOps
     if(shift<0) throw Ops.ValueError("negative shift count");
     return shift>63 ? 0 : a>>shift;
   }
+  
+  internal static object Reduce(long value) { return ((ulong)value>>32)==0 ? (int)value : (object)value; }
 }
 
 } // namespace Boa.Runtime

@@ -41,7 +41,7 @@ public sealed class IntOps
         case TypeCode.Int32: return checked(a + (int)b); // TODO: add these elsewhere
         case TypeCode.Int64: return checked(a + (long)b);
         case TypeCode.Object:
-          if(b is Integer) return a + (Integer)b;
+          if(b is Integer) return IntegerOps.Reduce(a + (Integer)b);
           if(b is Complex) return a + (Complex)b;
           IConvertible ic = b as IConvertible;
           return ic!=null ? checked(a + ic.ToInt32(NumberFormatInfo.InvariantInfo))
@@ -70,7 +70,7 @@ public sealed class IntOps
       case TypeCode.Int32: return a & (int)b;
       case TypeCode.Int64: return a & (long)b;
       case TypeCode.Object:
-        if(b is Integer) return (Integer)b & a;
+        if(b is Integer) return IntegerOps.Reduce((Integer)b & a);
         IConvertible ic = b as IConvertible;
         if(ic==null) return Ops.Invoke(b, "__rand__", a);
         long lv = ic.ToInt64(NumberFormatInfo.InvariantInfo);
@@ -146,10 +146,7 @@ public sealed class IntOps
       case TypeCode.Int32: return a - (int)b;
       case TypeCode.Int64: return (int)((a - (long)b)>>32);
       case TypeCode.Object:
-        if(b is Integer)
-        { Integer v = (Integer)b;
-          return v>a ? -1 : v<a ? 1 : 0;
-        }
+        if(b is Integer) return -((Integer)b).CompareTo(a);
         IConvertible ic = b as IConvertible;
         return ic==null ? (int)(a - ic.ToInt64(NumberFormatInfo.InvariantInfo))
                         : -Ops.ToInt(Ops.Invoke(b, "__cmp__", a));
@@ -195,11 +192,13 @@ public sealed class IntOps
           else if(a<0 && iv>=-(long)a) return -1;
           bv = iv.ToInt32();
         }
-        IConvertible ic = b as IConvertible;
-        if(ic==null) return Ops.Invoke(b, "__rfloordiv__", a);
-        long lv = ic.ToInt64(NumberFormatInfo.InvariantInfo);
-        if(lv>int.MaxValue || lv<int.MinValue) return LongOps.FloorDivide(a, b);
-        bv = (int)lv;
+        else
+        { IConvertible ic = b as IConvertible;
+          if(ic==null) return Ops.Invoke(b, "__rfloordiv__", a);
+          long lv = ic.ToInt64(NumberFormatInfo.InvariantInfo);
+          if(lv>int.MaxValue || lv<int.MinValue) return LongOps.FloorDivide(a, b);
+          bv = (int)lv;
+        }
         break;
       }
       case TypeCode.SByte: bv=(sbyte)b; break;
@@ -241,7 +240,6 @@ public sealed class IntOps
         break;
       }
       case TypeCode.Object:
-        if(b is Integer) shift = ((Integer)b).ToInt32();
         IConvertible ic = b as IConvertible;
         if(ic==null) return Ops.Invoke(b, "__rlshift__", a);
         shift = ic.ToInt32(NumberFormatInfo.InvariantInfo);
@@ -300,10 +298,13 @@ public sealed class IntOps
           else if(a>=0 && iv>a) return a;
           else if(a<0 && iv>=-(long)a) return iv+a;
           bv = iv.ToInt32();
+          break;
         }
-        IConvertible ic = b as IConvertible;
-        if(ic!=null) { b = ic.ToInt64(NumberFormatInfo.InvariantInfo); goto int64; }
-        return Ops.Invoke(b, "__rmod__", a);
+        else
+        { IConvertible ic = b as IConvertible;
+          if(ic!=null) { b = ic.ToInt64(NumberFormatInfo.InvariantInfo); goto int64; }
+          return Ops.Invoke(b, "__rmod__", a);
+        }
       case TypeCode.SByte: bv = (sbyte)b; break;
       case TypeCode.Single: return Math.IEEERemainder(a, (float)b);
       case TypeCode.UInt16: bv = (ushort)b; break;
@@ -381,10 +382,13 @@ public sealed class IntOps
         { Integer iv = (Integer)b;
           if(iv.Sign<0 || iv>int.MaxValue) return new Integer(a).Pow(iv);
           bv = iv.ToInt32();
+          break;
         }
-        IConvertible ic = b as IConvertible;
-        if(ic!=null) { b = ic.ToInt64(NumberFormatInfo.InvariantInfo); goto int64; }
-        return Ops.Invoke(b, "__rpow__", a);
+        else
+        { IConvertible ic = b as IConvertible;
+          if(ic!=null) { b = ic.ToInt64(NumberFormatInfo.InvariantInfo); goto int64; }
+          return Ops.Invoke(b, "__rpow__", a);
+        }
       case TypeCode.SByte: bv = (sbyte)b; break;
       case TypeCode.Single: return Math.Pow(a, (float)b);
       case TypeCode.UInt16: bv = (ushort)b; break;
@@ -427,7 +431,7 @@ public sealed class IntOps
 
     object pow = Power(a, b);
     if(pow is int) return (int)pow % mod;
-    if(pow is Integer) return (Integer)pow % mod;
+    if(pow is Integer) return IntegerOps.Reduce((Integer)pow % mod);
     throw Ops.TypeError("ternary pow() requires that the base and exponent be integers");
   }
 
@@ -443,7 +447,7 @@ public sealed class IntOps
         case TypeCode.Int16: return checked(a - (short)b);
         case TypeCode.Int64: return checked(a - (long)b);
         case TypeCode.Object:
-          if(b is Integer) return a - (Integer)b;
+          if(b is Integer) return IntegerOps.Reduce(a - (Integer)b);
           if(b is Complex) return a - (Complex)b;
           IConvertible ic = b as IConvertible;
           return ic!=null ? checked(a - ic.ToInt32(NumberFormatInfo.InvariantInfo))
@@ -477,7 +481,6 @@ public sealed class IntOps
         break;
       }
       case TypeCode.Object:
-        if(b is Integer) shift = ((Integer)b).ToInt32();
         IConvertible ic = b as IConvertible;
         if(ic==null) return Ops.Invoke(b, "__rrshift__", a);
         shift = ic.ToInt32(NumberFormatInfo.InvariantInfo);

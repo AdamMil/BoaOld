@@ -67,9 +67,11 @@ public sealed class FloatOps
       case TypeCode.Int64: bv=(long)b; break;
       case TypeCode.Object:
         if(b is Integer) bv = ((Integer)b).ToDouble();
-        IConvertible ic = b as IConvertible;
-        if(ic==null) return -Ops.ToInt(Ops.Invoke(b, "__cmp__", a));
-        bv = ic.ToDouble(NumberFormatInfo.InvariantInfo);
+        else
+        { IConvertible ic = b as IConvertible;
+          if(ic==null) return -Ops.ToInt(Ops.Invoke(b, "__cmp__", a));
+          bv = ic.ToDouble(NumberFormatInfo.InvariantInfo);
+        }
         break;
       case TypeCode.SByte: bv=(sbyte)b; break;
       case TypeCode.Single: bv=(float)b; break;
@@ -94,7 +96,6 @@ public sealed class FloatOps
       case TypeCode.Int32: bv=(int)b; break;
       case TypeCode.Int64: bv=(long)b; break;
       case TypeCode.Object:
-        if(b is Integer) bv = ((Integer)b).ToDouble();
         IConvertible ic = b as IConvertible;
         if(ic==null)
         { object ret;
@@ -115,6 +116,7 @@ public sealed class FloatOps
 
     if(floor)
     { double ret = Math.Floor(a/bv);
+      FIXME; // 'ret' could be greater than an int can hold!
       int iret = (int)ret;
       return iret==ret ? (object)iret : (object)ret;
     }
@@ -134,7 +136,6 @@ public sealed class FloatOps
       case TypeCode.Int32: bv=(int)b; break;
       case TypeCode.Int64: bv=(long)b; break;
       case TypeCode.Object:
-        if(b is Integer) bv = ((Integer)b).ToDouble();
         IConvertible ic = b as IConvertible;
         if(ic==null) return Ops.Invoke(b, "__rmod__", a);
         bv = ic.ToDouble(NumberFormatInfo.InvariantInfo);
@@ -186,7 +187,6 @@ public sealed class FloatOps
       case TypeCode.Int32: bv=(int)b; break;
       case TypeCode.Int64: bv=(long)b; break;
       case TypeCode.Object:
-        if(b is Integer) bv = ((Integer)b).ToDouble();
         IConvertible ic = b as IConvertible;
         if(ic==null) return Ops.Invoke(b, "__rpow__", a);
         bv = ic.ToDouble(NumberFormatInfo.InvariantInfo);
