@@ -3,6 +3,8 @@ using System;
 namespace Boa.Runtime
 {
 
+// TODO: don't duplicate functions that already exist? (NotImplemented, IOError, etc...)
+
 public abstract class BoaException : Exception
 { public BoaException() { }
   public BoaException(string message) : base(message) { }

@@ -9,8 +9,21 @@ namespace Boa.AST
 {
 
 // TODO: possibly rework compiled closures
-// TODO: using exceptions is very slow
 // TODO: add versions optimized for System.Array ?
+// TODO: disallow 'yield' and 'return' outside of functions
+/* TODO:
+If a variable is referenced in an enclosing scope, it is illegal
+to delete the name. An error will be reported at compile time.
+
+If the wild card form of import -- "import *" -- is used in a function and the function
+contains or is a nested block with free variables, the compiler will raise a SyntaxError.
+
+If exec is used in a function and the function contains or is a nested block with free
+variables, the compiler will raise a SyntaxError unless the exec explicitly specifies the local
+namespace for the exec. (In other words, "exec obj"would be illegal, but "exec obj in ns" would be legal.) 
+*/
+
+// TODO: using exceptions is very slow
 #region Exceptions (used to aid implementation)
 public class BreakException : Exception
 { public static BreakException Value = new BreakException();
@@ -64,11 +77,6 @@ public class Optimizer : IWalker
 }
 #endregion
 #endregion
-
-public struct YieldTarget
-{ public Statement Statement;
-  public Label Label;
-}
 
 #region Statement
 public abstract class Statement : Node
@@ -663,6 +671,65 @@ public class DelStatement : Statement
   }
 
   public Expression[] Expressions;
+}
+#endregion
+
+#region ExecStatement
+public class ExecStatement : Statement
+{ public ExecStatement(Expression code, Expression globals, Expression locals)
+  { Code=code; Globals=globals; Locals=locals;
+  }
+  
+  public override void Execute(Frame frame)
+  { object code = Code.Evaluate(frame);
+    if(Locals!=null)
+      Boa.Modules.__builtin__.exec(code, (IDictionary)Ops.ConvertTo(Globals.Evaluate(frame), typeof(IDictionary)),
+                                   (IDictionary)Ops.ConvertTo(Locals.Evaluate(frame), typeof(IDictionary)));
+    else if(Globals!=null)
+      Boa.Modules.__builtin__.exec(code, (IDictionary)Ops.ConvertTo(Globals.Evaluate(frame), typeof(IDictionary)));
+    else Boa.Modules.__builtin__.exec(code);
+  }
+  
+  public override void Emit(CodeGenerator cg)
+  { Code.Emit(cg);
+    if(Globals!=null)
+    { Globals.Emit(cg);
+      cg.EmitTypeOf(typeof(IDictionary));
+      cg.EmitCall(typeof(Ops), "ConvertTo", new Type[] { typeof(object), typeof(Type) });
+    }
+    if(Locals!=null)
+    { Locals.Emit(cg);
+      cg.EmitTypeOf(typeof(IDictionary));
+      cg.EmitCall(typeof(Ops), "ConvertTo", new Type[] { typeof(object), typeof(Type) });
+    }
+    cg.EmitCall(typeof(Boa.Modules.__builtin__), "exec",
+      Locals!=null  ? new Type[] { typeof(object), typeof(IDictionary), typeof(IDictionary) } :
+      Globals!=null ? new Type[] { typeof(object), typeof(IDictionary) } : new Type[] { typeof(object) });
+  }
+
+  public override void ToCode(System.Text.StringBuilder sb, int indent)
+  { sb.Append("exec ");
+    Code.ToCode(sb, 0);
+    if(Globals!=null)
+    { sb.Append(" in ");
+      Globals.ToCode(sb, 0);
+      if(Locals!=null)
+      { sb.Append(", ");
+        Locals.ToCode(sb, 0);
+      }
+    }
+  }
+  
+  public override void Walk(IWalker w)
+  { if(w.Walk(this))
+    { Code.Walk(w);
+      if(Globals!=null) Globals.Walk(w);
+      if(Locals!=null) Locals.Walk(w);
+    }
+    w.PostWalk(this);
+  }
+
+  public Expression Code, Globals, Locals;
 }
 #endregion
 
@@ -1342,6 +1409,11 @@ public class WhileStatement : Statement
 #region YieldStatement
 public class YieldStatement : Statement
 { public YieldStatement(Expression e) { Expression=e; }
+
+  public struct YieldTarget
+  { public Statement Statement;
+    public Label Label;
+  }
 
   public override void Emit(CodeGenerator cg)
   { cg.ILG.Emit(OpCodes.Ldarg_0);

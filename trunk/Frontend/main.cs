@@ -18,7 +18,7 @@ public class Text
     Ops.Frames.Push(topFrame);
 
     top.__setattr__("__builtins__", Importer.Import("__builtin__"));
-    top.__setattr__("__name__", "main");
+    top.__setattr__("__name__", "__main__");
 
     while(true)
     { try

@@ -10,7 +10,7 @@ namespace Boa.Runtime
 public class Module : Boa.AST.Snippet, IHasAttributes
 { public const string FieldName = "__module";
 
-  public Module() { __dict__ = new HybridDictionary(); }
+  public Module() { __dict__ = new Dict(); }
   public Module(IDictionary dict) { __dict__ = dict; }
 
   public override object Run(Frame frame) { throw new NotImplementedException("Run() not implemented!"); }

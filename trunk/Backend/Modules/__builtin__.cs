@@ -270,10 +270,7 @@ Execution of statements from a file is supported by the execfile() function.
 The globals() and locals() functions returns the current global and local
 dictionary, respectively, which may be useful to pass around for use by
 eval() or execfile().")]
-  public static object eval(object expr)
-  { IDictionary dict = (IDictionary)globals();
-    return eval(expr, dict, dict);
-  }
+  public static object eval(object expr) { return eval(expr, globals(), locals()); }
   public static object eval(object expr, IDictionary globals) { return eval(expr, globals, globals); }
   public static object eval(object expr, IDictionary globals, IDictionary locals)
   { Frame frame = new Frame(locals, globals);
@@ -285,7 +282,70 @@ eval() or execfile().")]
     finally { Ops.Frames.Pop(); }
   }
 
-  // TODO: execfile(filename[, globals[, locals]])
+  [DocString(@"exec(code[, globals[, locals]])
+
+This function is similar implements the exec statement.
+The arguments are an object and two optional dictionaries.
+The return value is null.
+
+'code' should be either a string, an open file object, or a code object.
+If it is a string, the string is parsed as a suite of Python statements
+which is then executed (unless a syntax error occurs). If it is an open
+file, the file is parsed until EOF and executed. If it is a code object,
+it is simply executed.
+
+The execution uses the globals and locals dictionaries as the global and
+local namespaces. If the locals dictionary is omitted it defaults to the
+globals dictionary. If both dictionaries are omitted, the expression is
+executed in the environment where execfile() is called. The return value
+is null.
+
+Warning: The default locals act as described for function locals():
+modifications to the default locals dictionary should not be attempted.
+Pass an explicit locals dictionary if you need to see effects of the code on
+locals after function execfile() returns. exec() cannot be used reliably
+to modify a function's locals.")]
+public static void exec(object code) { exec(code, globals(), locals()); }
+public static void exec(object code, IDictionary globals) { exec(code, globals, globals); }
+public static void exec(object code, IDictionary globals, IDictionary locals)
+{ Frame frame = new Frame(locals, globals);
+  try
+  { Ops.Frames.Push(frame);
+    if(code is string) Parser.FromString((string)code).Parse().Execute(frame);
+    else throw new NotImplementedException();
+  }
+  finally { Ops.Frames.Pop(); }
+}
+
+  [DocString(@"execfile(filename[, globals[, locals]])
+
+This function is similar to the exec statement, but parses a file instead of
+a string. It is different from the import statement in that it does not use
+the module administration -- it reads the file unconditionally and does not
+create a new module.
+
+The arguments are a file name and two optional dictionaries. The file is
+parsed and evaluated as a sequence of Boa statements (similarly to a module)
+using the globals and locals dictionaries as global and local namespace. If
+the locals dictionary is omitted it defaults to the globals dictionary. If
+both dictionaries are omitted, the expression is executed in the environment
+where execfile() is called. The return value is null.
+
+Warning: The default locals act as described for function locals():
+modifications to the default locals dictionary should not be attempted.
+Pass an explicit locals dictionary if you need to see effects of the code on
+locals after function execfile() returns. execfile() cannot be used reliably
+to modify a function's locals.")]
+public static void execfile(string filename) { execfile(filename, globals(), locals()); }
+public static void execfile(string filename, IDictionary globals) { execfile(filename, globals, globals); }
+public static void execfile(string filename, IDictionary globals, IDictionary locals)
+{ Frame frame = new Frame(locals, globals);
+  try
+  { Ops.Frames.Push(frame);
+    Parser.FromFile(filename).Parse().Execute(frame);
+  }
+  finally { Ops.Frames.Pop(); }
+}
 
   [DocString(@"filter(function, sequence) -> sequence
 
@@ -355,7 +415,7 @@ Return a dictionary representing the current global symbol table. This is
 always the dictionary of the current module (inside a function or method,
 this is the module where it is defined, not the module from which it is
 called).")]
-  public static object globals() { return Ops.GetExecutingModule().__dict__; }
+  public static IDictionary globals() { return Ops.GetExecutingModule().__dict__; }
 
   [DocString(@"hasattr(object, name) -> bool
 
@@ -569,7 +629,12 @@ sequence (string, tuple or list) or a mapping (dictionary).")]
     return Ops.ToInt(Ops.Invoke(o, "__len__"));    
   }
 
-  // TODO: locals()
+  [DocString(@"locals() -> dict
+
+Update and return a dictionary representing the current local symbol table.
+Warning: The contents of this dictionary should not be modified; changes
+may not affect the values of local variables used by the interpreter.")]
+  public static IDictionary locals() { throw new NotImplementedException(); }
 
   [DocString(@"map(function, seq1, ...) -> list
 

@@ -1,14 +1,16 @@
 using System;
 using System.Collections;
+using System.Collections.Specialized;
 using System.IO;
 using System.Text;
 using Boa.Runtime;
 
-// TODO: allow nonparenthesized tuples
-// TODO: implement string literal concatenation
 // TODO: implement implicit and explicit line joining
-// TODO: implement 'exec'
-// TODO: check for duplicate keyword arguments
+// TODO: give in and change 'null', 'false', and 'true' to 'None', 'False', and 'True' ?
+// TODO: implement backtick operator: `o` == repr(o)
+// TODO: raise OverflowError or ValueError for invalid literals
+// TODO: add switch?
+
 namespace Boa.AST
 {
 
@@ -26,7 +28,7 @@ enum Token
   
   // keywords
   Def, Print, Return, And, Or, Not, While, If, Elif, Else, Pass, Break, Continue, Global, Import, From, For, In,
-  Lambda, Try, Except, Finally, Raise, Class, Assert, Is, Del, Yield,
+  Lambda, Try, Except, Finally, Raise, Class, Assert, Is, Del, Yield, Exec,
   
   // abstract
   Identifier, Literal, Assign, Compare, Call, Member, Index, Slice, Hash, List, Tuple, Suite,
@@ -49,7 +51,7 @@ public class Parser
     { Token.Def, Token.Print, Token.Return, Token.And, Token.Or, Token.Not, Token.While, Token.Import, Token.From,
       Token.For, Token.If,  Token.Elif, Token.Else, Token.Pass, Token.Break, Token.Continue, Token.Global, Token.In,
       Token.Lambda, Token.Try, Token.Except, Token.Finally, Token.Raise, Token.Class, Token.Assert, Token.Is,
-      Token.Del, Token.Yield
+      Token.Del, Token.Yield, Token.Exec
     };
     foreach(Token token in tokens) stringTokens.Add(Enum.GetName(typeof(Token), token).ToLower(), token);
   }
@@ -71,13 +73,20 @@ public class Parser
     return stmts.Count==0 ? new PassStatement() : (Statement)new Suite((Statement[])stmts.ToArray(typeof(Statement)));
   }
 
-  // expression := <lowlogand> ('or' <lowlogand>)* | <lambda>
+  // expression := <lowlogand> ('or' <lowlogand>)* | <lambda> (',' <expression>)?
   public Expression ParseExpression()
   { if(token==Token.Lambda) return ParseLambda();
     Expression expr = ParseLowLogAnd();
     while(TryEat(Token.Or)) expr = AP(new OrExpression(expr, ParseLowLogAnd()));
+    if(bareTuples && token==Token.Comma)
+    { ArrayList exprs = new ArrayList();
+      exprs.Add(expr);
+      while(TryEat(Token.Comma)) exprs.Add(ParseExpression());
+      expr = AP(new TupleExpression((Expression[])exprs.ToArray(typeof(Expression))));
+    }
     return expr;
   }
+
   // statement     := <stmt_line> | <compound_stmt>
   // compount_stmt := <if_stmt> | <while_stmt> | <for_stmt> | <def_stmt> | <try_stmt> | <global_stmt> |
   //                  <import_stmt> | <class_stmt>
@@ -183,8 +192,10 @@ public class Parser
   Argument[] ParseArguments()
   { if(token==Token.RParen) return new Argument[0];
     ArrayList args = new ArrayList();
+    bool old = bareTuples;
     do
-    { if(TryEat(Token.Asterisk)) args.Add(new Argument(ParseExpression(), ArgType.List));
+    { bareTuples = false;
+      if(TryEat(Token.Asterisk)) args.Add(new Argument(ParseExpression(), ArgType.List));
       else if(TryEat(Token.Power)) args.Add(new Argument(ParseExpression(), ArgType.Dict));
       else if(token!=Token.Identifier) args.Add(new Argument(ParseExpression()));
       else
@@ -196,6 +207,15 @@ public class Parser
         else args.Add(new Argument(e));
       }
     } while(TryEat(Token.Comma));
+    bareTuples = old;
+
+    ListDictionary ld = new ListDictionary();
+    foreach(Argument a in args)
+      if(a.Name!=null)
+      { if(ld.Contains(a.Name)) SyntaxError("duplicate keyword argument '{0}'", a.Name);
+        else ld[a.Name] = null;
+      }
+
     return (Argument[])args.ToArray(typeof(Argument));
   }
 
@@ -481,21 +501,38 @@ public class Parser
   Expression ParsePrimary()
   { Expression expr;
     switch(token)
-    { case Token.Literal: expr = AP(new ConstantExpression(value)); break;
+    { case Token.Literal:
+        if(value is string)
+        { ConstantExpression e = (ConstantExpression)AP(new ConstantExpression(null));
+          string s = (string)value;
+          while(NextToken()==Token.Literal && value is string) s += (string)value;
+          if(token==Token.Literal) SyntaxError("unexpected literal '{0}' in string concatenation");
+          e.Value = s;
+          return e;
+        }
+        else expr = AP(new ConstantExpression(value));
+        break;
       case Token.Identifier: expr = AP(new NameExpression(new Name((string)value))); break;
       case Token.LParen:
         NextToken();
         if(token==Token.RParen) expr = AP(new TupleExpression());
         else
-        { expr = ParseExpression();
+        { bool old = bareTuples;
+          bareTuples = false;
+          expr = ParseExpression();
           if(token==Token.Comma)
           { NextToken();
             ArrayList list = new ArrayList();
             list.Add(expr);
-            while(token!=Token.RParen) { list.Add(ParseExpression()); if(!TryEat(Token.Comma)) break; }
+            while(token!=Token.RParen)
+            { bareTuples = false;
+              list.Add(ParseExpression());
+              if(!TryEat(Token.Comma)) break;
+            }
             expr = AP(new TupleExpression((Expression[])list.ToArray(typeof(Expression))));
           }
           else expr = AP(new ParenExpression(expr));
+          bareTuples = old;
         }
         Expect(Token.RParen);
         break;
@@ -503,14 +540,21 @@ public class Parser
         NextToken();
         if(token==Token.RBracket) expr = AP(new ListExpression());
         else
-        { Expression fe = ParseExpression();
+        { bool old = bareTuples;
+          bareTuples = false;
+          Expression fe = ParseExpression();
           if(token==Token.For) expr = ParseListComprehension(fe);
           else
           { ArrayList list = new ArrayList();
             list.Add(fe);
             TryEat(Token.Comma);
-            while(token!=Token.RBracket) { list.Add(ParseExpression()); if(!TryEat(Token.Comma)) break; }
+            while(token!=Token.RBracket)
+            { bareTuples = false;
+              list.Add(ParseExpression());
+              if(!TryEat(Token.Comma)) break;
+            }
             expr = AP(new ListExpression((Expression[])list.ToArray(typeof(Expression))));
+            bareTuples = old;
           }
         }
         Expect(Token.RBracket);
@@ -520,13 +564,16 @@ public class Parser
         if(token==Token.RBrace) expr = AP(new HashExpression());
         else
         { ArrayList list = new ArrayList();
+          bool old = bareTuples;
           while(token!=Token.RBrace)
-          { Expression e = ParseExpression();
+          { bareTuples = false;
+            Expression e = ParseExpression();
             Eat(Token.Colon);
             list.Add(new DictionaryEntry(e, ParseExpression()));
             if(!TryEat(Token.Comma)) break;
           }
           expr = AP(new HashExpression((DictionaryEntry[])list.ToArray(typeof(DictionaryEntry))));
+          bareTuples = old;
         }
         Expect(Token.RBrace);
         break;
@@ -542,13 +589,13 @@ public class Parser
     if(token==Token.EOL) return AP(new PrintStatement());
 
     ArrayList stmts = new ArrayList();
-    bool comma;
+    bool comma, old=bareTuples;
     do
-    { comma=false;
+    { bareTuples=comma=false;
       stmts.Add(ParseExpression());
       if(TryEat(Token.Comma)) comma=true;
     } while(token!=Token.EOL && token!=Token.Semicolon);
-    
+    bareTuples = old;
     return AP(new PrintStatement((Expression[])stmts.ToArray(typeof(Expression)), !comma));
   }
 
@@ -569,6 +616,7 @@ public class Parser
   { if(token==end) return new Parameter[0];
     ArrayList parms = new ArrayList();
     string ident;
+    bool old = bareTuples;
     while(true) // required identifiers
     { if(TryEat(Token.Asterisk)) goto list;
       if(token==Token.Power) goto dict;
@@ -579,7 +627,8 @@ public class Parser
       Eat(Token.Comma);
     }
     while(true) // positional parameters
-    { parms.Add(new Parameter(ident, ParseExpression()));
+    { bareTuples = false;
+      parms.Add(new Parameter(ident, ParseExpression()));
       if(token==end) goto done;
       Eat(Token.Comma);
       if(TryEat(Token.Asterisk)) break;
@@ -592,7 +641,15 @@ public class Parser
     Eat(Token.Comma);
     dict: Eat(Token.Power);
     parms.Add(new Parameter(ParseIdentifier(), ParamType.Dict));
-    done: return (Parameter[])parms.ToArray(typeof(Parameter));
+    done:
+    bareTuples=old;
+
+    ListDictionary ld = new ListDictionary();
+    foreach(Parameter p in parms)
+      if(ld.Contains(p.Name.String)) SyntaxError("duplicate parameter name '{0}'", p.Name.String);
+      else ld[p.Name.String] = null;
+
+    return (Parameter[])parms.ToArray(typeof(Parameter));
   }
 
   // power := <unary> ('**' <unary>)*
@@ -627,6 +684,7 @@ public class Parser
   // assert_stmt   := 'assert' <expression>
   // yield_stmt    := 'yield' <expression>
   // del_stmt      := 'del' <lvalue> (',' <lvalue>)*
+  // exec_stmt     := 'exec' <expression> ('in' <expression> (',' <expression>)?)?
   Statement ParseSimpleStmt()
   { switch(token)
     { case Token.Print: return ParsePrintStmt();
@@ -660,6 +718,18 @@ public class Parser
           list.Add(e);
         } while(TryEat(Token.Comma));
         return AP(new DelStatement((Expression[])list.ToArray(typeof(Expression))));
+      }
+      case Token.Exec:
+      { NextToken();
+        Expression e = ParseExpression(), globals=null, locals=null;
+        if(TryEat(Token.In))
+        { bool old = bareTuples;
+          bareTuples = false;
+          globals = ParseExpression();
+          if(TryEat(Token.Comma)) locals = ParseExpression();
+          bareTuples = old;
+        }
+        return new ExecStatement(e, globals, locals);
       }
       default: return ParseExprStmt();
     }
@@ -931,7 +1001,7 @@ public class Parser
         case '?': return Token.Question;
         case ';': return Token.Semicolon;
         case '\0': nextToken=Token.EOF; return Token.EOL;
-        default: SyntaxError(string.Format("unexpected character '{0}'", c)); break;
+        default: SyntaxError(string.Format("unexpected character '{0}' (0x{1:X})", c, (int)c)); break;
       }
     }
   }
@@ -958,6 +1028,7 @@ public class Parser
   object     value, nextValue;
   int        line=1, column=1, pos, indent, loopDepth;
   char       lastChar;
+  bool       bareTuples=true;
   
   static Hashtable stringTokens;
 }

@@ -175,6 +175,11 @@ public class CodeGenerator
   { if(MethodBuilder.IsStatic) throw new InvalidOperationException("no 'this' for a static method");
     ILG.Emit(OpCodes.Ldarg_0);
   }
+  
+  public void EmitTypeOf(Type type)
+  { ILG.Emit(OpCodes.Ldtoken, type);
+    EmitCall(typeof(Type), "GetTypeFromHandle");
+  }
 
   public void Finish()
   {

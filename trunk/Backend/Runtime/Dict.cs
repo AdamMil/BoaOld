@@ -2,6 +2,8 @@ using System;
 using System.Collections;
 using System.Collections.Specialized;
 
+// TODO: don't allow __repr__ to go into an infinite loop with circular references
+
 namespace Boa.Runtime
 {
 
