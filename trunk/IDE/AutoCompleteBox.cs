@@ -16,8 +16,8 @@ public class AutoCompleteItem
     else if(slot is ReflectedEvent) type = AcType.Event;
     else if(slot is ReflectedProperty) type = AcType.Property;
     else if(slot is ReflectedPackage || slot is Module) type = AcType.Namespace;
-    else if(slot is ReflectedType) type = AcType.Class;
-    else type = AcType.Field;
+    else if(slot is ReflectedType || slot is Type) type = AcType.Class;
+    else type = slot is IDescriptor ? AcType.Property : AcType.Field;
   }
 
   public override string ToString() { return name; }
