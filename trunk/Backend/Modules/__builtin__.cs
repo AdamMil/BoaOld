@@ -7,6 +7,7 @@ using Boa.Runtime;
 // TODO: allow functions to return 'longint' if they'd overflow an 'int'
 // TODO: docstrings on fields and simple properties don't work because evaluating the attribute retrieves the value
 // TODO: implement reversed(): http://python.org/peps/pep-0322.html
+// TODO: add help() for functions created in boa
 namespace Boa.Modules
 {
 

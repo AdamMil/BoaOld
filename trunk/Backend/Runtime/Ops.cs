@@ -1,10 +1,13 @@
 using System;
 using System.Collections;
+using System.Globalization;
 
 // TODO: investigate python's changes to the division operator
 // TODO: should we allow integer operations on chars?
 // TODO: implement all of http://docs.python.org/ref/specialnames.html
 // TODO: double check all mathematical operations
+// TODO: support floats in all integer operations as long as they are whole numbers
+// TODO: implement a warning system
 namespace Boa.Runtime
 {
 
@@ -547,6 +550,11 @@ public sealed class Ops
   { return new DivideByZeroException(string.Format(format, args));
   }
 
+  public static Tuple DivMod(object a, object b) // TODO: this could be optimized with type-specific code
+  { object mod = Modulus(a, b);
+    return new Tuple(Divide(Subtract(a, mod), b), mod);
+  }
+
   public static EOFErrorException EOFError(string format, params object[] args)
   { return new EOFErrorException(string.Format(format, args));
   }
@@ -824,6 +832,8 @@ public sealed class Ops
   { switch(Convert.GetTypeCode(a))
     { case TypeCode.Boolean: return IntOps.Modulus((bool)a ? 1 : 0, b);
       case TypeCode.Byte:    return IntOps.Modulus((int)(byte)a, b);
+      case TypeCode.Decimal: return FloatOps.Modulus(((IConvertible)a).ToDouble(NumberFormatInfo.InvariantInfo), b);
+      case TypeCode.Double:  return FloatOps.Modulus((double)a, b);
       case TypeCode.Int16:   return IntOps.Modulus((int)(short)a, b);
       case TypeCode.Int32:   return IntOps.Modulus((int)a, b);
       case TypeCode.Int64:   return LongOps.Modulus((long)a, b);
@@ -832,6 +842,7 @@ public sealed class Ops
         object ret;
         return TryInvoke(a, "__mod__", out ret, b) ? ret : Invoke(b, "__rmod__", a);
       case TypeCode.SByte: return IntOps.Modulus((int)(sbyte)a, b);
+      case TypeCode.Single: return FloatOps.Modulus((float)a, b);
       case TypeCode.String: return StringOps.PrintF((string)a, b);
       case TypeCode.UInt16: return IntOps.Modulus((int)(short)a, b);
       case TypeCode.UInt32: 

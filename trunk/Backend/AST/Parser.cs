@@ -14,6 +14,7 @@ using Boa.Runtime;
 // TODO: add <=> operator
 // TODO: add support for complex numbers: 5j == complex(0, 5)
 // TODO: add parsing for numbers without whole parts: (eg, .5)
+// TODO: implement sets
 namespace Boa.AST
 {
 
@@ -464,12 +465,16 @@ public class Parser
     return AP(new LambdaExpression(parms, new Suite((Statement[])list.ToArray(typeof(Statement)))));
   }
 
-  // list_comprehension := <expression> 'for' <namelist> 'in' <expression> ('if' <expression>)?
+  // list_comprehension := <expression> ('for' <namelist> 'in' <expression> ('if' <expression>)?)+
   Expression ParseListComprehension(Expression expr)
-  { Eat(Token.For);
-    Name[] names = ParseNameList();
-    Eat(Token.In);
-    return AP(new ListCompExpression(expr, names, ParseExpression(), TryEat(Token.If) ? ParseExpression() : null));
+  { ArrayList list = new ArrayList();
+    do
+    { Eat(Token.For);
+      Name[] names = ParseNameList();
+      Eat(Token.In);
+      list.Add(new ListCompFor(names, ParseExpression(), TryEat(Token.If) ? ParseExpression() : null));
+    } while(token==Token.For);
+    return AP(new ListCompExpression(expr, (ListCompFor[])list.ToArray(typeof(ListCompFor))));
   }
 
   // logand := <compare> ('&&' <compare>)*
@@ -535,6 +540,11 @@ public class Parser
               if(!TryEat(Token.Comma)) break;
             }
             expr = AP(new TupleExpression((Expression[])list.ToArray(typeof(Expression))));
+          }
+          else if(token==Token.For) // hijack ParseListComprehension()
+          { ListCompExpression lc = (ListCompExpression)ParseListComprehension(expr);
+            expr = new GeneratorExpression(lc.Item, lc.Fors);
+            expr.SetLocation(lc);
           }
           else expr = AP(new ParenExpression(expr));
         }

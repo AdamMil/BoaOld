@@ -4,6 +4,7 @@ using Boa.AST;
 using Boa.Modules;
 
 // TODO: clean up broken module out of sys.modules if import fails
+// TODO: add __builtins__ to all namespaces that don't otherwise define it
 namespace Boa.Runtime
 {
 

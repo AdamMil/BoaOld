@@ -11,6 +11,11 @@ namespace Boa.AST
 // TODO: implement generator expressions: http://python.org/peps/pep-0289.html
 // TODO: implement decimal: http://python.org/peps/pep-0327.html
 // TODO: implement other stuff here: http://python.org/2.4/highlights.html
+// TODO: support multiple 'for' clauses in generator statement
+// TODO: implement sets
+// TODO: implement privately scoped names
+// TODO: make the names in list comprehensions and generator expressions private
+// TODO: make sure generator functions/expressions and list comprehensions can access closed variables
 
 #region Expression
 public abstract class Expression : Node
@@ -419,6 +424,67 @@ public class ConstantExpression : Expression
 }
 #endregion
 
+#region GeneratorExpression
+public class GeneratorExpression : ListGenExpression
+{ public GeneratorExpression(Expression item, ListCompFor[] fors) : base(item, fors) { IsGenerator=true; }
+
+  public override void Emit(CodeGenerator cg)
+  { TypeGenerator tg = cg.TypeGenerator.DefineNestedType(TypeAttributes.Sealed, "ge$f"+index++, typeof(Generator));
+    CodeGenerator nc = tg.DefineMethod(MethodAttributes.Virtual|MethodAttributes.Family,
+                                       "InnerNext", typeof(bool), new Type[] { Misc.TypeOfObjectRef });
+    Label yield = nc.ILG.DefineLabel();
+    Name[] args = new Name[1] { new Name("genarg$", Scope.Local) };
+    Slot argslot;
+
+    nc.IsGenerator = true;
+    nc.Namespace = new FieldNamespace(cg.Namespace, "_", nc, new ThisSlot(tg.TypeBuilder));
+    nc.Namespace.SetArgs(args, 0, nc.MethodBuilder);
+    argslot = nc.Namespace.GetSlotForSet(args[0]);
+
+    nc.EmitPosition(this); // TODO: make sure this is done elsewhere, too
+    nc.ILG.BeginExceptionBlock();
+
+    FieldInfo jump = typeof(Generator).GetField("jump", BindingFlags.Instance|BindingFlags.NonPublic);
+    nc.ILG.Emit(OpCodes.Ldarg_0);
+    nc.EmitFieldGet(jump);
+    nc.EmitInt(0);
+    nc.ILG.Emit(OpCodes.Ceq);
+    nc.ILG.Emit(OpCodes.Brtrue, yield);
+    nc.ILG.Emit(OpCodes.Ldarg_0);
+    nc.EmitInt(0);
+    nc.EmitFieldSet(jump);
+
+    base.YieldLabel = yield;
+    EmitFors(nc, argslot);
+
+    nc.ILG.BeginCatchBlock(typeof(StopIterationException));
+    nc.ILG.Emit(OpCodes.Pop);
+    nc.ILG.EndExceptionBlock();
+    nc.ILG.Emit(OpCodes.Ldc_I4_0);
+    nc.ILG.Emit(OpCodes.Ret);
+    nc.Finish();
+
+    cg.EmitNew(tg.TypeBuilder.DefineDefaultConstructor(MethodAttributes.Public));
+    cg.ILG.Emit(OpCodes.Dup);
+    Fors[0].List.Emit(cg);
+    cg.EmitCall(typeof(Ops), "GetEnumerator", new Type[] { typeof(object) });
+    cg.EmitFieldSet(((FieldSlot)argslot).Info);
+  }
+  
+  public override object Evaluate(Frame frame)
+  { throw new NotImplementedException();
+  }
+
+  public override void ToCode(System.Text.StringBuilder sb, int indent)
+  { sb.Append('(');
+    base.ToCode(sb, 0);
+    sb.Append(')');
+  }
+
+  static int index;
+}
+#endregion
+
 #region HashExpression
 // TODO: check for duplicate entries
 public class HashExpression : Expression
@@ -609,62 +675,24 @@ public class ListExpression : Expression
 #endregion
 
 #region ListCompExpression
-public class ListCompExpression : Expression
-{ public ListCompExpression(Expression item, Name[] names, Expression list, Expression test)
-  { Item=item; List=list; Test=test;
-
-    if(names.Length==1) Names = new NameExpression(names[0]);
-    else
-    { Expression[] ne = new Expression[names.Length];
-      for(int i=0; i<names.Length; i++) ne[i] = new NameExpression(names[i]);
-      Names=new TupleExpression(ne);
-    }
-  }
+public class ListCompExpression : ListGenExpression
+{ public ListCompExpression(Expression item, ListCompFor[] fors) : base(item, fors) { }
 
   public override void Emit(CodeGenerator cg)
   { if(IsConstant) cg.EmitConstant(GetValue());
     else
-    { AssignStatement ass = new AssignStatement(Names);
-      Label next = cg.ILG.DefineLabel(), end = cg.ILG.DefineLabel();
-      Slot  list = cg.AllocLocalTemp(typeof(List), true);
-
+    { Slot list = cg.AllocLocalTemp(typeof(List), true);
       cg.EmitNew(typeof(List), Type.EmptyTypes);
       list.EmitSet(cg);
-      List.Emit(cg);
-      cg.EmitCall(typeof(Ops), "GetEnumerator", new Type[] { typeof(object) });
-      cg.ILG.MarkLabel(next);
-      cg.ILG.Emit(OpCodes.Dup);
-      cg.EmitCall(typeof(IEnumerator), "MoveNext");
-      cg.ILG.Emit(OpCodes.Brfalse, end);
-      cg.ILG.Emit(OpCodes.Dup);
-      cg.EmitPropGet(typeof(IEnumerator), "Current");
-      ass.Emit(cg);
-      if(Test!=null)
-      { Test.Emit(cg);
-        cg.EmitIsTrue();
-        cg.ILG.Emit(OpCodes.Brfalse, next);
-      }
-      list.EmitGet(cg);
-      Item.Emit(cg);
-      cg.EmitCall(typeof(List), "append");
-      cg.ILG.Emit(OpCodes.Br, next);
-      cg.ILG.MarkLabel(end);
-      cg.ILG.Emit(OpCodes.Pop);
+      EmitFors(cg, list);
       list.EmitGet(cg);
       cg.FreeLocalTemp(list);
     }
   }
 
   public override object Evaluate(Frame frame)
-  { ConstantExpression ce = new ConstantExpression(null);
-    AssignStatement ass = new AssignStatement(Names, ce);
-    List list = new List();
-    IEnumerator e = Ops.GetEnumerator(List.Evaluate(frame));
-    while(e.MoveNext())
-    { ce.Value = e.Current;
-      ass.Execute(frame);
-      if(Test==null || Ops.IsTrue(Test.Evaluate(frame))) list.append(Item.Evaluate(frame));
-    }
+  { List list = new List();
+    EvaluateFor(frame, list, 0);
     return list;
   }
 
@@ -674,28 +702,104 @@ public class ListCompExpression : Expression
 
   public override void ToCode(System.Text.StringBuilder sb, int indent)
   { sb.Append('[');
-    Item.ToCode(sb, 0);
-    sb.Append(" for ");
-    Names.ToCode(sb, 0);
-    sb.Append(" in ");
-    List.ToCode(sb, 0);
-    if(Test!=null)
-    { sb.Append(" if ");
-      Test.ToCode(sb, 0);
+    base.ToCode(sb, 0);
+    sb.Append(']');
+  }
+
+  void EvaluateFor(Frame frame, List list, int n)
+  { ConstantExpression ce = new ConstantExpression(null);
+    AssignStatement ass = new AssignStatement(Fors[n].Names, ce);
+    IEnumerator e = Ops.GetEnumerator(Fors[n].List.Evaluate(frame));
+    bool last = n==Fors.Length-1;
+    while(e.MoveNext())
+    { ce.Value = e.Current;
+      ass.Execute(frame);
+      if(Fors[n].Test==null || Ops.IsTrue(Fors[n].Test.Evaluate(frame)))
+      { if(last) list.append(Item.Evaluate(frame));
+        else EvaluateFor(frame, list, n+1);
+      }
     }
+  }
+}
+#endregion
+
+#region ListGenExpression
+public abstract class ListGenExpression : Expression
+{ public ListGenExpression(Expression item, ListCompFor[] fors) { Item=item; Fors=fors; }
+
+  public override void ToCode(System.Text.StringBuilder sb, int indent)
+  { sb.Append('[');
+    Item.ToCode(sb, 0);
+    for(int i=0; i<Fors.Length; i++) Fors[i].ToCode(sb);
     sb.Append(']');
   }
 
   public override void Walk(IWalker w)
   { if(w.Walk(this))
     { Item.Walk(w);
-      List.Walk(w);
-      if(Test!=null) Test.Walk(w);
+      foreach(ListCompFor f in Fors)
+      { f.List.Walk(w);
+        if(f.Test!=null) f.Test.Walk(w);
+      }
     }
     w.PostWalk(this);
   }
 
-  public Expression Item, Names, List, Test;
+  public Expression Item;
+  public ListCompFor[] Fors;
+  
+  protected void EmitFor(CodeGenerator cg, Slot slot, int n)
+  { AssignStatement ass = new AssignStatement(Fors[n].Names);
+    Label next = cg.ILG.DefineLabel(), end = cg.ILG.DefineLabel();
+    Slot e = cg.AllocLocalTemp(typeof(IEnumerator), true);
+
+    if(!IsGenerator || n>0)
+    { Fors[n].List.Emit(cg);
+      cg.EmitCall(typeof(Ops), "GetEnumerator", new Type[] { typeof(object) });
+    }
+    else slot.EmitGet(cg);
+    e.EmitSet(cg);
+
+    cg.ILG.MarkLabel(next);
+    e.EmitGet(cg);
+    cg.EmitCall(typeof(IEnumerator), "MoveNext");
+    cg.ILG.Emit(OpCodes.Brfalse, end);
+    e.EmitGet(cg);
+    cg.EmitPropGet(typeof(IEnumerator), "Current");
+    ass.Emit(cg);
+
+    if(Fors[n].Test!=null)
+    { Fors[n].Test.Emit(cg);
+      cg.EmitIsTrue();
+      cg.ILG.Emit(OpCodes.Brfalse, next);
+    }
+
+    if(n==Fors.Length-1)
+    { if(IsGenerator)
+      { cg.ILG.Emit(OpCodes.Ldarg_1);
+        Item.Emit(cg);
+        cg.ILG.Emit(OpCodes.Stind_Ref);
+        cg.ILG.Emit(OpCodes.Ldc_I4_1);
+        cg.ILG.Emit(OpCodes.Ret);
+        cg.ILG.MarkLabel(YieldLabel);
+      }
+      else
+      { slot.EmitGet(cg);
+        Item.Emit(cg);
+        cg.EmitCall(typeof(List), "append");
+      }
+    }
+    else EmitFor(cg, slot, n+1);
+
+    cg.ILG.Emit(OpCodes.Br, next);
+    cg.ILG.MarkLabel(end);
+    cg.FreeLocalTemp(e);
+  }
+
+  protected void EmitFors(CodeGenerator cg, Slot slot) { EmitFor(cg, slot, 0); }
+
+  protected Label YieldLabel;
+  protected bool  IsGenerator;
 }
 #endregion
 

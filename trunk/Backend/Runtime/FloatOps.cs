@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 
 namespace Boa.Runtime
 {
@@ -19,7 +20,7 @@ public sealed class FloatOps
         if(b is Integer) return a + ((Integer)b).ToDouble();
         if(b is Complex) return a + (Complex)b;
         IConvertible ic = b as IConvertible;
-        return ic!=null ? a + ic.ToDouble(System.Globalization.NumberFormatInfo.InvariantInfo)
+        return ic!=null ? a + ic.ToDouble(NumberFormatInfo.InvariantInfo)
                         : Ops.Invoke(b, "__radd__", a);
       case TypeCode.SByte: return a + (sbyte)b;
       case TypeCode.Single: return a + (float)b;
@@ -37,7 +38,7 @@ public sealed class FloatOps
     { case TypeCode.Boolean: bv=(bool)b ? 1 : 0; break;
       case TypeCode.Byte: bv=(byte)b; break;
       case TypeCode.Decimal:
-        bv=((IConvertible)b).ToDouble(System.Globalization.NumberFormatInfo.InvariantInfo); break;
+        bv=((IConvertible)b).ToDouble(NumberFormatInfo.InvariantInfo); break;
       case TypeCode.Int16: bv=(short)b; break;
       case TypeCode.Int32: bv=(int)b; break;
       case TypeCode.Int64: bv=(long)b; break;
@@ -45,7 +46,7 @@ public sealed class FloatOps
         if(b is Integer) bv = ((Integer)b).ToDouble();
         IConvertible ic = b as IConvertible;
         if(ic==null) return -Ops.ToInt(Ops.Invoke(b, "__cmp__", a));
-        bv = ic.ToDouble(System.Globalization.NumberFormatInfo.InvariantInfo);
+        bv = ic.ToDouble(NumberFormatInfo.InvariantInfo);
         break;
       case TypeCode.SByte: bv=(sbyte)b; break;
       case TypeCode.Single: bv=(float)b; break;
@@ -65,7 +66,7 @@ public sealed class FloatOps
     { case TypeCode.Boolean: bv=(bool)b ? 1 : 0; break;
       case TypeCode.Byte: bv=(byte)b; break;
       case TypeCode.Decimal:
-        bv=((IConvertible)b).ToDouble(System.Globalization.NumberFormatInfo.InvariantInfo); break;
+        bv=((IConvertible)b).ToDouble(NumberFormatInfo.InvariantInfo); break;
       case TypeCode.Int16: bv=(short)b; break;
       case TypeCode.Int32: bv=(int)b; break;
       case TypeCode.Int64: bv=(long)b; break;
@@ -77,7 +78,7 @@ public sealed class FloatOps
           return Ops.TryInvoke(b, floor ? "__rfloordiv__" : "__rtruediv__", out ret, a) ? ret
                   : Math.Floor(Ops.ToFloat(Ops.Invoke(b, "__rdiv__", a)));
         }
-        bv = ic.ToDouble(System.Globalization.NumberFormatInfo.InvariantInfo);
+        bv = ic.ToDouble(NumberFormatInfo.InvariantInfo);
         break;
       case TypeCode.SByte: bv=(sbyte)b; break;
       case TypeCode.Single: bv=(float)b; break;
@@ -99,6 +100,33 @@ public sealed class FloatOps
 
   public static object FloorDivide(double a, object b) { return Divide(a, b, true); }
 
+  public static object Modulus(double a, object b)
+  { double bv;
+    if(b is double) bv = (double)b;
+    else switch(Convert.GetTypeCode(b))
+    { case TypeCode.Boolean: bv=(bool)b ? 1 : 0; break;
+      case TypeCode.Byte: bv=(byte)b; break;
+      case TypeCode.Decimal: bv=((IConvertible)b).ToDouble(NumberFormatInfo.InvariantInfo); break;
+      case TypeCode.Int16: bv=(short)b; break;
+      case TypeCode.Int32: bv=(int)b; break;
+      case TypeCode.Int64: bv=(long)b; break;
+      case TypeCode.Object:
+        if(b is Integer) bv = ((Integer)b).ToDouble();
+        IConvertible ic = b as IConvertible;
+        if(ic==null) return Ops.Invoke(b, "__rmod__", a);
+        bv = ic.ToDouble(NumberFormatInfo.InvariantInfo);
+        break;
+      case TypeCode.SByte: bv=(sbyte)b; break;
+      case TypeCode.Single: bv=(float)b; break;
+      case TypeCode.UInt16: bv=(ushort)b; break;
+      case TypeCode.UInt32: bv=(uint)b; break;
+      case TypeCode.UInt64: bv=(ulong)b; break;
+      default: throw Ops.TypeError("invalid operand types for /: '{0}' and '{1}'", Ops.TypeName(a), Ops.TypeName(b));
+    }
+    if(bv==0) throw Ops.DivideByZeroError("float modulus by zero");
+    return Math.IEEERemainder(a, bv);
+  }
+
   public static object Multiply(double a, object b)
   { if(b is double) return a * (double)b;
     switch(Convert.GetTypeCode(b))
@@ -112,7 +140,7 @@ public sealed class FloatOps
         if(b is Integer) return a * ((Integer)b).ToDouble();
         if(b is Complex) return a * (Complex)b;
         IConvertible ic = b as IConvertible;
-        return ic!=null ? a * ic.ToDouble(System.Globalization.NumberFormatInfo.InvariantInfo)
+        return ic!=null ? a * ic.ToDouble(NumberFormatInfo.InvariantInfo)
                         : Ops.Invoke(b, "__rmul__", a);
       case TypeCode.SByte: return a * (sbyte)b;
       case TypeCode.Single: return a * (float)b;
@@ -130,7 +158,7 @@ public sealed class FloatOps
     { case TypeCode.Boolean: bv=(bool)b ? 1 : 0; break;
       case TypeCode.Byte: bv=(byte)b; break;
       case TypeCode.Decimal:
-        bv=((IConvertible)b).ToDouble(System.Globalization.NumberFormatInfo.InvariantInfo); break;
+        bv=((IConvertible)b).ToDouble(NumberFormatInfo.InvariantInfo); break;
       case TypeCode.Int16: bv=(short)b; break;
       case TypeCode.Int32: bv=(int)b; break;
       case TypeCode.Int64: bv=(long)b; break;
@@ -138,7 +166,7 @@ public sealed class FloatOps
         if(b is Integer) bv = ((Integer)b).ToDouble();
         IConvertible ic = b as IConvertible;
         if(ic==null) return Ops.Invoke(b, "__rpow__", a);
-        bv = ic.ToDouble(System.Globalization.NumberFormatInfo.InvariantInfo);
+        bv = ic.ToDouble(NumberFormatInfo.InvariantInfo);
         break;
       case TypeCode.SByte: bv=(sbyte)b; break;
       case TypeCode.Single: bv=(float)b; break;
@@ -165,7 +193,7 @@ public sealed class FloatOps
         if(b is Integer) return a - ((Integer)b).ToDouble();
         if(b is Complex) return a - (Complex)b;
         IConvertible ic = b as IConvertible;
-        return ic!=null ? a - ic.ToDouble(System.Globalization.NumberFormatInfo.InvariantInfo)
+        return ic!=null ? a - ic.ToDouble(NumberFormatInfo.InvariantInfo)
                         : Ops.Invoke(b, "__rsub__", a);
       case TypeCode.SByte: return a - (sbyte)b;
       case TypeCode.Single: return a - (float)b;

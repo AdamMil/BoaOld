@@ -252,6 +252,8 @@ public sealed class IntOps
     else switch(Convert.GetTypeCode(b))
     { case TypeCode.Boolean: bv = (bool)b ? 1 : 0; break;
       case TypeCode.Byte: bv = (byte)b; break;
+      case TypeCode.Decimal: return Math.IEEERemainder(a, ((IConvertible)b).ToDouble(NumberFormatInfo.InvariantInfo));
+      case TypeCode.Double: return Math.IEEERemainder(a, (double)b);
       case TypeCode.Int16: bv = (short)b; break;
       case TypeCode.Int32: bv = (int)b; break;
       case TypeCode.Int64: int64:
@@ -280,6 +282,7 @@ public sealed class IntOps
         if(ic!=null) { b = ic.ToInt64(NumberFormatInfo.InvariantInfo); goto int64; }
         return Ops.Invoke(b, "__rmod__", a);
       case TypeCode.SByte: bv = (sbyte)b; break;
+      case TypeCode.Single: return Math.IEEERemainder(a, (float)b);
       case TypeCode.UInt16: bv = (ushort)b; break;
       case TypeCode.UInt32:
       { uint ui = (uint)b;

@@ -130,7 +130,7 @@ public sealed class ArrayOps
     }
 
     int ai = source.Length, bvb=bv, mask=0;
-    Array.Copy(source, dest, 0);
+    Array.Copy(source, dest, ai);
     while((bv>>=1) != 0) { Array.Copy(dest, 0, dest, ai, ai); ai += ai; mask=mask<<1 | 1; }
     bv = bvb&mask;
     if(bv>0) Array.Copy(dest, 0, dest, ai, (bvb&mask)*source.Length);

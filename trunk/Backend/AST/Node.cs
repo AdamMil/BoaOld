@@ -3,7 +3,7 @@ using System;
 namespace Boa.AST
 {
 
-public enum Scope : byte { Free, Local, Global, Closed }
+public enum Scope : byte { Free, Local, Global, Closed, Private }
 
 public interface IWalker
 { void PostWalk(Node node);
@@ -72,6 +72,32 @@ public struct ImportName
   public string Name, AsName;
 }
 
+public struct ListCompFor
+{ public ListCompFor(Name[] names, Expression list, Expression test)
+  { List=list; Test=test;
+    for(int i=0; i<names.Length; i++) names[i].Scope = Scope.Private;
+    if(names.Length==1) Names = new NameExpression(names[0]);
+    else
+    { Expression[] ne = new NameExpression[names.Length];
+      for(int i=0; i<names.Length; i++) ne[i] = new NameExpression(names[i]);
+      Names = new TupleExpression(ne);
+    }
+  }
+  
+  public void ToCode(System.Text.StringBuilder sb)
+  { sb.Append(" for ");
+    Names.ToCode(sb, 0);
+    sb.Append(" in ");
+    List.ToCode(sb, 0);
+    if(Test!=null)
+    { sb.Append(" if ");
+      Test.ToCode(sb, 0);
+    }
+  }
+
+  public Expression Names, List, Test;
+}
+
 public class Name
 { public Name(string name) { String=name; Scope=Scope.Free; }
   public Name(string name, Scope scope) { String=name; Scope=scope; }
@@ -83,17 +109,16 @@ public class Name
 }
 
 public abstract class Node
-{ public void SetLocation(string source, int line, int column) { Source=source; Line=line; Column=column; }
-  public string Source="<unknown>";
-  public int Line, Column;
-  
-  public bool IsConstant
+{ public bool IsConstant
   { get { return (Flags&NodeFlag.Constant)!=0; }
     set { if(value) Flags|=NodeFlag.Constant; else Flags&=~NodeFlag.Constant; }
   }
 
   public virtual object GetValue() { throw new NotSupportedException(); }
   public virtual void Optimize() { }
+
+  public void SetLocation(Node node) { Source=node.Source; Line=node.Line; Column=node.Column; }
+  public void SetLocation(string source, int line, int column) { Source=source; Line=line; Column=column; }
 
   public string ToCode()
   { System.Text.StringBuilder sb = new System.Text.StringBuilder();
@@ -106,6 +131,9 @@ public abstract class Node
   { w.Walk(this);
     w.PostWalk(this);
   }
+
+  public string Source="<unknown>";
+  public int Line, Column;
 
   protected void StatementToCode(System.Text.StringBuilder sb, Statement stmt, int indent)
   { bool isSuite = stmt is Suite;

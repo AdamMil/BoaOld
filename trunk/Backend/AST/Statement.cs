@@ -22,6 +22,7 @@ If exec is used in a function and the function contains or is a nested block wit
 variables, the compiler will raise a SyntaxError unless the exec explicitly specifies the local
 namespace for the exec. (In other words, "exec obj"would be illegal, but "exec obj in ns" would be legal.) 
 */
+// TODO: make sure all enumerators can handle the underlying collection being changed, if possible
 
 // TODO: using exceptions is very slow
 #region Exceptions (used to aid implementation)
@@ -142,7 +143,8 @@ public abstract class Statement : Node
         else if(node is AssignStatement)
           foreach(Expression e in ((AssignStatement)node).LHS) HandleAssignment(e);
         else if(node is ForStatement) HandleAssignment(((ForStatement)node).Names);
-        else if(node is ListCompExpression) HandleAssignment(((ListCompExpression)node).Names);
+        else if(node is ListCompExpression)
+          foreach(ListCompFor f in ((ListCompExpression)node).Fors) HandleAssignment(f.Names);
         else if(node is TryStatement)
         { foreach(ExceptClause ec in ((TryStatement)node).Except) if(ec.Target!=null) HandleAssignment(ec.Target);
         }
@@ -628,7 +630,8 @@ public class DefStatement : Statement
         return false;
       }
       else if(node is ForStatement) HandleAssignment(((ForStatement)node).Names);
-      else if(node is ListCompExpression) HandleAssignment(((ListCompExpression)node).Names);
+      else if(node is ListCompExpression)
+        foreach(ListCompFor f in ((ListCompExpression)node).Fors) HandleAssignment(f.Names);
       else if(node is TryStatement)
         foreach(ExceptClause ec in ((TryStatement)node).Except) if(ec.Target!=null) HandleAssignment(ec.Target);
       return true;
@@ -738,7 +741,7 @@ public class ExpressionStatement : Statement
 { public ExpressionStatement(Expression expr) { Expression=expr; }
 
   public override void Emit(CodeGenerator cg)
-  { if(!Options.Debug && Expression.IsConstant) return;
+  { if(!Options.Debug && Expression.IsConstant) return; // TODO: don't return if it's at the top level
     Expression.Emit(cg);
     if(Options.Interactive)
     { Slot temp = cg.AllocLocalTemp(typeof(object));
@@ -1421,7 +1424,7 @@ public class YieldStatement : Statement
   public override void Emit(CodeGenerator cg)
   { cg.ILG.Emit(OpCodes.Ldarg_0);
     cg.EmitInt(YieldNumber);
-    cg.EmitFieldSet(typeof(Generator), "jump");
+    cg.EmitFieldSet(typeof(Generator).GetField("jump", BindingFlags.Instance|BindingFlags.NonPublic));
     cg.ILG.Emit(OpCodes.Ldarg_1);
     Expression.Emit(cg);
     cg.ILG.Emit(OpCodes.Stind_Ref);
