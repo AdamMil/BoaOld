@@ -74,7 +74,7 @@ public sealed class BoaFunction : Node
     index++;
   }
 
-  public object MakeFunction(Frame frame)
+  public Function MakeFunction(Frame frame)
   { Initialize();
     object[] defaults = numOptional==0 ? null : new object[numOptional]; // TODO: optimize this if expressions are constant?
     for(int i=0; i<numOptional; i++) defaults[i] = Parameters[i+optionalStart].Default.Evaluate(frame);

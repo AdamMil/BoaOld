@@ -66,7 +66,8 @@ public sealed class Ops
         break;
       case TypeCode.Decimal:
         if(b is Decimal) return (Decimal)a + (Decimal)b;
-        break;
+        try { return (Decimal)a + Convert.ToDecimal(b); }
+        catch { break; }
       case TypeCode.Double:  return FloatOps.Add((double)a, b);
       case TypeCode.Int16: return IntOps.Add((int)(short)a, b);
       case TypeCode.Int32: return IntOps.Add((int)a, b);
@@ -360,7 +361,8 @@ public sealed class Ops
       case TypeCode.Char: return IntOps.Compare((int)(char)a, b);
       case TypeCode.Decimal:
         if(b is Decimal) return ((Decimal)a).CompareTo(b);
-        break;
+        try { return ((Decimal)a).CompareTo(Convert.ToDecimal(b)); }
+        catch { break; }
       case TypeCode.Double: return FloatOps.Compare((double)a, b);
       case TypeCode.Empty: return b==null ? 0 : -1;
       case TypeCode.Int16: return IntOps.Compare((int)(short)a, b);
@@ -460,7 +462,8 @@ public sealed class Ops
       case TypeCode.Byte:    return FloatOps.Divide((byte)a, b);
       case TypeCode.Decimal:
         if(b is Decimal) return (Decimal)a / (Decimal)b;
-        break;
+        try { return (Decimal)a / Convert.ToDecimal(b); }
+        catch { break; }
       case TypeCode.Double:  return FloatOps.Divide((double)a, b);
       case TypeCode.Int16: return FloatOps.Divide((short)a, b);
       case TypeCode.Int32: return FloatOps.Divide((int)a, b);
@@ -848,7 +851,8 @@ public sealed class Ops
       case TypeCode.Char:    return IntOps.Multiply((int)(char)a, b);
       case TypeCode.Decimal:
         if(b is Decimal) return (Decimal)a * (Decimal)b;
-        break;
+        try { return (Decimal)a * Convert.ToDecimal(b); }
+        catch { break; }
       case TypeCode.Double:  return FloatOps.Multiply((double)a, b);
       case TypeCode.Int16: return IntOps.Multiply((int)(short)a, b);
       case TypeCode.Int32: return IntOps.Multiply((int)a, b);
@@ -1122,8 +1126,9 @@ public sealed class Ops
         if(b is char) return (char)a-(char)b;
         break;
       case TypeCode.Decimal:
-        if(b is Decimal) return (Decimal)a-(Decimal)b;
-        break;
+        if(b is Decimal) return (Decimal)a - (Decimal)b;
+        try { return (Decimal)a - Convert.ToDecimal(b); }
+        catch { break; }
       case TypeCode.Double:  return FloatOps.Subtract((double)a, b);
       case TypeCode.Int16: return IntOps.Subtract((int)(short)a, b);
       case TypeCode.Int32: return IntOps.Subtract((int)a, b);
