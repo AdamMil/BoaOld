@@ -181,6 +181,10 @@
                     BuildAction = "None"
                 />
                 <File
+                    RelPath = "lib\md5.boa"
+                    BuildAction = "None"
+                />
+                <File
                     RelPath = "lib\os.boa"
                     BuildAction = "None"
                 />
@@ -207,6 +211,11 @@
                 />
                 <File
                     RelPath = "Modules\__builtin__.cs"
+                    SubType = "Code"
+                    BuildAction = "Compile"
+                />
+                <File
+                    RelPath = "Modules\_md5.cs"
                     SubType = "Code"
                     BuildAction = "Compile"
                 />

@@ -32,7 +32,20 @@ namespace Boa
 public sealed class Misc
 { private Misc() { }
   
-  public static string BodyToDocString(Statement body)  { Suite suite = body as Suite;    if(suite!=null && suite.Statements[0] is ExpressionStatement) // TODO: strip uniform whitespace after second line    { ExpressionStatement es = (ExpressionStatement)suite.Statements[0];      if(es.Expression is ConstantExpression) return ((ConstantExpression)es.Expression).Value as string;    }    return null;  }
+  public unsafe static string ArrayToHex(byte[] bytes)
+  { const string hex = "0123456789abcdef";
+    System.Text.StringBuilder sb = new System.Text.StringBuilder(bytes.Length*2);
+
+    fixed(char* hp=hex)
+    fixed(byte* bp=bytes)
+      for(int i=0,len=bytes.Length; i<len; i++)
+      { byte b = bp[i];
+        sb.Append(hp[b>>4]);
+        sb.Append(hp[b&0xF]);
+      }
+    return sb.ToString();
+  }
+  public static string BodyToDocString(Statement body)  { Suite suite = body as Suite;    if(suite!=null && suite.Statements[0] is ExpressionStatement) // TODO: strip uniform whitespace after second line    { ExpressionStatement es = (ExpressionStatement)suite.Statements[0];      if(es.Expression is ConstantExpression) return ((ConstantExpression)es.Expression).Value as string;    }    return null;  }
   public static Type[] MakeTypeArray(Type type, int length)
   { Type[] arr = new Type[length];
     for(int i=0; i<length; i++) arr[i] = type;
