@@ -89,6 +89,52 @@ public sealed class __builtin__
   }
   #endregion
   
+  #region Super
+  [BoaType("super")]
+  [DocString(@"super(type, [type-or-object])
+
+Return the superclass of type. If the second argument is omitted the super
+object returned is unbound. If the second argument is an object,
+isinstance(obj, type) must be true. If the second argument is a type,
+issubclass(type2, type) must be true. super() only works for new-style
+classes.
+
+A typical use for calling a cooperative superclass method is:
+
+class C(B):
+    def meth(self, arg):
+        super(C, self).meth(arg)")]
+  public class Super : IHasAttributes
+  { public Super(BoaType type) : this(type, null) { }
+    public Super(BoaType type, object oot)
+    { baseType=type;
+      if(oot==null) mro = type.mro;
+      else if(oot is BoaType) mro = ((BoaType)oot).mro;
+      else if(oot!=null)
+      { mro = ((BoaType)Ops.GetDynamicType(oot)).mro;
+        obj = oot;
+      }
+
+      for(int i=0; i<mro.Count-1; i++) if(mro.items[i]==type) { index=i+1; return; }
+
+      throw Ops.TypeError("'{0}' and '{1}' don't have a super() relationship", type.__name__,
+                          oot is DynamicType ? ((DynamicType)oot).__name__ : Ops.TypeName(oot));
+    }
+
+    public List __attrs__() { throw new NotSupportedException("calling __attrs__ on a 'super' object"); }
+    public object __getattr__(string key) { return baseType.GetAttr(mro, index, obj, key); }
+    public void __setattr__(string key, object value) { baseType.SetAttr(mro, index, obj, key, value); }
+    public void __delattr__(string key) { baseType.DelAttr(mro, index, obj, key); }
+
+    public override string ToString() { return string.Format("<super: {0}, {1}>", baseType, Ops.Str(obj)); }
+
+    BoaType baseType;
+    Tuple mro;
+    int  index;
+    object obj;
+  }
+  #endregion
+
   #region XRange
   [BoaType("xrange")]
   [DocString(@"xrange([start,] stop[, step])
@@ -222,6 +268,27 @@ a __call__()  method.")]
 Return a string of one character whose ASCII code is the integer passed.
 For example, chr(97) returns the string 'a'. This is the inverse of ord().")]
   public static string chr(int value) { return new string((char)value, 1); }
+
+  [DocString(@"classmethod(function) -> function
+
+Return a class method for function.
+
+A class method receives the class as implicit first argument, just like an
+instance method receives the instance. To declare a class method, use this
+idiom:
+
+class C:
+    def f(cls, arg1, arg2, ...): ...
+    f = classmethod(f)
+
+It can be called either on the class (such as C.f()) or on an instance
+(such as C().f()). The instance is ignored except for its class. If a class
+method is called for a derived class, the derived class object is passed as
+the implied first argument.
+
+Class methods are different than C++ or Java static methods. If you want
+those, see staticmethod().")]
+  public static Function classmethod(Function func) { return func.MakeMarked(FunctionType.Class); }
 
   [DocString(@"cmp(x, y) -> int
 
@@ -899,6 +966,24 @@ object allows it. For example, setattr(x, 'foobar', 123) is equivalent to
 x.foobar = 123.")]
   public static void setattr(object o, string name, object value) { Ops.SetAttr(value, o, name); }
 
+  [DocString(@"staticmethod(function) -> function
+
+Return a static method for function.
+
+A static method does not receive an implicit first argument. To declare a
+static method, use this idiom:
+
+class C:
+    def f(arg1, arg2, ...): ...
+    f = staticmethod(f)
+
+It can be called either on the class (such as C.f()) or on an instance
+(such as C().f()). The instance is ignored except for its class.
+
+Static methods in Python are similar to those found in Java or C++. For a
+more advanced concept, see classmethod().")]
+  public static Function staticmethod(Function func) { return func.MakeMarked(FunctionType.Static); }
+
   [DocString(@"str([object]) -> str
 
 Return a string containing a nicely printable representation of an object.
@@ -983,6 +1068,7 @@ runtime.")]
   public static readonly object @object = ReflectedType.FromType(typeof(object));
   public static readonly object slice   = ReflectedType.FromType(typeof(Slice));
   public static readonly object @string = ReflectedType.FromType(typeof(string)); // FIXME: this should be 'str'
+  public static readonly object super   = ReflectedType.FromType(typeof(Super));
   public static readonly object tuple   = ReflectedType.FromType(typeof(Tuple));
   public static readonly object xrange  = ReflectedType.FromType(typeof(XRange));
   #endregion

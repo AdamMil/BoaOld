@@ -294,9 +294,14 @@ public class Parser
     { if(TryEat(Token.RParen)) bases = new Expression[0];
       else
       { ArrayList inherit = new ArrayList();
+        bool obt = bareTuples;
+        bareTuples = false;
+
         do inherit.Add(ParseExpression()); while(TryEat(Token.Comma));
         Eat(Token.RParen);
         bases = (Expression[])inherit.ToArray(typeof(Expression));
+
+        bareTuples = obt;
       }
     }
     else bases = new Expression[0];
