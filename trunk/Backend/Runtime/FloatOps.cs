@@ -60,6 +60,7 @@ public sealed class FloatOps
       case TypeCode.Byte: bv=(byte)b; break;
       case TypeCode.Decimal:
         bv=((IConvertible)b).ToDouble(NumberFormatInfo.InvariantInfo); break;
+      case TypeCode.Empty: return 1;
       case TypeCode.Int16: bv=(short)b; break;
       case TypeCode.Int32: bv=(int)b; break;
       case TypeCode.Int64: bv=(long)b; break;
@@ -71,6 +72,7 @@ public sealed class FloatOps
         break;
       case TypeCode.SByte: bv=(sbyte)b; break;
       case TypeCode.Single: bv=(float)b; break;
+      case TypeCode.String: return -1;
       case TypeCode.UInt16: bv=(ushort)b; break;
       case TypeCode.UInt32: bv=(uint)b; break;
       case TypeCode.UInt64: bv=(ulong)b; break;

@@ -202,6 +202,10 @@
                     BuildAction = "None"
                 />
                 <File
+                    RelPath = "lib\smtplib.boa"
+                    BuildAction = "None"
+                />
+                <File
                     RelPath = "lib\socket.boa"
                     BuildAction = "None"
                 />

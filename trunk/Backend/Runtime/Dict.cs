@@ -34,6 +34,15 @@ namespace Boa.Runtime
 public class Dict : HybridDictionary, IComparable, IMapping, ICloneable, IRepresentable
 { public Dict() { }
   public Dict(IDictionary dict) { foreach(DictionaryEntry e in dict) Add(e.Key, e.Value); }
+  public Dict(object o)
+  { IEnumerator e = Ops.GetEnumerator(o);
+    int i=0;
+    while(e.MoveNext())
+    { Tuple tup = e.Current as Tuple;
+      if(tup==null || tup.Count!=2) throw Ops.TypeError("dict(): sequence element #{0} is not a 2-tuple", i);
+      Add(tup.items[0], tup.items[1]);
+    }
+  }
   public Dict(int size) : base(size) { }
 
   #region DictEnumerator

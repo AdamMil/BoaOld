@@ -49,9 +49,9 @@ public sealed class sys
   public static readonly object __displayhook__ =
     Ops.GenerateFunction("displayhook", new Parameter[] { new Parameter("value") }, new CallTargetN(display));
   public static readonly object __excepthook__; // TODO: implement this
-  public static readonly object __stdin__; // TODO: implement this
-  public static readonly object __stdout__; // TODO: implement this
-  public static readonly object __stderr__; // TODO: implement this
+  public static readonly object __stdin__  = new BoaFile(Console.OpenStandardInput());
+  public static readonly object __stdout__ = new BoaFile(Console.OpenStandardOutput());
+  public static readonly object __stderr__ = new BoaFile(Console.OpenStandardError());
 
   public static readonly List argv    = new List();
   public static readonly Tuple builtin_module_names =

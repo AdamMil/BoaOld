@@ -255,7 +255,7 @@ public sealed class binascii
   public static string b2a_base64(string data) { return b2a_base64(Encoding.ASCII.GetBytes(data)); }
   public static unsafe string b2a_base64(byte[] data)
   { if(data.Length==0) return "\n";
-    char[] output = new char[(data.Length+2)/3*4 + (data.Length+75)/76];
+    char[] output = new char[(data.Length+2)/3*4 + data.Length/76];
 
     fixed(char* cp=b64e)
     fixed(char* op=output)
@@ -290,7 +290,6 @@ public sealed class binascii
         *o++ = cp[(b&0xF)<<2];
         *o++ = '=';
       }
-      if(left!=0 || i!=0) *o = '\n';
     }
 
     return new string(output);
@@ -411,22 +410,62 @@ public sealed class binascii
 
   #region uu (unix to unix)
   public static byte[] a2b_uu(byte[] data) { return a2b_uu(Encoding.ASCII.GetString(data)); }
-  public static unsafe byte[] a2b_uu(string data) { throw new NotImplementedException(); }
+  public static unsafe byte[] a2b_uu(string data)
+  { if(data.Length==0) goto baddata;
+
+    int len = data[0]-' ', left = len%3;
+    if(len<0 || (data.Length-1)*3/4<len) goto baddata;
+
+    byte[] output = new byte[len];
+    if(len==0) return output;
+
+    fixed(byte* cp=uud)
+    fixed(byte* op=output)
+    fixed(char* dp=data)
+    { byte* o = op;
+      char* p = dp+1, e=p+(len-left);
+      byte a, b, c, d;
+
+      while(p<e)
+      { a=cp[*p++&0x7F]; b=cp[*p++&0x7F]; c=cp[*p++&0x7F]; d=cp[*p++&0x7F];
+        if((a|b|c|d)>252) goto baddata;
+        *o++ = (byte)((a<<2) | ((b>>4)&3));
+        *o++ = (byte)((b<<4) | ((c>>2)&0xF));
+        *o++ = (byte)((c<<6) | d);
+      }
+
+      if(left==1)
+      { a=cp[*p++&0x7F]; b=cp[*p++&0x7F];
+        if((a|b)>252) goto baddata;
+        *o++ = (byte)((a<<2) | ((b>>4)&3));
+      }
+      else if(left==2)
+      { a=cp[*p++&0x7F]; b=cp[*p++&0x7F]; c=cp[*p++&0x7F];
+        if((a|b|c)>252) goto baddata;
+        *o++ = (byte)((a<<2) | ((b>>4)&3));
+        *o++ = (byte)((b<<4) | ((c>>2)&0xF));
+      }
+    }
+    return output;
+
+    baddata: throw Ops.TypeError("a2b_uu(): 'data' is not a valid uuencoded string");
+  }
 
   public static string b2a_uu(string data) { return b2a_uu(Encoding.ASCII.GetBytes(data)); }
   public static unsafe string b2a_uu(byte[] data)
   { if(data.Length==0) return " \n";
+    if(data.Length>45) throw Ops.TypeError("b2a_uu(): maximum of 45 bytes at a time");
+
     int left = data.Length%3;
-    char[] output = new char[data.Length/3*4 + (left==0 ? 0 : left+1) + (data.Length+59)/60*2];
+    char[] output = new char[data.Length/3*4 + (left==0 ? 0 : left+1) + 1];
 
     fixed(char* op=output)
     fixed(byte* dp=data)
     { char* o=op;
       byte* p=dp, e=dp+data.Length-2;
-      int i=0;
       byte a, b, c;
 
-      *o++ = (char)(Math.Min((int)(e-p)+2, 45)+' ');
+      *o++ = (char)((int)(e-p)+2+' ');
 
       while(p<e)
       { a=*p++; b=*p++; c=*p++;
@@ -434,12 +473,6 @@ public sealed class binascii
         *o++ = (char)((((a&3)<<4) | (b>>4))+' ');
         *o++ = (char)((((b&0xF)<<2) | (c>>6))+' ');
         *o++ = (char)((c&0x3F)+' ');
-        if(++i==15)
-        { *o++='\n';
-          i = (int)(e-p)+2;
-          if(i!=0) *o++ = (char)(i+' ');
-          i=0;
-        }
       }
 
       left = (int)(e-p)+2;
@@ -455,27 +488,19 @@ public sealed class binascii
         *o++ = (char)((((a&3)<<4) | (b>>4))+' ');
         *o++ = (char)(((b&0xF)<<2)+' ');
       }
-      if(left!=0 || i!=0) *o = '\n';
+      *o = '\n';
     }
 
     return new string(output);
   }
 
-  static readonly byte[] uud = new byte[256]
+  static readonly byte[] uud = new byte[128]
   { 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
-    255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
     255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
     0,   1,   2,   3,   4,   5,   6,   7,   8,   9,   10,  11,  12,  13,  14,  15,
     16,  17,  18,  19,  20,  21,  22,  23,  24,  25,  26,  27,  28,  29,  30,  31,
     32,  33,  34,  35,  36,  37,  38,  39,  40,  41,  42,  43,  44,  45,  46,  47,
     48,  49,  50,  51,  52,  53,  54,  55,  56,  57,  58,  59,  60,  61,  62,  63,
-    255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
-    255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
-    255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
-    255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
-    255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
-    255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
-    255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
     255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
     255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
   };  
