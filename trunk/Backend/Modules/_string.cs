@@ -87,11 +87,9 @@ public sealed class _string
   public static int find(string s, string sub) { return find(s, sub, 0, s.Length-1); }
   public static int find(string s, string sub, int start) { return find(s, sub, start, s.Length-1); }
   public static int find(string s, string sub, int start, int end)
-  { start = Ops.FixIndex(start, s.Length);
-    end   = Ops.FixIndex(end, s.Length);
-    if(end<start) throw Ops.ValueError("count(): end must be >= start");
-    if(start!=0 || end!=s.Length) s = s.Substring(start, end-start+1);
-    return s.IndexOf(sub);
+  { start = FixIndex(start, s.Length);
+    end   = FixIndex(end, s.Length);
+    return start<0 || end<0 || end<start ? -1 : s.IndexOf(sub, start, end-start+1);
   }
 
   public static int index(string s, string sub) { return index(s, sub, 0, s.Length-1); }
@@ -140,11 +138,9 @@ public sealed class _string
   public static int rfind(string s, string sub) { return rfind(s, sub, 0, s.Length-1); }
   public static int rfind(string s, string sub, int start) { return rfind(s, sub, start, s.Length-1); }
   public static int rfind(string s, string sub, int start, int end)
-  { start = Ops.FixIndex(start, s.Length);
-    end   = Ops.FixIndex(end, s.Length);
-    if(end<start) throw Ops.ValueError("count(): end must be >= start");
-    if(start!=0 || end!=s.Length) s = s.Substring(start, end-start+1);
-    return s.LastIndexOf(sub);
+  { start = FixIndex(start, s.Length);
+    end   = FixIndex(end, s.Length);
+    return start<0 || end<0 || end<start ? -1 : s.LastIndexOf(sub, start, end-start+1);
   }
 
   public static int rindex(string s, string sub) { return rindex(s, sub, 0, s.Length-1); }
@@ -256,6 +252,12 @@ public sealed class _string
   public static string uppercase = ascii_uppercase; // TODO: locale-dependent
   public static string whitespace = " \t\n\r\f\v";
   public static string printable = digits+letters+punctuation+whitespace; // TODO: locale-dependent
+  
+  static int FixIndex(int index, int length)
+  { if(index<0) index += length;
+    else if(index>=length) index = -1;
+    return index;
+  }
 }
 
 } // namespace Boa.Modules

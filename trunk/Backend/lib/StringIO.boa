@@ -28,16 +28,12 @@ Notes:
   bytes that occupy space in the buffer.
 - There's a simple test set (see end of this file).
 """
-try:
-    from errno import EINVAL
-except ImportError:
-    EINVAL = 22
 
 __all__ = ["StringIO"]
 
 def _complain_ifclosed(closed):
     if closed:
-        raise ValueError, "I/O operation on closed file"
+        raise ValueError("I/O operation on closed file")
 
 class StringIO:
     """class StringIO([buffer])
@@ -52,9 +48,8 @@ class StringIO:
     a UnicodeError to be raised when getvalue() is called.
     """
     def __init__(self, buf = ''):
-        # Force self.buf to be a string or unicode
-        if not isinstance(buf, basestring):
-            buf = str(buf)
+        # Force self.buf to be a string
+        buf = str(buf)
         self.buf = buf
         self.len = len(buf)
         self.buflist = []
@@ -73,10 +68,10 @@ class StringIO:
         or raises StopIteration when EOF is hit.
         """
         if self.closed:
-            raise StopIteration
+            raise StopIteration()
         r = self.readline()
         if not r:
-            raise StopIteration
+            raise StopIteration()
         return r
 
     def close(self):
@@ -200,7 +195,7 @@ class StringIO:
         if size is None:
             size = self.pos
         elif size < 0:
-            raise IOError(EINVAL, "Negative size not allowed")
+            raise IOError("Negative size not allowed")
         elif size < self.pos:
             self.pos = size
         self.buf = self.getvalue()[:size]
@@ -212,9 +207,8 @@ class StringIO:
         """
         _complain_ifclosed(self.closed)
         if not s: return
-        # Force s to be a string or unicode
-        if not isinstance(s, basestring):
-            s = str(s)
+        # Force s to be a string
+        s = str(s)
         spos = self.pos
         slen = self.len
         if spos == slen:
@@ -287,7 +281,7 @@ def test():
         f.write(line)
     f.writelines(lines[-2:])
     if f.getvalue() != text:
-        raise RuntimeError, 'write failed'
+        raise RuntimeError('write failed')
     length = f.tell()
     print 'File length =', length
     f.seek(len(lines[0]))
@@ -300,18 +294,18 @@ def test():
     f.seek(-len(line), 1)
     line2 = f.read(len(line))
     if line != line2:
-        raise RuntimeError, 'bad result after seek back'
+        raise RuntimeError('bad result after seek back')
     f.seek(len(line2), 1)
     list = f.readlines()
     line = list[-1]
     f.seek(f.tell() - len(line))
     line2 = f.read()
     if line != line2:
-        raise RuntimeError, 'bad result after seek back from EOF'
+        raise RuntimeError('bad result after seek back from EOF')
     print 'Read', len(list), 'more lines'
     print 'File length =', f.tell()
     if f.tell() != length:
-        raise RuntimeError, 'bad length'
+        raise RuntimeError('bad length')
     f.close()
 
 if __name__ == '__main__':

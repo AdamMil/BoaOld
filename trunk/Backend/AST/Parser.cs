@@ -35,6 +35,7 @@ using Boa.Runtime;
 // TODO: disallow assignment to constants
 // TODO: make string parsing more close to python's if possible
 // TODO: add proper parsing of octal numbers
+// TODO: support numbers in scientific notation
 
 namespace Boa.AST
 {
@@ -145,6 +146,7 @@ public class Parser
   \newline  Ignored
   \\        Backslash
   \"        Double quotation mark
+  \'        Single quotation mark
   \n        Newline
   \t        Tab
   \r        Carriage return
@@ -171,16 +173,17 @@ public class Parser
       return (char)num;
     }
     else switch(c)
-    { case '\\': return '\\';
-      case '\"': return '\"';
-      case 'n': return '\n';
-      case 't': return '\t';
-      case 'r': return '\r';
-      case 'b': return '\b';
-      case 'e': return (char)27;
-      case 'a': return '\a';
-      case 'f': return '\f';
-      case 'v': return '\v';
+    { case '\"': return '\"';
+      case '\'': return '\'';
+      case 'n':  return '\n';
+      case 't':  return '\t';
+      case 'r':  return '\r';
+      case 'b':  return '\b';
+      case 'e':  return (char)27;
+      case 'a':  return '\a';
+      case 'f':  return '\f';
+      case 'v':  return '\v';
+      case '\\': return '\\';
       case 'x': case 'u':
       { int num = 0;
         for(int i=0,limit=(c=='x'?2:4); i<limit; i++)
