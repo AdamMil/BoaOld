@@ -11,11 +11,6 @@ public class TypeGenerator
   { Assembly=assembly; TypeBuilder=typeBuilder;
   }
 
-  public Slot AddModuleSlot(Type moduleType)
-  { if(ModuleSlot!=null) return ModuleSlot;
-    return ModuleSlot = AddStaticSlot("__myModule", moduleType);
-  }
-
   public Slot AddStaticSlot(string name, Type type)
   { return new StaticSlot(TypeBuilder.DefineField(name, type, FieldAttributes.Public|FieldAttributes.Static));
   }
@@ -69,7 +64,6 @@ public class TypeGenerator
 
   public AssemblyGenerator Assembly;
   public TypeBuilder TypeBuilder;
-  public Slot ModuleSlot;
 
   Hashtable constants = new Hashtable();
   CodeGenerator initGen;

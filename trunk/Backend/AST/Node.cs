@@ -3,6 +3,8 @@ using System;
 namespace Boa.AST
 {
 
+public enum Scope : byte { Free, Local, Global, Closed }
+
 public interface IWalker
 { void PostWalk(Node node);
   bool Walk(Node node);
@@ -14,15 +16,13 @@ public struct Argument
 }
 
 public class Name
-{ public enum Scope : byte { Free, Local, Global, Closed }
-
-  public Name(string name) { String=name; Type=Scope.Free; }
-  public Name(string name, Scope type) { String=name; Type=type; }
+{ public Name(string name) { String=name; Scope=Scope.Free; }
+  public Name(string name, Scope scope) { String=name; Scope=scope; }
 
   public override int GetHashCode() { return String.GetHashCode(); }
 
   public string String;
-  public Scope  Type;
+  public Scope  Scope;
 }
 
 public abstract class Node
@@ -38,7 +38,7 @@ public abstract class Node
 
 public struct Parameter
 { public Parameter(Name name) { Name=name; }
-  public Parameter(string name) { Name=new Name(name, Name.Scope.Local); }
+  public Parameter(string name) { Name=new Name(name, Scope.Local); }
   public override int GetHashCode() { return Name.GetHashCode(); }
   public Name Name;
 }

@@ -11,13 +11,14 @@ namespace Boa.AST
 public abstract class Namespace
 { public Namespace(Namespace parent) { Parent=parent; }
 
+  public Slot GetLocalSlot(Name name) { return (Slot)slots[name.String]; }
   public Slot GetSlotForGet(Name name)
-  { Slot s = (Slot)slots[name];
+  { Slot s = (Slot)slots[name.String];
     return s==null ? GetGlobalSlot(name) : s;
   }
   public Slot GetSlotForSet(Name name) { return GetSlot(name); }
   
-  public virtual void SetArgs(Name[] names, MethodBuilder mb)
+  public virtual void SetArgs(Name[] names, int offset, MethodBuilder mb)
   { throw new NotImplementedException("SetArgs: "+GetType());
   }
 
@@ -28,9 +29,9 @@ public abstract class Namespace
 
   Slot GetGlobalSlot(Name name) { return Parent==null ? GetSlot(name) : Parent.GetGlobalSlot(name); }
   Slot GetSlot(Name name)
-  { Slot ret = (Slot)slots[name];
+  { Slot ret = (Slot)slots[name.String];
     if(ret!=null) return ret;
-    slots[name] = ret = MakeSlot(name);
+    slots[name.String] = ret = MakeSlot(name);
     return ret;
   }
   Slot MakeGlobalSlot(Name name) { return Parent==null ? MakeSlot(name) : Parent.MakeGlobalSlot(name); }
@@ -46,7 +47,7 @@ public class FrameNamespace : Namespace
     FrameSlot = new FrameObjectSlot(cg, new ArgSlot(cg.MethodBuilder, 0, "frame"), field);
   }
 
-  public override void SetArgs(Name[] names, MethodBuilder mb)
+  public override void SetArgs(Name[] names, int offset, MethodBuilder mb)
   { foreach(Name name in names) slots[name.String] = MakeSlot(name);
   }
 
@@ -62,19 +63,31 @@ public class FrameNamespace : Namespace
 public class LocalNamespace : Namespace
 { public LocalNamespace(Namespace parent, CodeGenerator cg) : base(parent) { codeGen=cg; }
 
-  public override void SetArgs(Name[] names, MethodBuilder mb)
-  { for(int i=0; i<names.Length; i++)
-    { Slot arg = new ArgSlot(mb, i, names[i].String);
-      slots[names[i].String] = names[i].Type==Name.Scope.Closed ? new ClosedSlot(names[i], codeGen, arg) : arg;
+  public override void SetArgs(Name[] names, int offset, MethodBuilder mb)
+  { for(int i=0; i<names.Length; i++) slots[names[i].String] = new ArgSlot(mb, i+offset, names[i].String);
+  }
+  public void SetArgs(Name[] names, CodeGenerator cg, Slot objArray)
+  { if(names.Length==0) return;
+    objArray.EmitGet(cg);
+    for(int i=0; i<names.Length; i++)
+    { if(i!=names.Length-1) cg.ILG.Emit(OpCodes.Dup);
+      cg.EmitInt(i);
+      cg.ILG.Emit(OpCodes.Ldelem_Ref);
+      Slot slot = new LocalSlot(cg.ILG.DeclareLocal(typeof(object)), names[i].String);
+      slot.EmitSet(cg);
+      slots[names[i].String] = slot;
     }
   }
 
+  public void UnpackClosedVar(Name name, CodeGenerator cg)
+  { Slot slot = new LocalSlot(codeGen.ILG.DeclareLocal(typeof(ClosedVar)), name.String);
+    slot.EmitSet(cg);
+    slots[name.String] = new ClosedSlot(slot);
+  }
+
   protected override Slot MakeSlot(Name name)
-  { if(name.Type==Name.Scope.Closed) return new ClosedSlot(name, codeGen);
-    LocalBuilder b = codeGen.ILG.DeclareLocal(typeof(object));
-    // TODO: reenable this
-    //b.SetLocalSymInfo(name);
-    return new LocalSlot(b);
+  { return name.Scope==Scope.Closed ? (Slot)new ClosedSlot(codeGen, name.String)
+                                    : (Slot)new LocalSlot(codeGen.ILG.DeclareLocal(typeof(object)), name.String);
   }
 
   CodeGenerator codeGen;

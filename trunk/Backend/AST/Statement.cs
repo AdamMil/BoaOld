@@ -27,17 +27,24 @@ public abstract class Statement : Node
     { if(node==current)
       { inDef=false;
 
+        ArrayList inherit = innerFuncs.Count==0 ? null : new ArrayList();
         foreach(DefStatement def in innerFuncs)
         { NameDecorator dec = new NameDecorator();
           def.Walk(dec);
           foreach(Name dname in dec.localNames.Values)
-            if(dname.Type==Name.Scope.Free)
+            if(dname.Scope==Scope.Free)
             { Name name = (Name)localNames[dname.String];
               if(name!=null)
-              { if(name.Type==Name.Scope.Local) name.Type=Name.Scope.Closed;
+              { if(name.Scope==Scope.Local) name.Scope=Scope.Closed;
+                inherit.Add(name);
               }
-              else localNames[dname.String] = dname;
+              else
+              { localNames[dname.String] = dname;
+                inherit.Add(dname);
+              }
             }
+          def.Inherit = (Name[])inherit.ToArray(typeof(Name));
+          inherit.Clear();
         }
       }
     }
@@ -48,7 +55,7 @@ public abstract class Statement : Node
         { DefStatement de = (DefStatement)node;
           innerFuncs.Add(node);
           de.Name = AddLocal(de.Name);
-          de.Name.Type = Name.Scope.Local;
+          de.Name.Scope = Scope.Local;
           return false;
         }
         else if(node is NameExpression)
@@ -60,7 +67,7 @@ public abstract class Statement : Node
           if(ass.LHS is NameExpression)
           { NameExpression ne = (NameExpression)ass.LHS;
             ne.Name = AddLocal(ne.Name);
-            ne.Name.Type = Name.Scope.Local;
+            ne.Name.Scope = Scope.Local;
           }
           else throw Ops.NotImplemented("Unhandled type '{0}' in NameDecorator", node.GetType());
           Walk(ass.RHS);
@@ -160,14 +167,18 @@ public class DefStatement : Statement
   public override void Emit(CodeGenerator cg)
   { CodeGenerator impl = MakeImplMethod(cg);
 
+    Type targetType = Inherit==null ? typeof(CallTargetN) : typeof(CallTargetFN);
+    Type funcType   = Inherit==null ? typeof(CompiledFunctionN) : typeof(CompiledFunctionFN);
+
     cg.EmitString(Name.String);
     GetParmsSlot(cg).EmitGet(cg);
+    EmitClosedGet(cg);
     cg.ILG.Emit(OpCodes.Ldnull); // create delegate
     cg.ILG.Emit(OpCodes.Ldftn, impl.MethodBuilder);
-    cg.EmitNew((ConstructorInfo)typeof(CallTarget).GetMember(".ctor")[0]);
-    cg.EmitNew(typeof(CompiledFunction), new Type[] { typeof(string), typeof(Parameter[]), typeof(CallTarget) });
-
+    cg.EmitNew((ConstructorInfo)targetType.GetMember(".ctor")[0]);
+    cg.EmitNew(funcType, new Type[] { typeof(string), typeof(Parameter[]), typeof(ClosedVar[]), targetType });
     cg.EmitSet(Name);
+    index++;
   }
 
   public override object Execute(Frame frame)
@@ -185,11 +196,36 @@ public class DefStatement : Statement
   public Parameter[] Parameters;
   public Statement Body;
 
+  void EmitClosedGet(CodeGenerator cg)
+  { if(Inherit==null) cg.ILG.Emit(OpCodes.Ldnull);
+    else
+    { cg.EmitNewArray(typeof(ClosedVar), Inherit.Length);
+      ConstructorInfo ci = typeof(ClosedVar).GetConstructor(new Type[] { typeof(string) });
+      FieldInfo fi = typeof(ClosedVar).GetField("Value");
+
+      for(int i=0; i<Inherit.Length; i++)
+      { cg.ILG.Emit(OpCodes.Dup);
+        cg.EmitInt(i);
+        Slot slot = cg.Namespace.GetLocalSlot(Inherit[i]);
+        ClosedSlot cs = slot as ClosedSlot;
+        if(cs!=null) cs.Storage.EmitGet(cg);
+        else
+        { cg.EmitString(Inherit[i].String);
+          cg.EmitNew(ci);
+          cg.ILG.Emit(OpCodes.Dup);
+          slot.EmitGet(cg);
+          cg.EmitFieldSet(fi);
+        }
+        cg.ILG.Emit(OpCodes.Stelem_Ref);
+      }
+    }
+  }
+
   Slot GetParmsSlot(CodeGenerator cg)
   { if(namesSlot==null)
-    { namesSlot = cg.TypeGenerator.AddStaticSlot(Name.String+"$parms"+index++, typeof(Parameter[]));
+    { namesSlot = cg.TypeGenerator.AddStaticSlot(Name.String+"$parms"+index, typeof(Parameter[]));
       CodeGenerator icg = cg.TypeGenerator.GetInitializer();
-      ConstructorInfo nci = typeof(Name).GetConstructor(new Type[] { typeof(string), typeof(Name.Scope) });
+      ConstructorInfo nci = typeof(Name).GetConstructor(new Type[] { typeof(string), typeof(Scope) });
       ConstructorInfo pci = typeof(Parameter).GetConstructor(new Type[] { typeof(Name) });
 
       icg.EmitNewArray(typeof(Parameter), Parameters.Length);
@@ -198,7 +234,7 @@ public class DefStatement : Statement
         icg.EmitInt(i);
         icg.ILG.Emit(OpCodes.Ldelema, typeof(Parameter));
         icg.EmitString(Parameters[i].Name.String);
-        icg.EmitInt((int)Parameters[i].Name.Type);
+        icg.EmitInt((int)Parameters[i].Name.Scope);
         icg.EmitNew(nci);
         icg.EmitNew(pci);
         icg.ILG.Emit(OpCodes.Stobj, typeof(Parameter));
@@ -212,10 +248,24 @@ public class DefStatement : Statement
   { Name[] names = new Name[Parameters.Length]; 
     for(int i=0; i<Parameters.Length; i++) names[i] = Parameters[i].Name;
 
-    CodeGenerator icg = cg.TypeGenerator.DefineMethod(Name.String + "$f" + index++, typeof(object),
-                                                      new Type[] { typeof(object[]) });
-    icg.Namespace = new LocalNamespace(cg.Namespace, icg);
-    icg.SetArgs(names);
+    Type[] parmTypes = Inherit==null ? new Type[] { typeof(object[]) }
+                                     : new Type[] { typeof(CompiledFunction), typeof(object[]) };
+    CodeGenerator icg = cg.TypeGenerator.DefineMethod(Name.String + "$f" + index++, typeof(object), parmTypes);
+    LocalNamespace ns = new LocalNamespace(cg.Namespace, icg);
+    icg.Namespace = ns;
+    //icg.SetArgs(names, 1);
+    ns.SetArgs(names, icg, new ArgSlot(icg.MethodBuilder, Inherit==null ? 0 : 1, "$names", typeof(object[])));
+
+    if(Inherit!=null && Inherit.Length>0)
+    { icg.EmitArgGet(0);
+      icg.EmitFieldGet(typeof(CompiledFunction), "Closed");
+      for(int i=0; i<Inherit.Length; i++)
+      { if(i!=Inherit.Length-1) icg.ILG.Emit(OpCodes.Dup);
+        icg.EmitInt(i);
+        icg.ILG.Emit(OpCodes.Ldelem_Ref);
+        ns.UnpackClosedVar(Inherit[i], icg);
+      }
+    }
     Body.Emit(icg);
     icg.EmitReturn(null);
     icg.Finish();
@@ -223,6 +273,8 @@ public class DefStatement : Statement
   }
 
   public object MakeFunction(Frame frame) { return new InterpretedFunction(frame, Name.String, Parameters, Body); }
+  
+  public Name[] Inherit;
 
   Slot namesSlot;
   static int index;
