@@ -35,7 +35,7 @@ using Boa.Runtime;
 // TODO: disallow assignment to constants
 // TODO: make string parsing closer to python's if possible
 // TODO: add proper parsing of octal numbers
-// TODO: add support for parsing numbers in any base (eg 3#1212 is 1212 in base 3)
+// TODO: add support for parsing numbers in any base (eg 3#1212 is 1212 using base 3)
 
 namespace Boa.AST
 {
@@ -72,6 +72,10 @@ public class Parser
     if(autoclose) data.Close();
     NextToken();
   }
+  public Parser(string source, string data)
+  { sourceFile=source; this.data=data;
+    NextToken();
+  }
 
   static Parser()
   { stringTokens = new Hashtable();
@@ -88,7 +92,7 @@ public class Parser
 
   public static Parser FromFile(string filename) { return new Parser(filename, new StreamReader(filename), true); }
   public static Parser FromStream(Stream stream) { return new Parser("<stream>", new StreamReader(stream)); }
-  public static Parser FromString(string text) { return new Parser("<string>", new StringReader(text)); }
+  public static Parser FromString(string text) { return new Parser("<string>", text); }
 
   public Statement Parse()
   { ArrayList stmts = new ArrayList();
@@ -160,7 +164,7 @@ public class Parser
   \cC       Control code (eg, \cC is ctrl-c)
   \OOO      Up to 3 octal digits -> byte value
   */
-  char GetEscapeChar() // keep in sync with StringOps.Unescape
+  char GetEscapeChar()
   { char c = ReadChar();
     if(char.IsDigit(c))
     { if(c>'7') SyntaxError("invalid octal digit");
@@ -1060,7 +1064,7 @@ public class Parser
           if(c=='\"' || c=='\'')
           { char delim = c;
             while((c=ReadChar())!=0 && c!=delim) sb.Append(c);
-            if(c==0) SyntaxError("unterminated string constant");
+            if(c==0) SyntaxError("unterminated string literal");
             value = sb.ToString();
             return Token.Literal;
           }
@@ -1077,19 +1081,6 @@ public class Parser
         value = stringTokens[s];
         if(value!=null) return (Token)value;
         
-        if(s=="r" && (c=='\"' || c=='\''))
-        { char delim = c;
-          sb.Remove(0, sb.Length);
-          while(true)
-          { c = ReadChar();
-            if(c==delim) break;
-            if(c==0) SyntaxError("unexpected EOF in string literal");
-            sb.Append(c);
-          }
-          value = sb.ToString();
-          return Token.Literal;
-        }
-
         value = s;
         return Token.Identifier;
       }
@@ -1128,7 +1119,7 @@ public class Parser
                 else sb.Append(c);
               }
             }
-            else if(c==0) SyntaxError("unexpected EOF in string literal");
+            else if(c==0) SyntaxError("unterminated string literal");
             else sb.Append(c);
           }
           value = sb.ToString();
