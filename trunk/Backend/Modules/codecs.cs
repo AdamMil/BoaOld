@@ -37,7 +37,7 @@ public sealed class codecs
 
   
   #region Support classes
-  public class BoaEncoding// TODO: : Encoding
+  public class BoaEncoding // TODO: : Encoding
   { public BoaEncoding(Tuple tup) { encoder=tup.items[0]; decoder=tup.items[1]; }
 
     object encoder, decoder;
