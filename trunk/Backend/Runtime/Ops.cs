@@ -23,6 +23,8 @@ using System;
 using System.Collections;
 using System.Globalization;
 
+// TODO: make sure all static methods everywhere are thread-safe
+
 // TODO: investigate python's changes to the division operator
 // TODO: should we allow integer operations on chars?
 // TODO: implement all of http://docs.python.org/ref/specialnames.html
@@ -208,7 +210,7 @@ public sealed class Ops
   { ICallable ic = func as ICallable;
     return ic==null ? Invoke(func, "__call__", args) : ic.Call(args);
   }
-  
+
   public unsafe static object Call(object func, CallArg[] args)
   { int ai=0, pi=0, num=0;
     bool hasdict=false;
@@ -327,7 +329,7 @@ public sealed class Ops
     if(ic==null) throw Ops.NotImplementedError("This object does not support named arguments.");
     return ic.Call(positional, names, values);
   }
-  
+
   public static object Call0(object func) { return Call(func, Misc.EmptyArray); }
   public static object Call1(object func, object a0) { return Call(func, a0); }
 
@@ -399,11 +401,12 @@ public sealed class Ops
       case Conversion.None: throw TypeError("object cannot be converted to '{0}'", type);
       default:
         if(type==typeof(bool)) return FromBool(IsTrue(o));
+        if(type.IsSubclassOf(typeof(Delegate))) return MakeDelegate(o, type);
         try { return Convert.ChangeType(o, type); }
         catch(OverflowException) { throw ValueError("large value caused overflow"); }
     }
   }
-  
+
   public static Conversion ConvertTo(Type from, Type to)
   { if(from==null)
       return !to.IsValueType ? Conversion.Reference : to==typeof(bool) ? Conversion.Safe : Conversion.None;
@@ -429,6 +432,8 @@ public sealed class Ops
     }
     if(from.IsArray && to.IsArray && to.GetElementType().IsAssignableFrom(from.GetElementType()))
       return Conversion.Reference;
+    if(to.IsSubclassOf(typeof(Delegate))) // we use None if both are delegates because we already checked above that it's not the right type of delegate
+      return from.IsSubclassOf(typeof(Delegate)) ? Conversion.None : Conversion.Unsafe;
     return Conversion.None;
   }
 
@@ -809,6 +814,10 @@ public sealed class Ops
        metaclass==ReflectedType.FromType(typeof(UserType)))
       return new UserType(module, name, bases, dict);
     return Call(metaclass, name, bases, dict);
+  }
+
+  public static Delegate MakeDelegate(object callable, Type delegateType)
+  { return Delegate.CreateDelegate(delegateType, DelegateProxy.Make(callable, delegateType), "Handle");
   }
 
   public static TypeErrorException MethodCalledWithoutInstance(string name)
