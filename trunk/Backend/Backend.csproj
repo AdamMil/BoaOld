@@ -173,6 +173,10 @@
                     BuildAction = "None"
                 />
                 <File
+                    RelPath = "lib\bisect.boa"
+                    BuildAction = "None"
+                />
+                <File
                     RelPath = "lib\ftplib.boa"
                     BuildAction = "None"
                 />
@@ -227,6 +231,11 @@
                 />
                 <File
                     RelPath = "Modules\__builtin__.cs"
+                    SubType = "Code"
+                    BuildAction = "Compile"
+                />
+                <File
+                    RelPath = "Modules\_bisect.cs"
                     SubType = "Code"
                     BuildAction = "Compile"
                 />
