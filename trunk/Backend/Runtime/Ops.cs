@@ -684,6 +684,16 @@ public sealed class Ops
     return Ops.Invoke(obj, "__getitem__", index);
   }
 
+  public static object GetRawAttr(object obj, string name)
+  { DynamicType dt = obj as DynamicType;
+    if(dt==null)
+    { IHasAttributes ha = obj as IHasAttributes;
+      if(ha!=null) return ha.__getattr__(name);
+      dt = GetDynamicType(obj);
+    }
+    return dt.GetRawAttr(name);
+  }
+
   public static ImportErrorException ImportError(string format, params object[] args)
   { return new ImportErrorException(string.Format(format, args));
   }

@@ -41,6 +41,11 @@ public abstract class DynamicType
     return false;
   }
 
+  public virtual object GetRawAttr(string name)
+  { object ret;
+    return GetAttr(null, name, out ret) ? ret : Ops.Missing;
+  }
+
   public virtual List GetAttrNames(object self) { return new List(0); }
 
   public virtual bool IsSubclassOf(object other) { throw new NotSupportedException(); }

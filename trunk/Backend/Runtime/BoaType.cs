@@ -96,6 +96,8 @@ public abstract class BoaType : DynamicType, IDynamicObject, ICallable, IHasAttr
     return value!=Ops.Missing;
   }
 
+  public override object GetRawAttr(string name) { return LookupSlot(name); }
+
   internal object LookupSlot(string name)
   { foreach(BoaType type in mro)
     { object slot = type.RawGetSlot(name);
