@@ -144,6 +144,15 @@
                     BuildAction = "Compile"
                 />
                 <File
+                    RelPath = "AST\TypeMaker.cs"
+                    SubType = "Code"
+                    BuildAction = "Compile"
+                />
+                <File
+                    RelPath = "lib\ftplib.boa"
+                    BuildAction = "None"
+                />
+                <File
                     RelPath = "lib\os.boa"
                     BuildAction = "None"
                 />

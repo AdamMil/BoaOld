@@ -44,7 +44,7 @@ variables, the compiler will raise a SyntaxError unless the exec explicitly spec
 namespace for the exec. (In other words, "exec obj" would be illegal, but "exec obj in ns" would be legal.)
 */
 // TODO: make sure all enumerators can handle the underlying collection being changed, if possible
-// TODO: implement 'break' and 'continue' inside 'finally' blocks
+// TODO: disallow 'break' and 'continue' inside 'finally' blocks (difficult to implement)
 // TODO: allow 'import' inside functions/class defs
 
 // TODO: using exceptions is very slow
@@ -335,7 +335,7 @@ public class AssignStatement : Statement
   public override void Emit(CodeGenerator cg)
   { bool leftAllTups = RHS is TupleExpression;
     if(leftAllTups) foreach(Expression e in LHS) if(!(e is TupleExpression)) { leftAllTups=false; break; }
-    if(leftAllTups && RHS is TupleExpression)
+    if(leftAllTups) // RHS is TupleExpression
     { TupleExpression rhs = (TupleExpression)RHS;
       TupleExpression[] lhs = new TupleExpression[LHS.Length];
       for(int i=0; i<LHS.Length; i++)
@@ -560,25 +560,37 @@ public class ClassStatement : Statement
   { Name  = new Name(name);
     Bases = bases;
     Body  = body;
+    docstring = Misc.BodyToDocString(body);
   }
 
   public override void Emit(CodeGenerator cg)
-  { CodeGenerator icg = cg.TypeGenerator.DefineMethod(Name.String+"$maker"+index++,
-                                                      typeof(IDictionary), Type.EmptyTypes);
-    LocalNamespace ns = new LocalNamespace(cg.Namespace, icg);
-    icg.Namespace = ns;
-    Body.Emit(icg);
-    ns.EmitLocalsDict(icg);
-    icg.ILG.Emit(OpCodes.Ret);
-    
-    cg.EmitGet(new Name("__name__"));
-    cg.EmitCall(typeof(Ops), "ToString", new Type[] { typeof(object) }); // FIXME: doesn't handle non-existant __name__
-    cg.EmitString(Name.String);
-    cg.EmitObjectArray(Bases);
-    cg.EmitNew(typeof(Tuple), new Type[] { typeof(object[]) });
-    cg.EmitCall(icg.MethodBuilder);
-    cg.EmitCall(typeof(Ops), "MakeClass");
-    cg.EmitSet(Name);
+  { bool interactive = Options.Interactive;
+    Options.Interactive = false;
+    try
+    { CodeGenerator icg = cg.TypeGenerator.DefineMethod(Name.String+"$maker"+index++,
+                                                        typeof(IDictionary), Type.EmptyTypes);
+      LocalNamespace ns = new LocalNamespace(cg.Namespace, icg);
+      icg.Namespace = ns;
+      Body.Emit(icg);
+      ns.EmitLocalsDict(icg);
+      icg.ILG.Emit(OpCodes.Ret);
+
+      cg.EmitGet(new Name("__name__"));
+      cg.EmitCall(typeof(Ops), "ToString", new Type[] { typeof(object) }); // FIXME: doesn't handle non-existant __name__
+      cg.EmitString(Name.String);
+      cg.EmitObjectArray(Bases);
+      cg.EmitNew(typeof(Tuple), new Type[] { typeof(object[]) });
+      cg.EmitCall((MethodInfo)icg.MethodBase);
+      cg.EmitCall(typeof(Ops), "MakeClass");
+      if(docstring!=null)
+      { cg.ILG.Emit(OpCodes.Dup);
+        cg.EmitString("__doc__");
+        cg.EmitString(docstring);
+        cg.EmitCall(typeof(IHasAttributes), "__setattr__");
+      }
+      cg.EmitSet(Name);
+    }
+    finally { Options.Interactive = interactive; }
   }
 
   public override void Execute(Frame frame)
@@ -614,6 +626,8 @@ public class ClassStatement : Statement
   public Expression[] Bases;
   public Statement Body;
   
+  string docstring;
+
   static int index;
 }
 #endregion
@@ -835,8 +849,15 @@ public class IfStatement : Statement
     }
     else
     { Label endLab = cg.ILG.DefineLabel(), elseLab = Else==null ? new Label() : cg.ILG.DefineLabel();
-      cg.EmitIsTrue(Test);
-      cg.ILG.Emit(OpCodes.Brfalse, Else==null ? endLab : elseLab);
+      if(!Options.Debug && Test is UnaryExpression && ((UnaryExpression)Test).Op==UnaryOperator.LogicalNot)
+      { cg.EmitIsTrue(((UnaryExpression)Test).Expression);
+        cg.ILG.Emit(OpCodes.Brtrue, Else==null ? endLab : elseLab);
+      }
+      else
+      { cg.EmitIsTrue(Test);
+        cg.ILG.Emit(OpCodes.Brfalse, Else==null ? endLab : elseLab);
+      }
+
       Body.Emit(cg);
       if(Else!=null)
       { cg.ILG.Emit(OpCodes.Br, endLab);
@@ -979,17 +1000,15 @@ public class ForStatement : Statement
     cg.ILG.BeginExceptionBlock();
     cg.ILG.MarkLabel(start);
     list.EmitGet(cg);
-    cg.ILG.Emit(OpCodes.Dup);
     cg.EmitCall(typeof(IEnumerator), "MoveNext");
     cg.ILG.Emit(OpCodes.Brfalse, end);
+    list.EmitGet(cg);
     cg.EmitPropGet(typeof(IEnumerator), "Current");
     ass.Emit(cg);
     Body.Emit(cg);
     cg.ILG.Emit(OpCodes.Br, start);
     cg.ILG.MarkLabel(end);
-    cg.ILG.Emit(OpCodes.Pop);
     cg.ILG.BeginCatchBlock(typeof(StopIterationException));
-    cg.ILG.Emit(OpCodes.Pop);
     cg.ILG.EndExceptionBlock();
     cg.FreeLocalTemp(list);
   }
@@ -1245,11 +1264,11 @@ public class TryStatement : Statement
   }
 
   public override void Emit(CodeGenerator cg)
-  { Slot occurred = Else==null ? null : cg.AllocLocalTemp(typeof(bool));
+  { Slot fromElse = Else!=null && Except.Length!=0 ? cg.AllocLocalTemp(typeof(bool)) : null;
 
-    if(occurred!=null)
+    if(fromElse!=null)
     { cg.EmitInt(0);
-      occurred.EmitSet(cg);
+      fromElse.EmitSet(cg);
     }
 
     Slot choice=null;
@@ -1283,84 +1302,96 @@ public class TryStatement : Statement
       cg.FreeLocalTemp(choice);
     }
     Body.Emit(cg);                                  //   body
-    cg.ILG.BeginCatchBlock(typeof(Exception));      // } catch(Exception e) {
-    Slot dt = cg.AllocLocalTemp(typeof(DynamicType)), type = cg.AllocLocalTemp(typeof(object)),
-         et = cg.AllocLocalTemp(typeof(DynamicType)), e = cg.AllocLocalTemp(typeof(Exception));
-    cg.ILG.Emit(OpCodes.Dup);
-    e.EmitSet(cg);
-    if(occurred!=null)                              // occurred = true
-    { cg.EmitInt(1);
-      occurred.EmitSet(cg);
-    }
-    cg.EmitCall(typeof(Ops), "GetDynamicType");     // dt = GetDynamicType(e)
-    dt.EmitSet(cg);
-
-    foreach(ExceptClause ec in Except)              // foreach(ExceptClause ec in Except) {
-    { if(ec.Type==null) break;
-      Label isDT=cg.ILG.DefineLabel(), next=cg.ILG.DefineLabel();
-      ec.Type.Emit(cg);                             // type = ec.Type
-      cg.ILG.Emit(OpCodes.Dup);
-      type.EmitSet(cg);
-      cg.ILG.Emit(OpCodes.Isinst, typeof(DynamicType)); // DynamicType et = type as DynamicType
-      cg.ILG.Emit(OpCodes.Dup);
-      et.EmitSet(cg);
-      cg.ILG.Emit(OpCodes.Brtrue, isDT);                // if(et==null) et = Ops.GetDynamicType(type)
-      type.EmitGet(cg);
-      cg.EmitCall(typeof(Ops), "GetDynamicType");
-      et.EmitSet(cg);
-      cg.ILG.MarkLabel(isDT);
-      et.EmitGet(cg);                                   // if(et.IsSubclassOf(dt)) {
-      dt.EmitGet(cg);
-      cg.EmitCall(typeof(DynamicType), "IsSubclassOf");
-      cg.ILG.Emit(OpCodes.Brfalse, next);
-      if(ec.Target!=null)                               // ec.Target = e
-      { e.EmitGet(cg);
-        new AssignStatement(ec.Target).Emit(cg);
+    if(Else!=null)                                  //   else
+    { if(fromElse!=null)
+      { cg.EmitInt(1);
+        fromElse.EmitSet(cg);
       }
-      ec.Body.Emit(cg);                                 // ec.Body()
-      cg.ILG.Emit(OpCodes.Leave, done);                 // }
-      cg.ILG.MarkLabel(next);
+      Else.Emit(cg);
     }
 
-    if(Except.Length==0 || Except[Except.Length-1].Type!=null) cg.ILG.Emit(OpCodes.Rethrow);
-    else
-    { ExceptClause ec = Except[Except.Length-1];
-      if(ec.Target!=null)
-      { e.EmitGet(cg);
-        new AssignStatement(ec.Target).Emit(cg);
+    if(Except.Length!=0)
+    { cg.ILG.BeginCatchBlock(typeof(Exception));      // } catch(Exception e) {
+      Slot dt = cg.AllocLocalTemp(typeof(DynamicType)), type = cg.AllocLocalTemp(typeof(object)),
+          et = cg.AllocLocalTemp(typeof(DynamicType)), e = cg.AllocLocalTemp(typeof(Exception));
+
+      if(fromElse!=null)                              // if(fromElse) throw;
+      { Label prop = cg.ILG.DefineLabel();
+        fromElse.EmitGet(cg);
+        cg.ILG.Emit(OpCodes.Brfalse_S, prop);
+        cg.ILG.Emit(OpCodes.Rethrow);
+        cg.ILG.MarkLabel(prop);
       }
-      ec.Body.Emit(cg);
+
+      if(Except[0].Type!=null)
+      { cg.ILG.Emit(OpCodes.Dup);
+        e.EmitSet(cg);
+        cg.EmitCall(typeof(Ops), "GetDynamicType");     // dt = GetDynamicType(e)
+        dt.EmitSet(cg);
+
+        foreach(ExceptClause ec in Except)              // foreach(ExceptClause ec in Except) {
+        { if(ec.Type==null) break;
+          Label isDT=cg.ILG.DefineLabel(), next=cg.ILG.DefineLabel();
+          ec.Type.Emit(cg);                             // type = ec.Type
+          cg.ILG.Emit(OpCodes.Dup);
+          type.EmitSet(cg);
+          cg.ILG.Emit(OpCodes.Isinst, typeof(DynamicType)); // DynamicType et = type as DynamicType
+          cg.ILG.Emit(OpCodes.Dup);
+          et.EmitSet(cg);
+          cg.ILG.Emit(OpCodes.Brtrue, isDT);                // if(et==null) et = Ops.GetDynamicType(type)
+          type.EmitGet(cg);
+          cg.EmitCall(typeof(Ops), "GetDynamicType");
+          et.EmitSet(cg);
+          cg.ILG.MarkLabel(isDT);
+          et.EmitGet(cg);                                   // if(et.IsSubclassOf(dt)) {
+          dt.EmitGet(cg);
+          cg.EmitCall(typeof(DynamicType), "IsTryMatch");
+          cg.ILG.Emit(OpCodes.Brfalse, next);
+          if(ec.Target!=null)                               // ec.Target = e
+          { e.EmitGet(cg);
+            new AssignStatement(ec.Target).Emit(cg);
+          }
+          ec.Body.Emit(cg);                                 // ec.Body()
+          cg.ILG.Emit(OpCodes.Leave, done);                 // }
+          cg.ILG.MarkLabel(next);
+        }
+      }
+
+      if(Except[Except.Length-1].Type!=null) cg.ILG.Emit(OpCodes.Rethrow);
+      else
+      { ExceptClause ec = Except[Except.Length-1];
+        if(ec.Target!=null)
+        { e.EmitGet(cg);
+          new AssignStatement(ec.Target).Emit(cg);
+        }
+        ec.Body.Emit(cg);
+      }
+      cg.FreeLocalTemp(dt);
+      cg.FreeLocalTemp(type);
+      cg.FreeLocalTemp(et);
+      cg.FreeLocalTemp(e);
     }
 
-    if(Else!=null || Finally!=null)
+    if(Finally!=null)
     { cg.ILG.BeginFinallyBlock();
-      if(Else!=null)
-      { Label noElse=cg.ILG.DefineLabel();
-        occurred.EmitGet(cg);
-        cg.ILG.Emit(OpCodes.Brtrue, noElse);
-        cg.ILG.BeginExceptionBlock();
-        Else.Emit(cg);
-        cg.ILG.BeginCatchBlock(typeof(object));
-        cg.ILG.Emit(OpCodes.Pop);
-        cg.ILG.EndExceptionBlock();
-        cg.ILG.MarkLabel(noElse);
-      }
-      if(Finally!=null) Finally.Emit(cg);
+      Finally.Emit(cg);
     }
     cg.ILG.EndExceptionBlock();
 
-    if(occurred!=null) cg.FreeLocalTemp(occurred);
-    cg.FreeLocalTemp(dt);
-    cg.FreeLocalTemp(type);
-    cg.FreeLocalTemp(et);
-    cg.FreeLocalTemp(e);
+    if(fromElse!=null) cg.FreeLocalTemp(fromElse);
   }
   
   public override void Execute(Frame frame)
-  { bool occurred=false;
-    try { Body.Execute(frame); }
+  { bool fromElse=false, occurred=false;
+    try
+    { Body.Execute(frame);
+      if(Else!=null) { fromElse=true; Else.Execute(frame); }
+    }
+    catch(BreakException) { throw; }
+    catch(ContinueException) { throw; }
     catch(Exception e)
-    { occurred = true;
+    { if(fromElse) throw;
+      occurred = true;
       Boa.Modules.sys.Exceptions.Push(e);
 
       DynamicType dt = Ops.GetDynamicType(e);
@@ -1378,13 +1409,10 @@ public class TryStatement : Statement
           goto done;
         }
       }
-      if(Else==null) throw;
-      else Else.Execute(frame);
       done:;
     }
     finally
-    { if(!occurred && Else!=null) try { Else.Execute(frame); } catch { }
-      if(Finally!=null) Finally.Execute(frame);
+    { if(Finally!=null) Finally.Execute(frame);
       if(occurred) Boa.Modules.sys.Exceptions.Pop();
     }
   }
@@ -1445,7 +1473,6 @@ public class WhileStatement : Statement
     cg.ILG.Emit(OpCodes.Br, start);
     cg.ILG.MarkLabel(end);
     cg.ILG.BeginCatchBlock(typeof(StopIterationException));
-    cg.ILG.Emit(OpCodes.Pop);
     cg.ILG.EndExceptionBlock();
   }
 

@@ -43,6 +43,15 @@ public abstract class DynamicType
 
   public virtual bool IsSubclassOf(object other) { throw new NotSupportedException(); }
 
+  public bool IsTryMatch(object other)
+  { Tuple tup = other as Tuple;
+    if(tup!=null)
+    { foreach(object o in tup.items) if(IsSubclassOf(o)) return true;
+      return false;
+    }
+    else return IsSubclassOf(other);
+  }
+
   public virtual string Repr(object self)
   { object ret;
     if(Ops.TryInvoke(self, "__repr__", out ret)) return (string)ret;

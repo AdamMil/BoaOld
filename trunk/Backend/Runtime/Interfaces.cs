@@ -90,6 +90,11 @@ public interface IHasAttributes
   void __delattr__(string key);
 }
 
+public interface IInstance : IDynamicObject
+{ Dict __dict__ { get; }
+  UserType __class__ { get; set; }
+}
+
 public interface IRepresentable
 { string __repr__();
 }

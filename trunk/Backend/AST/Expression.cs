@@ -200,7 +200,7 @@ public class CallExpression : Expression
     Target.Emit(cg);
     if(numlist==0 && numdict==0)
     { if(numnamed==0)
-      { if(Arguments.Length==0) cg.EmitNewArray(typeof(object), 0);
+      { if(Arguments.Length==0) cg.EmitFieldGet(typeof(Misc), "EmptyArray");
         else EmitRun(cg, Arguments.Length, 0, Arguments.Length);
         cg.EmitCall(typeof(Ops), "Call", new Type[] { typeof(object), typeof(object[]) });
       }
@@ -314,7 +314,8 @@ public class CallExpression : Expression
 
     if(numlist==0 && numdict==0)
     { if(numnamed==0)
-      { object[] args = Arguments.Length==0 ? new object[0] : EvaluateRun(frame, Arguments.Length, 0, Arguments.Length);
+      { object[] args = Arguments.Length==0 ? Misc.EmptyArray
+                                            : EvaluateRun(frame, Arguments.Length, 0, Arguments.Length);
         return Ops.Call(callee, args);
       }
       else
@@ -543,7 +544,7 @@ public class GeneratorExpression : ListGenExpression
 
     nc.IsGenerator = true;
     nc.Namespace = new FieldNamespace(cg.Namespace, "_", nc, new ThisSlot(tg.TypeBuilder));
-    nc.Namespace.SetArgs(args, 0, nc.MethodBuilder);
+    nc.Namespace.SetArgs(args, 0, nc.MethodBase);
     argslot = nc.Namespace.GetSlotForSet(args[0]);
 
     nc.EmitPosition(this); // TODO: make sure this is done elsewhere, too
@@ -1079,11 +1080,13 @@ public class SliceExpression : Expression
   }
   
   public override object Evaluate(Frame frame)
-  { return new Slice(Start.Evaluate(frame), Stop.Evaluate(frame), Step==null ? null : Step.Evaluate(frame));
+  { return new Slice(Start==null ? null : Start.Evaluate(frame), Stop==null ? null : Stop.Evaluate(frame),
+                     Step ==null ? null : Step.Evaluate(frame));
   }
 
   public override void Optimize()
-  { IsConstant = Start==null || Start.IsConstant && Stop==null || Stop.IsConstant && Step==null || Step.IsConstant;
+  { IsConstant = (Start==null || Start.IsConstant) && (Stop==null || Stop.IsConstant) &&
+                 (Step==null || Step.IsConstant);
   }
 
   public override void ToCode(System.Text.StringBuilder sb, int indent)

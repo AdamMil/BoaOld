@@ -63,7 +63,7 @@ public sealed class BoaFunction : Node
     cg.EmitInt(numRequired);
     EmitClosedGet(cg);
     cg.ILG.Emit(OpCodes.Ldnull); // create delegate
-    cg.ILG.Emit(OpCodes.Ldftn, impl.MethodBuilder);
+    cg.ILG.Emit(OpCodes.Ldftn, (MethodInfo)impl.MethodBase);
     cg.EmitNew((ConstructorInfo)targetType.GetMember(".ctor")[0]);
     cg.EmitNew(funcType, consTypes);
     if(docstring!=null)
@@ -217,7 +217,7 @@ public sealed class BoaFunction : Node
                                             "InnerNext", typeof(bool), new Type[] { Misc.TypeOfObjectRef });
         ncg.IsGenerator = true;
         ncg.Namespace   = new FieldNamespace(cg.Namespace, "_", ncg, new ThisSlot(tg.TypeBuilder));
-        ncg.Namespace.SetArgs(parmNames, 0, ncg.MethodBuilder);
+        ncg.Namespace.SetArgs(parmNames, 0, ncg.MethodBase);
         Body.Walk(new LabelMaker(ncg));
         ncg.ILG.BeginExceptionBlock();
 
@@ -280,7 +280,7 @@ public sealed class BoaFunction : Node
     for(int i=0; i<numOptional; i++) if(!Parameters[i+optionalStart].Default.IsConstant) { constant=false; break; }
   
     if(constant)
-    { defaultSlot = cg.TypeGenerator.AddStaticSlot(FuncName + "$d" + index, typeof(object[]));
+    { defaultSlot = cg.TypeGenerator.DefineStaticField(FuncName + "$d" + index, typeof(object[]));
       CodeGenerator icg = cg.TypeGenerator.GetInitializer();
       icg.EmitNewArray(typeof(object), numOptional);
       for(int i=0; i<numOptional; i++)
@@ -305,7 +305,7 @@ public sealed class BoaFunction : Node
 
   void EmitNames(CodeGenerator cg)
   { if(namesSlot==null)
-    { namesSlot = cg.TypeGenerator.AddStaticSlot(FuncName + "$n" + index, typeof(string[]));
+    { namesSlot = cg.TypeGenerator.DefineStaticField(FuncName + "$n" + index, typeof(string[]));
       CodeGenerator icg = cg.TypeGenerator.GetInitializer();
       icg.EmitStringArray(names);
       namesSlot.EmitSet(icg);
@@ -342,7 +342,8 @@ public sealed class BoaFunction : Node
     LocalNamespace ns = new LocalNamespace(cg.Namespace, icg);
     icg.Namespace = ns;
     //icg.SetArgs(names, 1);
-    ns.SetArgs(names, icg, new ArgSlot(icg.MethodBuilder, Inherit==null ? 0 : 1, "$names", typeof(object[])));
+    ns.SetArgs(names, icg,
+               new ArgSlot((MethodBuilder)icg.MethodBase, Inherit==null ? 0 : 1, "$names", typeof(object[])));
 
     if(Inherit!=null && Inherit.Length>0)
     { icg.EmitArgGet(0);

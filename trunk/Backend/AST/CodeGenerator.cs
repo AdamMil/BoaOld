@@ -29,8 +29,8 @@ namespace Boa.AST
 {
 
 public class CodeGenerator
-{ public CodeGenerator(TypeGenerator tg, MethodBuilder mb, ILGenerator ilg)
-  { TypeGenerator = tg; MethodBuilder = mb; ILG = ilg;
+{ public CodeGenerator(TypeGenerator tg, MethodBase mb, ILGenerator ilg)
+  { TypeGenerator = tg; MethodBase = mb; ILG = ilg;
   }
 
   public Slot AllocLocalTemp(Type type) { return AllocLocalTemp(type, false); }
@@ -49,7 +49,7 @@ public class CodeGenerator
   }
 
   public void EmitArgGet(int index)
-  { if(!MethodBuilder.IsStatic) index++;
+  { if(!MethodBase.IsStatic) index++;
     switch(index)
     { case 0: ILG.Emit(OpCodes.Ldarg_0); break;
       case 1: ILG.Emit(OpCodes.Ldarg_1); break;
@@ -59,11 +59,11 @@ public class CodeGenerator
     }
   }
   public void EmitArgGetAddr(int index)
-  { if(!MethodBuilder.IsStatic) index++;
+  { if(!MethodBase.IsStatic) index++;
     ILG.Emit(index<256 ? OpCodes.Ldarga_S : OpCodes.Ldarga, index);
   }
   public void EmitArgSet(int index)
-  { if(!MethodBuilder.IsStatic) index++;
+  { if(!MethodBase.IsStatic) index++;
     ILG.Emit(index<256 ? OpCodes.Starg_S : OpCodes.Starg, index);
   }
 
@@ -132,7 +132,12 @@ public class CodeGenerator
 		ILG.Emit(op);
   }
   
-  public void EmitIsFalse() { EmitIsTrue(); ILG.Emit(OpCodes.Not); }
+  public void EmitIsFalse()
+  { EmitIsTrue();
+    EmitInt(0);
+    ILG.Emit(OpCodes.Ceq);
+  }
+
   public void EmitIsFalse(Expression e) { e.Emit(this); EmitIsFalse(); }
   public void EmitIsTrue() { EmitCall(typeof(Ops), "IsTrue"); }
   public void EmitIsTrue(Expression e) { e.Emit(this); EmitIsTrue(); }
@@ -199,7 +204,7 @@ public class CodeGenerator
   }
 
   public void EmitThis()
-  { if(MethodBuilder.IsStatic) throw new InvalidOperationException("no 'this' for a static method");
+  { if(MethodBase.IsStatic) throw new InvalidOperationException("no 'this' for a static method");
     ILG.Emit(OpCodes.Ldarg_0);
   }
   
@@ -214,14 +219,14 @@ public class CodeGenerator
 
   public void FreeLocalTemp(Slot slot) { localTemps.Add(slot); }
 
-  public void SetArgs(Name[] names) { Namespace.SetArgs(names, 0, MethodBuilder); }
-  public void SetArgs(Name[] names, int offset) { Namespace.SetArgs(names, offset, MethodBuilder); }
+  public void SetArgs(Name[] names) { Namespace.SetArgs(names, 0, MethodBase); }
+  public void SetArgs(Name[] names, int offset) { Namespace.SetArgs(names, offset, MethodBase); }
 
   public Namespace Namespace;
   public bool IsGenerator;
 
   public readonly TypeGenerator TypeGenerator;
-  public readonly MethodBuilder MethodBuilder;
+  public readonly MethodBase MethodBase;
   public readonly ILGenerator   ILG;
 
   ArrayList localTemps;

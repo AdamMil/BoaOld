@@ -50,7 +50,7 @@ public abstract class Namespace
   }
   public Slot GetSlotForSet(Name name) { return GetSlot(name); }
   
-  public virtual void SetArgs(Name[] names, int offset, MethodBuilder mb)
+  public virtual void SetArgs(Name[] names, int offset, MethodBase mb)
   { throw new NotSupportedException("SetArgs: "+GetType());
   }
 
@@ -112,7 +112,7 @@ public class FieldNamespace : Namespace
     }
   }
 
-  public override void SetArgs(Name[] names, int offset, MethodBuilder mb)
+  public override void SetArgs(Name[] names, int offset, MethodBase mb)
   { for(; offset<names.Length; offset++) GetSlotForSet(names[offset]);
   }
 
@@ -129,7 +129,7 @@ public class FrameNamespace : Namespace
 { public FrameNamespace(TypeGenerator tg, CodeGenerator cg) : base(null, cg)
   { Slot field = new StaticSlot(tg.TypeBuilder.DefineField("__frame", typeof(Frame),
                                                            FieldAttributes.Public|FieldAttributes.Static));
-    FrameSlot = new FrameObjectSlot(cg, new ArgSlot(cg.MethodBuilder, 0, "frame"), field);
+    FrameSlot = new FrameObjectSlot(cg, new ArgSlot((MethodBuilder)cg.MethodBase, 0, "frame"), field);
   }
 
   public override void DeleteSlot(Name name)
@@ -138,7 +138,7 @@ public class FrameNamespace : Namespace
     codeGen.EmitCall(typeof(Frame), "Delete");
   }
 
-  public override void SetArgs(Name[] names, int offset, MethodBuilder mb)
+  public override void SetArgs(Name[] names, int offset, MethodBase mb)
   { foreach(Name name in names) slots[GetKey(name)] = MakeSlot(name);
   }
 
@@ -180,8 +180,9 @@ public class LocalNamespace : Namespace
     }
   }
 
-  public override void SetArgs(Name[] names, int offset, MethodBuilder mb)
-  { for(int i=0; i<names.Length; i++) slots[names[i].String] = new ArgSlot(mb, i+offset, names[i].String);
+  public override void SetArgs(Name[] names, int offset, MethodBase mb)
+  { for(int i=0; i<names.Length; i++)
+      slots[names[i].String] = new ArgSlot((MethodBuilder)mb, i+offset, names[i].String);
   }
 
   public void SetArgs(Name[] names, CodeGenerator cg, Slot objArray)

@@ -30,7 +30,7 @@ using Boa.Runtime;
 // TODO: add <=> operator
 // TODO: implement sets
 // TODO: try to make precedence match python's where it makes sense
-// TODO: support unicode strings
+// TODO: support unicode string parsing
 
 namespace Boa.AST
 {
@@ -98,14 +98,16 @@ public class Parser
     return stmts.Count==0 ? new PassStatement() : (Statement)new Suite((Statement[])stmts.ToArray(typeof(Statement)));
   }
 
-  // expression := <typelow> | <lambda> (',' <expression>)?
+  // expression := <ternary> | <lambda> (',' <expression>)?
   public Expression ParseExpression()
   { if(token==Token.Lambda) return ParseLambda();
-    Expression expr = ParseTypeLow();
+    Expression expr = ParseTernary();
     if(bareTuples && token==Token.Comma)
     { ArrayList exprs = new ArrayList();
       exprs.Add(expr);
+      bareTuples = false;
       while(TryEat(Token.Comma) && token!=Token.EOL && token!=Token.Assign) exprs.Add(ParseExpression());
+      bareTuples = true;
       expr = AP(new TupleExpression((Expression[])exprs.ToArray(typeof(Expression))));
     }
     return expr;
@@ -215,33 +217,37 @@ public class Parser
   // argument_list := <argument> (',' <argument>)*
   // argument := ('*' | '**')? <expression> | <identifier> '=' <expression>
   Argument[] ParseArguments()
-  { if(token==Token.RParen) return new Argument[0];
-    ArrayList args = new ArrayList();
-    bool obt=bareTuples, owe=wantEOL;
+  { bool obt=bareTuples, owe=wantEOL;
     bareTuples=wantEOL=false;
-    do
-    { if(TryEat(Token.Asterisk)) args.Add(new Argument(ParseExpression(), ArgType.List));
-      else if(TryEat(Token.Power)) args.Add(new Argument(ParseExpression(), ArgType.Dict));
-      else if(token!=Token.Identifier) args.Add(new Argument(ParseExpression()));
-      else
-      { Expression e = ParseExpression();
-        if(TryEat(Token.Assign))
-        { if(!(e is NameExpression)) Unexpected(Token.Assign);
-          args.Add(new Argument(((NameExpression)e).Name.String, ParseExpression()));
+
+    try
+    { Eat(Token.LParen);
+      if(token==Token.RParen) return new Argument[0];
+      ArrayList args = new ArrayList();
+      do
+      { if(TryEat(Token.Asterisk)) args.Add(new Argument(ParseExpression(), ArgType.List));
+        else if(TryEat(Token.Power)) args.Add(new Argument(ParseExpression(), ArgType.Dict));
+        else if(token!=Token.Identifier) args.Add(new Argument(ParseExpression()));
+        else
+        { Expression e = ParseExpression();
+          if(TryEat(Token.Assign))
+          { if(!(e is NameExpression)) Unexpected(Token.Assign);
+            args.Add(new Argument(((NameExpression)e).Name.String, ParseExpression()));
+          }
+          else args.Add(new Argument(e));
         }
-        else args.Add(new Argument(e));
-      }
-    } while(TryEat(Token.Comma));
+      } while(TryEat(Token.Comma));
 
-    ListDictionary ld = new ListDictionary();
-    foreach(Argument a in args)
-      if(a.Name!=null)
-      { if(ld.Contains(a.Name)) SyntaxError("duplicate keyword argument '{0}'", a.Name);
-        else ld[a.Name] = null;
-      }
+      ListDictionary ld = new ListDictionary();
+      foreach(Argument a in args)
+        if(a.Name!=null)
+        { if(ld.Contains(a.Name)) SyntaxError("duplicate keyword argument '{0}'", a.Name);
+          else ld[a.Name] = null;
+        }
 
-    bareTuples=obt; wantEOL=owe;
-    return (Argument[])args.ToArray(typeof(Argument));
+      return (Argument[])args.ToArray(typeof(Argument));
+    }
+    finally { bareTuples=obt; wantEOL=owe; }
   }
 
   // bitwise    := <shift> (<bitwise_op> <shift>)*
@@ -265,7 +271,7 @@ public class Parser
   Expression ParseCIM()
   { Expression expr = ParsePrimary();
     while(true)
-    { if(TryEat(Token.LParen))
+    { if(token==Token.LParen)
       { expr = AP(new CallExpression(expr, ParseArguments()));
         Eat(Token.RParen);
       }
@@ -309,7 +315,7 @@ public class Parser
   }
 
   // compare    := <isin> (<compare_op> <isin>)*
-  // compare_op := '==' | '!=' | '<' | '>' | '<=' | '>=' | 'is' | 'is not'
+  // compare_op := '==' | '!=' | '<' | '>' | '<=' | '>=' | '<>' | 'is' | 'is not'
   Expression ParseCompare()
   { Expression expr = ParseIsIn();
     ArrayList comps = null;
@@ -412,7 +418,11 @@ public class Parser
   { Eat(Token.For);
     Name[] names = ParseNameList();
     Eat(Token.In);
-    return AP(new ForStatement(names, ParseExpression(), ParseSuite()));
+    Expression loopExp = ParseExpression();
+    loopDepth++;
+    Statement body = ParseSuite();
+    loopDepth--;
+    return AP(new ForStatement(names, loopExp, body));
   }
 
   // global_stmt := 'global' <namelist> EOL
@@ -864,13 +874,18 @@ public class Parser
     return expr;
   }
 
+  // try := 'try' <suite> NEWLINE ('except' <expression>? ',' <ident> <suite>)*
+  //        ('except' <suite>)? ('else' <suite>)? ('finally' <suite>)?
   Statement ParseTry()
   { int indent=this.indent;
     Eat(Token.Try);
     Statement body = ParseSuite(), elze=null, final=null;
     ArrayList list = new ArrayList();
     while(indent==this.indent && TryEat(Token.Except))
-    { Expression     type = token==Token.Comma || token==Token.Colon || token==Token.EOL ? null : ParseExpression();
+    { bool obt=bareTuples;
+      bareTuples=false;
+      Expression     type = token==Token.Comma || token==Token.Colon || token==Token.EOL ? null : ParseExpression();
+      bareTuples=true;
       NameExpression name = TryEat(Token.Comma) ? (NameExpression)AP(new NameExpression(ParseIdentifier())) : null;
       list.Add(AP((Node)new ExceptClause(type, name, ParseSuite())));
       if(type==null) break;
@@ -879,11 +894,6 @@ public class Parser
     if(indent==this.indent && TryEat(Token.Finally)) final = ParseSuite();
     if(list.Count==0 && elze==null && final==null) SyntaxError("expecting 'except', 'else', or 'finally'");
     return AP(new TryStatement(body, (ExceptClause[])list.ToArray(typeof(ExceptClause)), elze, final));
-  }
-
-  // typelow := <ternary>
-  Expression ParseTypeLow()
-  { return ParseTernary();
   }
 
   // unary     := <unary_op> <unary>
@@ -1068,6 +1078,7 @@ public class Parser
           c = ReadChar();
           if(c=='<') return Token.LeftShift;
           if(c=='=') value=BinaryOperator.LessEqual;
+          else if(c=='>') value = BinaryOperator.NotEqual;
           else { lastChar = c; value = BinaryOperator.Less; }
           return Token.Compare;
         case '>':

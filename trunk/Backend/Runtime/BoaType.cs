@@ -35,6 +35,8 @@ public class BoaTypeAttribute : Attribute
 public abstract class BoaType : DynamicType, IDynamicObject, ICallable, IHasAttributes
 { public BoaType(Type type)
   { this.type=type;
+    inheritType = type;
+    while(typeof(IInstance).IsAssignableFrom(inheritType)) inheritType = inheritType.BaseType;
 
     if(type==typeof(object)) __name__ = "object";
     else if(type==typeof(string)) __name__ = "string";
@@ -80,6 +82,9 @@ public abstract class BoaType : DynamicType, IDynamicObject, ICallable, IHasAttr
     RawSetSlot(name, value);
   }
   #endregion
+
+  public Type RealType { get { return type; } }
+  public Type TypeToInheritFrom { get { return inheritType; } }
 
   public virtual void DelAttr(Tuple mro, int index, object self, string name) { DelAttr(self, name); }
 
@@ -132,7 +137,7 @@ public abstract class BoaType : DynamicType, IDynamicObject, ICallable, IHasAttr
   }
 
   protected Dict dict;
-  protected Type type;
+  protected Type type, inheritType;
   protected bool initialized;
 }
 

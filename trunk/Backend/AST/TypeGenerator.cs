@@ -36,13 +36,32 @@ public class TypeGenerator
 
   public Slot ModuleField
   { get
-    { if(moduleField==null) moduleField = AddStaticSlot(Boa.Runtime.Module.FieldName, typeof(Boa.Runtime.Module));
+    { if(moduleField==null) moduleField = DefineStaticField(Boa.Runtime.Module.FieldName, typeof(Boa.Runtime.Module));
       return moduleField;
     }
   }
 
-  public Slot AddStaticSlot(string name, Type type)
-  { return new StaticSlot(TypeBuilder.DefineField(name, type, FieldAttributes.Public|FieldAttributes.Static));
+  public CodeGenerator DefineChainedConstructor(ConstructorInfo parent)
+  { ParameterInfo[] pi = parent.GetParameters();
+    Type[] types = GetParamTypes(pi);
+    ConstructorBuilder cb = TypeBuilder.DefineConstructor(MethodAttributes.Public, CallingConventions.Standard, types);
+    for(int i=0; i<pi.Length; i++)
+    { ParameterBuilder pb = cb.DefineParameter(i+1, pi[i].Attributes, pi[i].Name);
+      if(pi[i].IsDefined(typeof(ParamArrayAttribute), false))
+        pb.SetCustomAttribute(
+          new CustomAttributeBuilder(typeof(ParamArrayAttribute).GetConstructor(Type.EmptyTypes), Misc.EmptyArray));
+    }
+    
+    CodeGenerator cg = new CodeGenerator(this, cb, cb.GetILGenerator());
+    cg.EmitThis();
+    for(int i=0; i<pi.Length; i++) cg.EmitArgGet(i);
+    cg.ILG.Emit(OpCodes.Call, parent);
+    return cg;
+  }
+
+  public Slot DefineField(string name, Type type) { return DefineField(name, type, FieldAttributes.Public); }
+  public Slot DefineField(string name, Type type, FieldAttributes access)
+  { return new FieldSlot(new ThisSlot(TypeBuilder), TypeBuilder.DefineField(name, type, access));
   }
 
   public CodeGenerator DefineMethod(string name, Type retType, Type[] paramTypes)
@@ -52,7 +71,16 @@ public class TypeGenerator
   { MethodBuilder mb = TypeBuilder.DefineMethod(name, attrs, retType, paramTypes);
     return new CodeGenerator(this, mb, mb.GetILGenerator());
   }
-  
+
+  public CodeGenerator DefineMethodOverride(MethodInfo baseMethod)
+  { MethodAttributes attrs = baseMethod.Attributes & ~MethodAttributes.Abstract;
+    MethodBuilder mb = TypeBuilder.DefineMethod(baseMethod.Name, attrs, baseMethod.ReturnType,
+                                                GetParamTypes(baseMethod.GetParameters()));
+    // TODO: figure out how to use this properly
+    //TypeBuilder.DefineMethodOverride(mb, baseMethod);
+    return new CodeGenerator(this, mb, mb.GetILGenerator());
+  }
+
   public TypeGenerator DefineNestedType(string name, Type parent) { return DefineNestedType(0, name, parent); }
   public TypeGenerator DefineNestedType(TypeAttributes attrs, string name, Type parent)
   { if(nestedTypes==null) nestedTypes = new ArrayList();
@@ -60,6 +88,10 @@ public class TypeGenerator
     TypeGenerator ret = new TypeGenerator(Assembly, TypeBuilder.DefineNestedType(name, ta, parent));
     nestedTypes.Add(ret);
     return ret;
+  }
+
+  public Slot DefineStaticField(string name, Type type)
+  { return new StaticSlot(TypeBuilder.DefineField(name, type, FieldAttributes.Public|FieldAttributes.Static));
   }
 
   public Type FinishType()
@@ -93,6 +125,17 @@ public class TypeGenerator
     }
     return slot;
   }
+
+  public CodeGenerator GetInitializer()
+  { if(initGen==null)
+    { ConstructorBuilder cb = TypeBuilder.DefineTypeInitializer();
+      initGen = new CodeGenerator(this, cb, cb.GetILGenerator());
+    }
+    return initGen;
+  }
+
+  public AssemblyGenerator Assembly;
+  public TypeBuilder TypeBuilder;
 
   void EmitConstantInitializer(object value)
   { CodeGenerator cg = GetInitializer();
@@ -152,13 +195,11 @@ public class TypeGenerator
     }
   }
 
-  public CodeGenerator GetInitializer()
-  { if(initGen==null) initGen = new CodeGenerator(this, null, TypeBuilder.DefineTypeInitializer().GetILGenerator());
-    return initGen;
+  Type[] GetParamTypes(ParameterInfo[] pi)
+  { Type[] paramTypes = new Type[pi.Length];
+    for(int i=0; i<pi.Length; i++) paramTypes[i] = pi[i].ParameterType;
+    return paramTypes;
   }
-
-  public AssemblyGenerator Assembly;
-  public TypeBuilder TypeBuilder;
 
   HybridDictionary constants = new HybridDictionary();
   ArrayList nestedTypes, constobjs, constslots;
