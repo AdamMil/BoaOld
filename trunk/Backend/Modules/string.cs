@@ -21,9 +21,9 @@ public sealed class @string
   public static string capwords(string s)
   { List list = split(s);
     for(int i=0; i<list.Count; i++) list[i] = capitalize((string)list[i]);
-    return join(" ");
+    return join(list, " ");
   }
-  
+
   public static string center(string s, int width)
   { width -= s.Length;
     if(width<2) return s;
@@ -99,8 +99,18 @@ public sealed class @string
 
   public static string replace(string s, string old, string @new) { return replace(s, old, @new, 0); }
   public static string replace(string s, string old, string @new, int maxreplace)
-  { if(maxreplace==0) return s.Replace(old, @new);
-    throw new NotImplementedException();
+  { if(maxreplace<0) throw Ops.ValueError("replace(): 'maxreplace' should not be negative");
+    if(maxreplace==0) return s.Replace(old, @new);
+    StringBuilder sb = new StringBuilder();
+    int pos=0, opos=0, reps=0;
+    while(pos<s.Length && (pos=s.IndexOf(old, pos))!=-1)
+    { sb.Append(s.Substring(opos, pos-opos));
+      opos = pos = pos+old.Length;
+      sb.Append(@new);
+      if(++reps>=maxreplace) break;
+    }
+    if(opos<s.Length) sb.Append(s.Substring(opos));
+    return sb.ToString();
   }
 
   public static int rfind(string s, string sub) { return rfind(s, sub, 0, s.Length-1); }
@@ -126,9 +136,33 @@ public sealed class @string
   public static string rstrip(string s, string ws) { return s.TrimEnd(ws.ToCharArray()); }
 
   public static List split(string s) { return split(s, whitespace, 0); }
-  public static List split(string s, string sep) { return split(s, whitespace, 0); }
+  public static List split(string s, string sep) { return split(s, sep, 0); }
   public static List split(string s, string sep, int maxsplit)
-  { throw new NotImplementedException();
+  { if(maxsplit<0) throw Ops.ValueError("split(): 'maxsplit' should not be negative");
+    if(sep==null || sep=="")
+    { List ret = new List(maxsplit==0 ? s.Length : maxsplit<s.Length ? maxsplit+1 : maxsplit);
+      int i=0, end=Math.Min(maxsplit, s.Length);
+      for(; i<end; i++) ret.append(new string(s[i], 1));
+      if(i<s.Length) ret.append(s.Substring(i));
+      return ret;
+    }
+    else
+    { List ret = new List();
+      int start=0, splits=0;
+      for(int i=0; i<s.Length; i++)
+      { char c = s[i];
+        for(int j=0; j<sep.Length; j++)
+          if(c==sep[j])
+          { ret.append(s.Substring(start, i-start));
+            start = i+1;
+            if(maxsplit>0 && ++splits==maxsplit) goto done;
+            break;
+          }
+      }
+      done:
+      if(start<s.Length) ret.append(start==0 ? s : s.Substring(start));
+      return ret;
+    }
   }
 
   public static string strip(string s) { return strip(s, whitespace); }
