@@ -35,9 +35,8 @@ public class ReflectedPackage : IHasAttributes
   #region IHasAttributes Members
   public List __attrs__() { return __dict__.keys(); }
   public object __getattr__(string key)
-  { object ret = __dict__[key];
-    if(ret==null && !__dict__.Contains(key)) ret = Ops.Missing;
-    return ret;
+  { object obj = __dict__[key];
+    return obj!=null || __dict__.Contains(obj) ? obj : Ops.Missing;
   }
   public void __setattr__(string key, object value) { __dict__[key]=value; }
   public void __delattr__(string key) { __dict__.Remove(key); }
