@@ -129,12 +129,15 @@ public class UserType : BoaType
 
   public override void DelAttr(Tuple mro, int index, object self, string name)
   { IInstance ui = (IInstance)self;
-    if(ui!=null && ui.__dict__.Contains(name)) ui.__dict__.Remove(name);
-    else
-    { object slot = LookupSlot(mro, index, name);
-      if(slot!=Ops.Missing) Ops.DelDescriptor(slot, self);
-      else throw Ops.AttributeError("no such slot '{0}'", name);
+    if(ui!=null)
+    { int count = ui.__dict__.Count; // i assume it's more efficient to check .Count twice than to call Contains()
+      ui.__dict__.Remove(name);      // (to see if the item was actually removed)
+      if(ui.__dict__.Count!=count) return;
     }
+
+    object slot = LookupSlot(mro, index, name);
+    if(slot!=Ops.Missing) Ops.DelDescriptor(slot, self);
+    else throw Ops.AttributeError("no such slot '{0}'", name);
   }
   public override void DelAttr(object self, string name) { DelAttr(mro, 0, self, name); }
 
@@ -172,8 +175,9 @@ public class UserType : BoaType
         return true;
       }
 
-      if(ui.__dict__.Contains(name))
-      { value = Ops.GetDescriptor(ui.__dict__[name], self);
+      object obj = ui.__dict__[name];
+      if(obj!=null || ui.__dict__.Contains(name))
+      { value = Ops.GetDescriptor(obj, self);
         return true;
       }
     }

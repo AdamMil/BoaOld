@@ -40,9 +40,9 @@ public class Frame
 
   public object Get(string name) // TODO: eliminate double lookup
   { if(globalNames!=null && globalNames.Contains(name)) return GetGlobal(name);
-    object ret = Locals[name];
-    if(ret==null && !Locals.Contains(name)) ret = Parent==null ? GetGlobal(name) : Parent.Get(name);
-    return ret;
+    object obj = Locals[name];
+    if(obj!=null || Locals.Contains(name)) return obj;
+    return Parent==null ? GetGlobal(name) : Parent.Get(name);
   }
 
   public void Set(string name, object value)

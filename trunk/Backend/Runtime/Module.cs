@@ -49,8 +49,8 @@ public class Module : Boa.AST.Snippet, IHasAttributes, IRepresentable
   }
   public object __getattr__(string name)
   { object obj = __dict__[name];
-    if(obj==null && !__dict__.Contains(name)) return builtins.__getattr__(name);
-    return Ops.GetDescriptor(obj, null);
+    if(obj!=null || __dict__.Contains(name)) return Ops.GetDescriptor(obj, null);
+    return builtins.__getattr__(name);
   }
   public void __setattr__(string key, object value)
   { if(!Ops.SetDescriptor(__dict__[key], null, value)) __dict__[key] = value;
