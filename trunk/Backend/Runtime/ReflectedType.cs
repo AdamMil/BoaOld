@@ -38,13 +38,17 @@ public class ArrayGetItem : IDescriptor, ICallable
   public object Call(params object[] args)
   { if(args.Length==0) return Ops.TooFewArgs("System.Array.__getitem__()", 1, 0);
     if(instance==null) throw Ops.MethodCalledWithoutInstance("System.Array.__getitem__()");
+    int length = instance.Length;
     switch(args.Length)
-    { case 1: return instance.GetValue(Ops.ToInt(args[0]));
-      case 2: return instance.GetValue(Ops.ToInt(args[0]), Ops.ToInt(args[1]));
-      case 3: return instance.GetValue(Ops.ToInt(args[0]), Ops.ToInt(args[1]), Ops.ToInt(args[2]));
+    { case 1: return instance.GetValue(Ops.FixIndex(Ops.ToInt(args[0]), length));
+      case 2: return instance.GetValue(Ops.FixIndex(Ops.ToInt(args[0]), length),
+                                       Ops.FixIndex(Ops.ToInt(args[1]), length));
+      case 3: return instance.GetValue(Ops.FixIndex(Ops.ToInt(args[0]), length),
+                                       Ops.FixIndex(Ops.ToInt(args[1]), length),
+                                       Ops.FixIndex(Ops.ToInt(args[2]), length));
       default:
         int[] indices = new int[args.Length];
-        for(int i=0; i<args.Length; i++) indices[i] = Ops.ToInt(args[i]);
+        for(int i=0; i<args.Length; i++) indices[i] = Ops.FixIndex(Ops.ToInt(args[i]), length);
         return instance.GetValue(indices);
     }
   }
@@ -66,7 +70,8 @@ public class ArraySetItem : IDescriptor, ICallable
   public object Call(params object[] args)
   { if(args.Length<2) return Ops.TooFewArgs("System.Array.__setitem__()", 2, args.Length);
     if(instance==null) throw Ops.MethodCalledWithoutInstance("System.Array.__setitem__()");
-    instance.SetValue(Ops.ConvertTo(args[1], instance.GetType().GetElementType()), Ops.ToInt(args[0]));
+    instance.SetValue(Ops.ConvertTo(args[1], instance.GetType().GetElementType()),
+                      Ops.FixIndex(Ops.ToInt(args[0]), instance.Length));
     return null;
   }
 
@@ -149,7 +154,8 @@ public class StringGetItem : IDescriptor, ICallable
   { if(args.Length!=1) throw Ops.WrongNumArgs("__getitem__", args.Length, 1);
     if(instance==null) throw Ops.MethodCalledWithoutInstance("string.__getitem__()");
     Slice slice = args[0] as Slice;
-    return slice==null ? new string(instance[Ops.ToInt(args[0])], 1) : StringOps.Slice(instance, slice);
+    return slice==null ? new string(instance[Ops.FixIndex(Ops.ToInt(args[0]), instance.Length)], 1)
+                       : StringOps.Slice(instance, slice);
   }
 
   public override string ToString() { return "<method '__getitem__' on 'System.String'>"; }

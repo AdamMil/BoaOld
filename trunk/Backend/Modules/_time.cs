@@ -65,7 +65,8 @@ public sealed class _time
     #region ISequence Members
     public object __add__(object o) { throw new NotImplementedException(); }
     public object __getitem__(int index)
-    { switch(index)
+    { if(index<0) index += 9;
+      switch(index)
       { case 0: return tm_year;
         case 1: return tm_mon;
         case 2: return tm_mday;

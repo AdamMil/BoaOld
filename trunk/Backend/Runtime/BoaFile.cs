@@ -300,7 +300,7 @@ public class BoaFile : IFile, IEnumerable
   void AssertOpen() { if(stream==null) throw Ops.IOError("operation attempted on a closed file"); }
 
   void clearBuffer()
-  { if(bufLen>0)
+  { if(bufLen>0 && stream.CanSeek)
     { stream.Position -= bufLen;
       bufLen = 0;
     }

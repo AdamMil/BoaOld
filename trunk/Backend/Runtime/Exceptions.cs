@@ -26,6 +26,7 @@ namespace Boa.Runtime
 
 // TODO: don't duplicate exceptions that already exist (NotImplemented, IOError, etc...)
 // TODO: implement python-like exception handling (with the throw type,value / except type,value form)
+// TODO: make exceptions accept the same constructor arguments as python's
 
 public class ArithmeticErrorException : RuntimeException
 { public ArithmeticErrorException(string message) : base(message) { }

@@ -280,7 +280,7 @@ object, or null if no match was found.")]
   public static Match match(object pattern, string str) { return match(pattern, str, 0); }
   public static Match match(object pattern, string str, int flags)
   { Match m = search(pattern, str, flags);
-    return m.Index==0 ? m : null;
+    return m!=null && m.Index==0 ? m : null;
   }
 
   [DocString(@"search(pattern, string[, flags]) -> Match

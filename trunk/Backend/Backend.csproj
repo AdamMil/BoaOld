@@ -218,6 +218,10 @@
                     BuildAction = "None"
                 />
                 <File
+                    RelPath = "lib\SocketServer.boa"
+                    BuildAction = "None"
+                />
+                <File
                     RelPath = "lib\string.boa"
                     BuildAction = "None"
                 />
