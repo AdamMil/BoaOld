@@ -201,12 +201,17 @@ public sealed class _string
     return sb.ToString();
   }
 
-  public static byte[] tobytes(string s) { return Encoding.ASCII.GetBytes(s); }
+  public static byte[] tobytes(string s) { return Encoding.Default.GetBytes(s); }
   public static byte[] tobytes(string s, Encoding e) { return e.GetBytes(s); }
 
-  public static string tostring(byte[] bytes) { return Encoding.ASCII.GetString(bytes); }
+  public static string tostring(byte[] bytes) { return Encoding.Default.GetString(bytes); }
+  public static string tostring(byte[] bytes, Encoding e) { return e.GetString(bytes); }
+
   public static string tostring(byte[] bytes, int offset, int length)
   { return Encoding.ASCII.GetString(bytes, offset, length);
+  }
+  public static string tostring(byte[] bytes, int offset, int length, Encoding e)
+  { return e.GetString(bytes, offset, length);
   }
 
   public static string tostring(char[] chars) { return new string(chars); }

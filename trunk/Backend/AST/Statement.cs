@@ -45,7 +45,7 @@ namespace for the exec. (In other words, "exec obj" would be illegal, but "exec 
 */
 // TODO: make sure all enumerators can handle the underlying collection being changed, if possible
 // TODO: disallow 'break' and 'continue' inside 'finally' blocks (difficult to implement)
-// TODO: allow 'import' inside functions/class defs
+// TODO: allow 'from xxx import yyy/*' inside functions/class defs
 
 // TODO: using exceptions is very slow
 #region Exceptions (used to aid implementation)
@@ -403,124 +403,23 @@ public class AssignStatement : Statement
             if(emitted && ti==0) cg.ILG.Emit(OpCodes.Pop);
           }
           else
-          { 
-            #region lots of MSIL code here
-            Label notseq = cg.ILG.DefineLabel(), notstr = cg.ILG.DefineLabel(), notcol = cg.ILG.DefineLabel(),
-                  badlen = cg.ILG.DefineLabel(), start  = cg.ILG.DefineLabel(), end = cg.ILG.DefineLabel();
-            Slot lenslot = cg.AllocLocalTemp(typeof(int)), seqslot = cg.AllocLocalTemp(typeof(ISequence)),
-                strslot = cg.AllocLocalTemp(typeof(string)), colslot = cg.AllocLocalTemp(typeof(ICollection)),
-                eslot = cg.AllocLocalTemp(typeof(IEnumerator));
-
-            if(!emitted) { RHS.Emit(cg); emitted=true; }
+          { if(!emitted) { RHS.Emit(cg); emitted=true; }
             if(ti!=0) cg.ILG.Emit(OpCodes.Dup);
-            // maybe it's an ICollection
-            cg.ILG.Emit(OpCodes.Dup);
-            cg.ILG.Emit(OpCodes.Isinst, typeof(ICollection));
-            cg.ILG.Emit(OpCodes.Dup);
-            colslot.EmitSet(cg);
-            cg.ILG.Emit(OpCodes.Brfalse_S, notcol);
-            // it's an ICollection. check the length
-            colslot.EmitGet(cg);
-            cg.EmitPropGet(typeof(ICollection), "Count");
-            cg.ILG.Emit(OpCodes.Dup);
-            lenslot.EmitSet(cg);
+            
+            Slot eslot = cg.AllocLocalTemp(typeof(IEnumerator));
             cg.EmitInt(lhs.Expressions.Length);
-            cg.ILG.Emit(OpCodes.Ceq);
-            cg.ILG.Emit(OpCodes.Brfalse, badlen);
-            colslot.EmitGet(cg);
-            cg.EmitCall(typeof(IEnumerable), "GetEnumerator");
-            eslot.EmitSet(cg);
-            cg.ILG.Emit(OpCodes.Br_S, start);
-            cg.ILG.MarkLabel(notcol);
-            // it's not an ICollection. maybe it's a string
-            cg.ILG.Emit(OpCodes.Dup);
-            cg.ILG.Emit(OpCodes.Isinst, typeof(string));
-            cg.ILG.Emit(OpCodes.Dup);
-            strslot.EmitSet(cg);
-            cg.ILG.Emit(OpCodes.Brfalse_S, notstr);
-            // it's a string. check the length
-            strslot.EmitGet(cg);
-            cg.EmitPropGet(typeof(string), "Length");
-            cg.ILG.Emit(OpCodes.Dup);
-            lenslot.EmitSet(cg);
-            cg.EmitInt(lhs.Expressions.Length);
-            cg.ILG.Emit(OpCodes.Ceq);
-            cg.ILG.Emit(OpCodes.Brfalse, badlen);
-            strslot.EmitGet(cg);
-            cg.EmitNew(typeof(BoaCharEnumerator), new Type[] { typeof(string) });
-            eslot.EmitSet(cg);
-            cg.ILG.Emit(OpCodes.Br_S, start);
-            cg.ILG.MarkLabel(notstr);
-            // it's not a string. maybe it's an ISequence
-            cg.ILG.Emit(OpCodes.Dup);
-            cg.ILG.Emit(OpCodes.Isinst, typeof(ISequence));
-            cg.ILG.Emit(OpCodes.Dup);
-            seqslot.EmitSet(cg);
-            cg.ILG.Emit(OpCodes.Brfalse_S, notseq);
-            // it's a sequence. check the length
-            seqslot.EmitGet(cg);
-            cg.EmitCall(typeof(IContainer), "__len__");
-            cg.ILG.Emit(OpCodes.Dup);
-            lenslot.EmitSet(cg);
-            cg.EmitInt(lhs.Expressions.Length);
-            cg.ILG.Emit(OpCodes.Ceq);
-            cg.ILG.Emit(OpCodes.Brfalse, badlen);
-            seqslot.EmitGet(cg);
-            cg.EmitNew(typeof(ISeqEnumerator), new Type[] { typeof(ISequence) });
-            eslot.EmitSet(cg);
-            cg.ILG.Emit(OpCodes.Br_S, start);
-            cg.ILG.MarkLabel(notseq);
-            // assume it's a user-implemented sequence
-            cg.ILG.Emit(OpCodes.Dup);
-            cg.EmitString("__len__");
-            cg.EmitCall(typeof(Ops), "GetAttr", new Type[] { typeof(object), typeof(string) });
-            cg.EmitCall(typeof(Ops), "Call0");
-            cg.EmitCall(typeof(Ops), "ToInt");
-            cg.ILG.Emit(OpCodes.Dup);
-            lenslot.EmitSet(cg);
-            cg.EmitInt(lhs.Expressions.Length);
-            cg.ILG.Emit(OpCodes.Ceq);
-            cg.ILG.Emit(OpCodes.Brfalse, badlen);
-            cg.ILG.Emit(OpCodes.Dup);
-            cg.EmitCall(typeof(Ops), "GetEnumerator", new Type[] { typeof(object) });
-            eslot.EmitSet(cg);
-            // okay, let's do the assignment now
-            cg.ILG.MarkLabel(start);
-            cg.ILG.Emit(OpCodes.Pop);
-            eslot.EmitGet(cg);
+            cg.EmitCall(typeof(Ops), "PrepareTupleAssignment");
+
             for(int i=0; i<lhs.Expressions.Length; i++)
             { if(i!=lhs.Expressions.Length-1) cg.ILG.Emit(OpCodes.Dup);
               cg.ILG.Emit(OpCodes.Dup);
               cg.EmitCall(typeof(IEnumerator), "MoveNext");
-              cg.ILG.Emit(OpCodes.Pop);
+              cg.ILG.Emit(OpCodes.Pop); // ignore return value
               cg.EmitPropGet(typeof(IEnumerator), "Current");
               lhs.Expressions[i].EmitSet(cg);
             }
-            cg.ILG.Emit(OpCodes.Br_S, end);
 
-            cg.ILG.MarkLabel(badlen);
-            cg.EmitString("wrong number of values to unpack (expected {0}, got {1})");
-            cg.EmitNewArray(typeof(object), 2);
-            cg.ILG.Emit(OpCodes.Dup);
-            cg.EmitInt(0);
-            cg.EmitInt(lhs.Expressions.Length);
-            cg.ILG.Emit(OpCodes.Box, typeof(int));
-            cg.ILG.Emit(OpCodes.Stelem_Ref);
-            cg.ILG.Emit(OpCodes.Dup);
-            cg.EmitInt(1);
-            lenslot.EmitGet(cg);
-            cg.ILG.Emit(OpCodes.Box, typeof(int));
-            cg.ILG.Emit(OpCodes.Stelem_Ref);
-            cg.EmitCall(typeof(Ops), "ValueError", new Type[] { typeof(string), typeof(object[]) });
-            cg.ILG.Emit(OpCodes.Throw);
-            cg.ILG.MarkLabel(end); // phew!
-
-            cg.FreeLocalTemp(lenslot);
-            cg.FreeLocalTemp(seqslot);
-            cg.FreeLocalTemp(strslot);
-            cg.FreeLocalTemp(colslot);
             cg.FreeLocalTemp(eslot);
-            #endregion
           }
         }
         else
@@ -1034,17 +933,15 @@ public class ForStatement : Statement
     AssignStatement ass = new AssignStatement(Names, ce);
     ass.Optimize();
 
-    try
-    { IEnumerator e = Ops.GetEnumerator(Expression.Evaluate(frame));
-      while(e.MoveNext())
-      { ce.Value=e.Current;
-        ass.Execute(frame);
-        try { Body.Execute(frame); }
-        catch(BreakException) { break; }
-        catch(ContinueException) { }
-      }
+    IEnumerator e = Ops.GetEnumerator(Expression.Evaluate(frame));
+    while(e.MoveNext())
+    { ce.Value=e.Current;
+      ass.Execute(frame);
+      try { Body.Execute(frame); }
+      catch(BreakException) { break; }
+      catch(StopIterationException) { break; }
+      catch(ContinueException) { }
     }
-    catch(StopIterationException) { }
   }
   
   public override void ToCode(System.Text.StringBuilder sb, int indent)
@@ -1120,22 +1017,39 @@ public class PassStatement : Statement
 #region PrintStatement
 public class PrintStatement : Statement
 { public PrintStatement() { Expressions=null; TrailingNewline=true; }
-  public PrintStatement(Expression[] exprs, bool trailingNewline)
-  { Expressions=exprs; TrailingNewline=trailingNewline;
+  public PrintStatement(Expression file) : this() { File=file; }
+  public PrintStatement(Expression file, Expression[] exprs, bool trailingNewline)
+  { File=file; Expressions=exprs; TrailingNewline=trailingNewline;
   }
 
   public override void Emit(CodeGenerator cg)
-  { if(Expressions!=null)
+  { Slot file = File==null ? null : cg.AllocLocalTemp(typeof(object));
+    if(file!=null)
+    { File.Emit(cg);
+      file.EmitSet(cg);
+    }
+
+    if(Expressions!=null)
       foreach(Expression e in Expressions)
-      { e.Emit(cg);
+      { if(file==null) cg.ILG.Emit(OpCodes.Ldnull);
+        else file.EmitGet(cg);
+        e.Emit(cg);
         cg.EmitCall(typeof(Ops), "Print");
       }
-    if(TrailingNewline || Expressions.Length==0) cg.EmitCall(typeof(Ops), "PrintNewline");
+
+    if(TrailingNewline || Expressions.Length==0)
+    { if(file==null) cg.ILG.Emit(OpCodes.Ldnull);
+      else file.EmitGet(cg);
+      cg.EmitCall(typeof(Ops), "PrintNewline");
+    }
+
+    if(file!=null) cg.FreeLocalTemp(file);
   }
 
   public override void Execute(Frame frame)
-  { if(Expressions!=null) foreach(Expression e in Expressions) Ops.Print(e.Evaluate(frame));
-    if(TrailingNewline || Expressions.Length==0) Ops.PrintNewline();
+  { object file = File==null ? null : File.Evaluate(frame);
+    if(Expressions!=null) foreach(Expression e in Expressions) Ops.Print(file, e.Evaluate(frame));
+    if(TrailingNewline || Expressions.Length==0) Ops.PrintNewline(file);
   }
 
   public override void ToCode(System.Text.StringBuilder sb, int indent)
@@ -1153,6 +1067,7 @@ public class PrintStatement : Statement
   }
 
   public Expression[] Expressions;
+  public Expression   File;
   public bool TrailingNewline;
 }
 #endregion

@@ -142,7 +142,7 @@ public sealed class _socket
 
     public string recvstr(int bufsize) { return recvstr(bufsize, 0); }
     public string recvstr(int bufsize, int flags)
-    { return System.Text.Encoding.ASCII.GetString(recv(bufsize, flags));
+    { return System.Text.Encoding.Default.GetString(recv(bufsize, flags));
     }
 
     public Tuple recvfrom(int bufsize) { return recvfrom(bufsize, 0); }
@@ -166,7 +166,7 @@ public sealed class _socket
     public Tuple recvstrfrom(int bufsize) { return recvstrfrom(bufsize, 0); }
     public Tuple recvstrfrom(int bufsize, int flags)
     { Tuple tup = recvfrom(bufsize, flags);
-      tup.items[0] = System.Text.Encoding.ASCII.GetString((byte[])tup.items[0]);
+      tup.items[0] = System.Text.Encoding.Default.GetString((byte[])tup.items[0]);
       return tup;
     }
 
@@ -178,7 +178,7 @@ public sealed class _socket
     }
 
     public int send(string str) { return send(str, 0); }
-    public int send(string str, int flags) { return send(System.Text.Encoding.ASCII.GetBytes(str), flags); }
+    public int send(string str, int flags) { return send(System.Text.Encoding.Default.GetBytes(str), flags); }
 
     public void sendall(byte[] data) { sendall(data, 0); }
     public void sendall(byte[] data, int flags)
@@ -191,7 +191,7 @@ public sealed class _socket
     }
 
     public void sendall(string str) { sendall(str, 0); }
-    public void sendall(string str, int flags) { sendall(System.Text.Encoding.ASCII.GetBytes(str), flags); }
+    public void sendall(string str, int flags) { sendall(System.Text.Encoding.Default.GetBytes(str), flags); }
 
     public int sendto(byte[] data, Tuple address) { return sendto(data, 0, address); }
     public int sendto(byte[] data, int flags, Tuple address)

@@ -34,6 +34,7 @@ using Boa.Runtime;
 // FIXME: make this parse:   (lambda: print)
 // TODO: disallow assignment to constants
 // TODO: make string parsing more close to python's if possible
+// TODO: add proper parsing of octal numbers
 
 namespace Boa.AST
 {
@@ -677,21 +678,32 @@ public class Parser
     return expr;
   }
 
-  // print_stmt := 'print' (<expression> (',' <expression>)* ','?)?
+  // print_stmt := 'print' (<expression> (',' <expression>)* ','?)? |
+  //               'print' '>>' <expression> (',' <expression> (',' <expression>)* ','?)?
   Statement ParsePrintStmt()
   { Eat(Token.Print);
-    if(token==Token.EOL) return AP(new PrintStatement());
+    if(token==Token.EOL || token==Token.Semicolon) return AP(new PrintStatement());
 
-    ArrayList stmts = new ArrayList();
     bool comma, old=bareTuples;
     bareTuples = false;
+
+    Expression file = TryEat(Token.RightShift) ? ParseExpression() : null;
+    if(file!=null)
+    { if(token==Token.EOL || token==Token.Semicolon)
+      { bareTuples=old;
+        return AP(new PrintStatement(file));
+      }
+      Eat(Token.Comma);
+    }
+
+    ArrayList stmts = new ArrayList();
     do
     { comma=false;
       stmts.Add(ParseExpression());
       if(TryEat(Token.Comma)) comma=true;
     } while(token!=Token.EOL && token!=Token.Semicolon);
     bareTuples = old;
-    return AP(new PrintStatement((Expression[])stmts.ToArray(typeof(Expression)), !comma));
+    return AP(new PrintStatement(file, (Expression[])stmts.ToArray(typeof(Expression)), !comma));
   }
 
   // namelist := <identifier> (',' <identifier>)*
@@ -980,29 +992,38 @@ public class Parser
         }
 
         string s=string.Empty;
-        bool period=false;
+        bool period=false, hex=false;
 
         while(true)
         { if(c=='.')
-          { if(period) SyntaxError("invalid number");
+          { if(hex) break;
+            if(period) SyntaxError("invalid number");
             period = true;
           }
-          else if(!char.IsDigit(c)) break;
+          else if(!char.IsDigit(c) && (!hex || (c<'a' || c>'f') && (c<'A' || c>'F')))
+          { if(!hex && (c=='x' || c=='X') && s=="0") { s=string.Empty; hex=true; goto nextchar; }
+            break;
+          }
           s += c;
-          c = ReadChar();
+          nextchar: c = ReadChar();
         }
+
         try
-        { if(char.ToUpper(c)=='J') value = new Complex(0, double.Parse(s));
+        { if(char.ToUpper(c)=='J')
+          { if(hex) SyntaxError("'J' modifier cannot be used with hex numbers");
+            value = new Complex(0, double.Parse(s));
+          }
           else if(period)
-          { if(char.ToUpper(c)=='L') throw new NotImplementedException("decimal type");
+          { if(hex) SyntaxError("invalid number or attribute reference");
+            if(char.ToUpper(c)=='L') throw new NotImplementedException("decimal type");
             else { lastChar=c; value = double.Parse(s); }
           }
           else
           { if(char.ToUpper(c)!='L') lastChar=c;
-            try { value = int.Parse(s); }
+            try { value = hex ? Convert.ToInt32(s, 16) : int.Parse(s); }
             catch(OverflowException)
-            { try { value = long.Parse(s); }
-              catch(OverflowException) { value = Integer.Parse(s); }
+            { try { value = hex ? Convert.ToInt64(s, 16) : long.Parse(s); }
+              catch(OverflowException) { value = Integer.Parse(s, hex ? 16 : 10); }
             }
           }
           return Token.Literal;

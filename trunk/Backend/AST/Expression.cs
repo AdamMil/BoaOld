@@ -1169,37 +1169,11 @@ public class TupleExpression : Expression
   public TupleExpression(Expression[] expressions) { Expressions=expressions; }
 
   public override void Assign(object value, Frame frame)
-  { if(value is ISequence)
-    { ISequence seq = (ISequence)value;
-      if(seq.__len__() != Expressions.Length) goto badlen;
-      for(int i=0; i<Expressions.Length; i++) Expressions[i].Assign(seq.__getitem__(i), frame);
+  { IEnumerator e = Ops.PrepareTupleAssignment(value, Expressions.Length);
+    for(int i=0; i<Expressions.Length; i++)
+    { e.MoveNext();
+      Expressions[i].Assign(e.Current, frame);
     }
-    else if(value is string)
-    { string s = (string)value;
-      if(s.Length != Expressions.Length) goto badlen;
-      for(int i=0; i<Expressions.Length; i++) Expressions[i].Assign(new string(s[i], 1), frame);
-    }
-    else if(value is IList)
-    { IList ls = (IList)value;
-      if(ls.Count != Expressions.Length) goto badlen;
-      for(int i=0; i<Expressions.Length; i++) Expressions[i].Assign(ls[i], frame);
-    }
-    else if(value is ICollection)
-    { ICollection col = (ICollection)value;
-      if(col.Count != Expressions.Length) goto badlen;
-      IEnumerator e = col.GetEnumerator();
-      for(int i=0; i<Expressions.Length; i++)
-      { e.MoveNext();
-        Expressions[i].Assign(e.Current, frame);
-      }
-    }
-    else // assume it's a sequence
-    { object getitem = Ops.GetAttr(value, "__getitem__");
-      if(Ops.ToInt(Ops.Call(Ops.GetAttr(value, "__len__")))!=Expressions.Length) goto badlen;
-      for(int i=0; i<Expressions.Length; i++) Expressions[i].Assign(Ops.Call(getitem, i), frame);
-    }
-    return;
-    badlen: throw Ops.ValueError("wrong number of values to unpack");
   }
 
   public override void EmitDel(CodeGenerator cg) { foreach(Expression e in Expressions) e.EmitDel(cg); }
@@ -1231,6 +1205,11 @@ public class TupleExpression : Expression
     }
     if(Expressions.Length==1) sb.Append(',');
     sb.Append(')');
+  }
+
+  public override void Walk(IWalker w)
+  { if(w.Walk(this)) foreach(Expression e in Expressions) e.Walk(w);
+    w.PostWalk(this);
   }
 
   public Expression[] Expressions;

@@ -121,6 +121,7 @@ public sealed class IntegerOps
         return ic!=null ? a.CompareTo(ic.ToInt64(NumberFormatInfo.InvariantInfo))
                         : -Ops.ToInt(Ops.Invoke(b, "__cmp__", a));
       case TypeCode.SByte: return a.CompareTo((sbyte)b);
+      case TypeCode.String: return -1;
       case TypeCode.UInt16: return a.CompareTo((ushort)b);
       case TypeCode.UInt32: return a.CompareTo((uint)b);
       case TypeCode.UInt64: return a.CompareTo((ulong)b);

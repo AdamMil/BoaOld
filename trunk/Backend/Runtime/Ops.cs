@@ -375,9 +375,8 @@ public sealed class Ops
       case TypeCode.SByte: return IntOps.Compare((int)(sbyte)a, b);
       case TypeCode.Single: return FloatOps.Compare((float)a, b);
       case TypeCode.String:
-      { string sa=(string)a, sb = b as string;
-        if(sb!=null) return ((string)a).CompareTo(sb);
-        break;
+      { string sb = b as string;
+        return sb==null ? "string".CompareTo(TypeName(b)) : ((string)a).CompareTo(sb);
       }
       case TypeCode.UInt16: return IntOps.Compare((int)(short)a, b);
       case TypeCode.UInt32: 
@@ -618,6 +617,7 @@ public sealed class Ops
 
   public static bool GetEnumerator(object o, out IEnumerator e)
   { if(o is string) e=new BoaCharEnumerator((string)o);
+    else if(o is IDictionary) e=((IDictionary)o).Keys.GetEnumerator();
     else if(o is IEnumerable) e=((IEnumerable)o).GetEnumerator();
     else if(o is ISequence) e=new ISeqEnumerator((ISequence)o);
     else if(o is IEnumerator) e=(IEnumerator)o;
@@ -955,8 +955,55 @@ public sealed class Ops
     return Modulus(Power(a, b), c);
   }
 
-  public static void Print(object o) { Console.Write(Str(o)); }
-  public static void PrintNewline() { Console.WriteLine(); }
+  public static IEnumerator PrepareTupleAssignment(object value, int items)
+  { if(value is ICollection)
+    { ICollection col = (ICollection)value;
+      if(col.Count==items)
+      { IDictionary d = col as IDictionary;
+        return d==null ? col.GetEnumerator() : d.Keys.GetEnumerator();
+      }
+    }
+    else if(value is string)
+    { string s = (string)value;
+      if(s.Length==items) return new BoaCharEnumerator(s);
+    }
+    else if(value is ISequence)
+    { ISequence seq = (ISequence)value;
+      if(seq.__len__()==items) return new ISeqEnumerator(seq);
+    }
+    else if(ToInt(Invoke(value, "__len__", Misc.EmptyArray)) == items) return new SeqEnumerator(value);
+
+    throw Ops.ValueError("wrong number of values to unpack");
+  }
+
+  public static void Print(object file, object o)
+  { string str = Str(o);
+    if(file==null) { Console.Write(str); return; }
+
+    IFile f = file as IFile;
+    if(f!=null) { f.write(str); return; }
+
+    System.IO.Stream stream = file as System.IO.Stream;
+    if(stream!=null)
+    { byte[] data = System.Text.Encoding.Default.GetBytes(str);
+      stream.Write(data, 0, data.Length);
+      return;
+    }
+
+    Invoke(file, "write", str);
+  }
+
+  public static void PrintNewline(object file)
+  { if(file==null) { Console.WriteLine(); return; }
+
+    IFile f = file as IFile;
+    if(f!=null) { f.writebyte('\n'); return; }
+
+    System.IO.Stream stream = file as System.IO.Stream;
+    if(stream!=null) { stream.WriteByte((byte)'\n'); return; }
+
+    Invoke(file, "write", "\n");
+  }
 
   // TODO: handle char somehow
   public static string Repr(object o)

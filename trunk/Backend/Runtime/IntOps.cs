@@ -158,6 +158,7 @@ public sealed class IntOps
       { float av=a, bv=(float)b;
         return av<bv ? -1 : av>bv ? 1 : 0;
       }
+      case TypeCode.String: return -1;
       case TypeCode.UInt16: return a - (ushort)b;
       case TypeCode.UInt32: return a<0 ? -1 : (int)((uint)a - (uint)b);
       case TypeCode.UInt64: return a<0 ? -1 : (int)((ulong)a - (ulong)b);

@@ -138,6 +138,7 @@ public sealed class LongOps
       { double av=a, bv = (double)b;
         return av<bv ? -1 : av>bv ? 1 : 0;
       }
+      case TypeCode.Empty: return 1;
       case TypeCode.Int16: return (int)(a - (short)b);
       case TypeCode.Int32: return (int)(a - (int)b);
       case TypeCode.Int64: return (int)(a - (long)b);
@@ -154,6 +155,7 @@ public sealed class LongOps
       { float av=a, bv=(float)b;
         return av<bv ? -1 : av>bv ? 1 : 0;
       }
+      case TypeCode.String: return -1;
       case TypeCode.UInt16: return (int)(a - (ushort)b);
       case TypeCode.UInt32: return a<0 ? -1 : (int)((ulong)a - (uint)b);
       case TypeCode.UInt64: return a<0 ? -1 : (int)((ulong)a - (ulong)b);
