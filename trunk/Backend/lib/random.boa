@@ -619,7 +619,7 @@ class WichmannHill(Random):
                 a = long(_hexlify(_urandom(16)), 16)
             except NotImplementedError:
                 import time
-                a = long(time.time() * 256) # use fractional seconds
+                a = time.time()
 
         if not isinstance(a, (int, long)):
             a = hash(a)

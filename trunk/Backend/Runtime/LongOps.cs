@@ -127,9 +127,9 @@ public sealed class LongOps
   public static int Compare(long a, object b)
   { if(b is long) return (int)(a-(long)b);
     switch(Convert.GetTypeCode(b))
-    { case TypeCode.Boolean: return (int)((bool)b ? a-1 : a);
-      case TypeCode.Byte: return (int)(a - (byte)b);
-      case TypeCode.Char: return (int)(a - (char)b);
+    { case TypeCode.Boolean: return (int)(((bool)b ? a-1 : a)>>32);
+      case TypeCode.Byte: return (int)(((a - (byte)b)>>32)>>32);
+      case TypeCode.Char: return (int)((a - (char)b)>>32);
       case TypeCode.Decimal:
       { Decimal v = (Decimal)b;
         return a<v ? -1 : a>v ? 1 : 0;
@@ -139,9 +139,9 @@ public sealed class LongOps
         return av<bv ? -1 : av>bv ? 1 : 0;
       }
       case TypeCode.Empty: return 1;
-      case TypeCode.Int16: return (int)(a - (short)b);
-      case TypeCode.Int32: return (int)(a - (int)b);
-      case TypeCode.Int64: return (int)(a - (long)b);
+      case TypeCode.Int16: return (int)((a - (short)b)>>32);
+      case TypeCode.Int32: return (int)((a - (int)b)>>32);
+      case TypeCode.Int64: return (int)((a - (long)b)>>32);
       case TypeCode.Object:
         if(b is Integer)
         { Integer v = (Integer)b;
@@ -150,13 +150,13 @@ public sealed class LongOps
         IConvertible ic = b as IConvertible;
         return ic==null ? (int)(a - ic.ToInt64(NumberFormatInfo.InvariantInfo))
                         : -Ops.ToInt(Ops.Invoke(b, "__cmp__", a));
-      case TypeCode.SByte: return (int)(a - (sbyte)b);
+      case TypeCode.SByte: return (int)((a - (sbyte)b)>>32);
       case TypeCode.Single:
       { float av=a, bv=(float)b;
         return av<bv ? -1 : av>bv ? 1 : 0;
       }
       case TypeCode.String: return -1;
-      case TypeCode.UInt16: return (int)(a - (ushort)b);
+      case TypeCode.UInt16: return (int)((a - (ushort)b)>>32);
       case TypeCode.UInt32: return a<0 ? -1 : (int)((ulong)a - (uint)b);
       case TypeCode.UInt64: return a<0 ? -1 : (int)((ulong)a - (ulong)b);
     }
