@@ -168,6 +168,18 @@ public class LocalNamespace : Namespace
     }
   }
 
+  public void EmitLocalsDict(CodeGenerator cg)
+  { MethodInfo add = typeof(HybridDictionary).GetMethod("Add", new Type[] { typeof(object), typeof(object) });
+
+    cg.EmitNew(typeof(HybridDictionary));
+    foreach(string name in slots.Keys)
+    { cg.ILG.Emit(OpCodes.Dup);
+      cg.EmitString(name);
+      ((Slot)slots[name]).EmitGet(codeGen);
+      cg.EmitCall(add);
+    }
+  }
+
   public override void SetArgs(Name[] names, int offset, MethodBuilder mb)
   { for(int i=0; i<names.Length; i++) slots[names[i].String] = new ArgSlot(mb, i+offset, names[i].String);
   }

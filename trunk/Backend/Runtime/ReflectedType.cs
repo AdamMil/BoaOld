@@ -551,6 +551,8 @@ public class ReflectedProperty : ReflectedMember, IDataDescriptor
 public class ReflectedType : BoaType
 { ReflectedType(Type type) : base(type) { }
 
+  public ReflectedConstructor Constructor { get { Initialize(); return cons; } }
+
   public override object Call(params object[] args)
   { Initialize();
     return cons.Call(args);
@@ -559,7 +561,7 @@ public class ReflectedType : BoaType
   public override void DelAttr(object self, string name)
   { object slot = RawGetSlot(name);
     if(slot==null) throw Ops.AttributeError("no such slot '{0}'", name);
-    if(!Ops.DelDescriptor(slot, this)) dict.Remove(name);
+    if(!Ops.DelDescriptor(slot, self)) dict.Remove(name);
   }
 
   public override bool GetAttr(object self, string name, out object value)
