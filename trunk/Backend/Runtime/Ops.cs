@@ -153,7 +153,7 @@ public sealed class Ops
     return ic==null ? Invoke(func, "__call__", args) : ic.Call(args);
   }
   
-  public static object Call0(object func) { return Call(func); }
+  public static object Call0(object func) { return Call(func, Misc.EmptyArray); }
   public static object Call1(object func, object a0) { return Call(func, a0); }
 
   public static object CallWithArgsSequence(object func, object seq)
@@ -439,6 +439,10 @@ public sealed class Ops
 
   public static object LogicalAnd(object a, object b) { return IsTrue(a) ? b : a; }
   public static object LogicalOr (object a, object b) { return IsTrue(a) ? a : b; }
+
+  public static TypeErrorException MethodCalledWithoutInstance(string name)
+  { return new TypeErrorException(name+" is a method and requires an instance object");
+  }
 
   public static object Modulus(object a, object b)
   { if(a is int && b is int) return (int)a%(int)b;

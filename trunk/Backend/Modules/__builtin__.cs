@@ -384,8 +384,65 @@ of object, a help page on the object is generated.")]
   public static void help() { throw new NotImplementedException(); }
   public static void help(object o)
   { object doc;
-    if(Ops.GetAttr(o, "__doc__", out doc)) Console.WriteLine(doc);
-    else Console.WriteLine("No help available for {0}.", Ops.GetDynamicType(o).__name__);
+    if(Ops.GetAttr(o, "__doc__", out doc) && doc!=null && Ops.Str(doc)!="") Console.WriteLine(doc);
+    else if(o is ReflectedEvent)
+    { ReflectedEvent re = (ReflectedEvent)o;
+      Console.WriteLine("'{0}' is an event that takes a '{1}' object",
+                        re.info.Name, typeName(re.info.EventHandlerType));
+    }
+    else if(o is ReflectedField)
+    { ReflectedField rf = (ReflectedField)o;
+      Console.WriteLine("'{0}' is a field of type '{1}'", rf.info.Name, typeName(rf.info.FieldType));
+    }
+    else if(o is ReflectedMethodBase)
+    { ReflectedMethodBase rm = (ReflectedMethodBase)o;
+      foreach(System.Reflection.MethodBase mb in rm.sigs)
+      { Console.Write(rm.__name__);
+        Console.Write('(');
+        bool first=true;
+        foreach(System.Reflection.ParameterInfo pi in mb.GetParameters())
+        { if(!first) Console.Write(", ");
+          Console.Write("{0} {1}{2}", typeName(pi.ParameterType),
+                        pi.IsDefined(typeof(ParamArrayAttribute), false) ? "*" : "", pi.Name);
+          if(pi.IsOptional) Console.Write("="+Ops.Repr(pi.DefaultValue));
+          first=false;
+        }
+        Console.Write(mb.IsStatic ? ")" : ") (method)");
+        if(!mb.IsConstructor)
+        { Type ret = ((System.Reflection.MethodInfo)mb).ReturnType;
+          if(ret!=typeof(void)) Console.WriteLine(" --> "+typeName(ret));
+        }
+        else Console.WriteLine();
+      }
+    }
+    else if(o is ReflectedProperty)
+    { ReflectedProperty rp = (ReflectedProperty)o;
+      Console.Write("{0} is a property with ", rp.state.info.Name);
+      if(rp.state.get==null) Console.Write("no get accessors ");
+      else { Console.WriteLine("the following get accessors:"); help(rp.state.get); }
+      if(rp.state.set==null) Console.WriteLine("and no set accessors");
+      else { Console.WriteLine("and the following set accessors:"); help(rp.state.set); }
+    }
+    else if(o is ReflectedType)
+    { Type type = ((ReflectedType)o).Type;
+      if(type.IsEnum)
+      { int nameLen=0;
+        string[] names = Enum.GetNames(type);
+        Array values = Enum.GetValues(type);
+        for(int i=0; i<names.Length; i++) if(names[i].Length>nameLen) nameLen=names[i].Length;
+        nameLen += 2;
+
+        Console.WriteLine("{0} is an enum with the following values:", type.FullName);
+        for(int i=0; i<names.Length; i++)
+        { Console.Write(names[i].PadRight(nameLen));
+          Console.WriteLine(Ops.ToInt(values.GetValue(i)));
+        }
+      }
+      else goto noHelp;
+    }
+    else goto noHelp;
+    return;
+    noHelp: Console.WriteLine("No help available for {0}.", Ops.GetDynamicType(o).__name__);
   }
 
   [DocString(@"hex(number)
@@ -811,7 +868,7 @@ runtime.")]
   public static readonly object list    = ReflectedType.FromType(typeof(List));
   public static readonly object @object = ReflectedType.FromType(typeof(object));
   public static readonly object slice   = ReflectedType.FromType(typeof(Slice));
-  public static readonly object @string = ReflectedType.FromType(typeof(string));
+  public static readonly object @string = ReflectedType.FromType(typeof(string)); // FIXME: this should be 'str'
   public static readonly object tuple   = ReflectedType.FromType(typeof(Tuple));
   public static readonly object xrange  = ReflectedType.FromType(typeof(XRange));
   #endregion
@@ -834,6 +891,15 @@ runtime.")]
   public static readonly object TypeError = ReflectedType.FromType(typeof(TypeErrorException));
   public static readonly object ValueError = ReflectedType.FromType(typeof(ValueErrorException));
   #endregion
+  
+  static string typeName(Type type)
+  { if(type.IsArray) return typeName(type.GetElementType())+"[]";
+    if(type==typeof(object)) return "object";
+    if(type==typeof(int)) return "int";
+    if(type==typeof(string)) return "str";
+    if(type==typeof(char)) return "char";
+    return type.FullName;
+  }
 }
   
 } // namespace Boa.Modules

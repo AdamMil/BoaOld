@@ -5,7 +5,7 @@ namespace Boa.Runtime
 {
 
 [BoaType("tuple")]
-public class Tuple : ISequence, ICollection, IComparable
+public class Tuple : ISequence, ICollection, IComparable, IRepresentable
 { public Tuple() { items = Misc.EmptyArray; }
   public Tuple(ICollection col)
   { items = new object[col.Count];
@@ -56,16 +56,8 @@ public class Tuple : ISequence, ICollection, IComparable
   }
   #endregion
 
-  public override bool Equals(object o) { return CompareTo(o)==0; }
-
-  public override int GetHashCode() // TODO: improve hashing
-  { int ret = 0, inc = Math.Max(items.Length/10, 1); // limit to 10 items (bad idea?)
-    for(int i=0; i<items.Length; i+=inc) ret ^= items[i].GetHashCode();
-    return ret;
-  }
-
-
-  public override string ToString()
+  #region IRepresentable Members
+  public string __repr__()
   { System.Text.StringBuilder sb = new System.Text.StringBuilder();
     sb.Append('(');
     for(int i=0; i<items.Length; i++)
@@ -76,6 +68,18 @@ public class Tuple : ISequence, ICollection, IComparable
     sb.Append(')');
     return sb.ToString();
   }
+  #endregion
+
+  public override bool Equals(object o) { return CompareTo(o)==0; }
+
+  public override int GetHashCode() // TODO: improve hashing
+  { int ret = 0, inc = Math.Max(items.Length/10, 1); // limit to 10 items (bad idea?)
+    for(int i=0; i<items.Length; i+=inc) ret ^= items[i].GetHashCode();
+    return ret;
+  }
+
+
+  public override string ToString() { return __repr__(); }
 
   public static readonly Tuple Empty = new Tuple();
   

@@ -5,20 +5,78 @@ using System.Reflection;
 namespace Boa.Runtime
 {
 
-// FIXME: make 'repr(slice)' work
-
 #region Specialized attributes
 public class SpecialAttr
 {
+#region ArrayGetItem
+public class ArrayGetItem : IDescriptor, ICallable
+{ ArrayGetItem(Array instance) { this.instance=instance; }
+
+  public object __get__(object instance) { return instance==null ? this : new ArrayGetItem((Array)instance); }
+
+  public object Call(params object[] args)
+  { if(args.Length==0) return Ops.TooFewArgs("System.Array.__getitem__()", 1, 0);
+    if(instance==null) throw Ops.MethodCalledWithoutInstance("System.Array.__getitem__()");
+    switch(args.Length)
+    { case 1: return instance.GetValue(Ops.ToInt(args[0]));
+      case 2: return instance.GetValue(Ops.ToInt(args[0]), Ops.ToInt(args[1]));
+      case 3: return instance.GetValue(Ops.ToInt(args[0]), Ops.ToInt(args[1]), Ops.ToInt(args[2]));
+      default:
+        int[] indices = new int[args.Length];
+        for(int i=0; i<args.Length; i++) indices[i] = Ops.ToInt(args[i]);
+        return instance.GetValue(indices);
+    }
+  }
+
+  public override string ToString() { return "<method '__getitem__' on 'System.Array'>"; }
+  
+  public static readonly ArrayGetItem Value = new ArrayGetItem(null);
+
+  Array instance;
+}
+#endregion
+
+#region ArraySetItem
+public class ArraySetItem : IDescriptor, ICallable
+{ ArraySetItem(Array instance) { this.instance=instance; }
+
+  public object __get__(object instance) { return instance==null ? this : new ArraySetItem((Array)instance); }
+
+  public object Call(params object[] args)
+  { if(args.Length<2) return Ops.TooFewArgs("System.Array.__setitem__()", 2, args.Length);
+    if(instance==null) throw Ops.MethodCalledWithoutInstance("System.Array.__setitem__()");
+    switch(args.Length)
+    { case 2: instance.SetValue(args[0], Ops.ToInt(args[1])); break;
+      case 3: instance.SetValue(args[0], Ops.ToInt(args[1]), Ops.ToInt(args[2])); break;
+      case 4: instance.SetValue(args[0], Ops.ToInt(args[1]), Ops.ToInt(args[2]), Ops.ToInt(args[3])); break;
+      default:
+        int[] indices = new int[args.Length-1];
+        for(int i=1; i<args.Length; i++) indices[i-1] = Ops.ToInt(args[i]);
+        instance.SetValue(args[0], indices);
+        break;
+    }
+    return null;
+  }
+
+  public override string ToString() { return "<method '__setitem__' on 'System.Array'>"; }
+
+  public static readonly ArraySetItem Value = new ArraySetItem(null);
+
+  Array instance;
+}
+#endregion
+
 #region DelegateCaller
 public class DelegateCaller : IDescriptor
 { DelegateCaller() { }
 
   public object __get__(object instance)
   { Delegate d = (Delegate)instance;
-    return d==null ? (object)this : new ReflectedMethod(new MethodBase[] { d.Method }, d.Target);
+    return d==null ? (object)this : new ReflectedMethod(new MethodBase[] { d.Method }, d.Target, null);
   }
-  
+
+  public override string ToString() { return "<method '__call__' on 'System.Delegate'>"; }
+
   public static DelegateCaller Value = new DelegateCaller();
 }
 #endregion
@@ -32,9 +90,12 @@ public class NextMethod : IDescriptor, ICallable
   public object __get__(object instance) { return instance==null ? this : new NextMethod((IEnumerator)instance); }
   
   public object Call(params object[] args)
-  { if(instance.MoveNext()) return instance.Current;
+  { if(instance==null) throw Ops.MethodCalledWithoutInstance("IEnumerator.next()");
+    if(instance.MoveNext()) return instance.Current;
     throw new StopIterationException();
   }
+
+  public override string ToString() { return "<method 'next' on 'System.Collections.IEnumerator'>"; }
 
   public static NextMethod Value = new NextMethod();
 
@@ -51,9 +112,12 @@ public class StringGetItem : IDescriptor, ICallable
 
   public object Call(params object[] args)
   { if(args.Length!=1) throw Ops.WrongNumArgs("__getitem__", args.Length, 1);
+    if(instance==null) throw Ops.MethodCalledWithoutInstance("string.__getitem__()");
     Slice slice = args[0] as Slice;
     return slice==null ? new string(instance[Ops.ToInt(args[0])], 1) : StringOps.Slice(instance, slice);
   }
+
+  public override string ToString() { return "<method '__getitem__' on 'System.String'>"; }
 
   string instance;
 }
@@ -67,8 +131,11 @@ public class StringRepr : IDescriptor, ICallable
   public object __get__(object instance) { return instance==null ? this : new StringRepr((string)instance); }
   public object Call(params object[] args)
   { if(args.Length!=0) throw Ops.WrongNumArgs("__repr__", args.Length, 0);
-    return instance==null ? ReflectedType.FromType(typeof(string)).ToString() : StringOps.Escape(instance);
+    if(instance==null) throw Ops.MethodCalledWithoutInstance("string.__repr__()");
+    return StringOps.Escape(instance);
   }
+
+  public override string ToString() { return "<method '__repr__' on 'System.String'>"; }
 
   string instance;
 }
@@ -86,6 +153,7 @@ public class DocStringAttribute : Attribute
 #region ReflectedMember
 public class ReflectedMember
 { public ReflectedMember() { }
+  public ReflectedMember(string docs) { __doc__=docs; }
   public ReflectedMember(MemberInfo mi)
   { object[] docs = mi.GetCustomAttributes(typeof(DocStringAttribute), false);
     if(docs.Length!=0) __doc__ = ((DocStringAttribute)docs[0]).Docs;
@@ -98,7 +166,9 @@ public class ReflectedMember
 #region ReflectedConstructor
 public class ReflectedConstructor : ReflectedMethodBase
 { public ReflectedConstructor(ConstructorInfo ci) : base(ci) { }
-  public override string ToString() { return string.Format("<constructor for {0}>", sigs[0].DeclaringType.FullName); }
+  public override string ToString()
+  { return string.Format("<constructor for '{0}'>", sigs[0].DeclaringType.FullName);
+  }
 }
 #endregion
 
@@ -133,10 +203,10 @@ public class ReflectedEvent : ReflectedMember, IDescriptor
   public object __get__(object instance) { return this; }
 
   public override string ToString()
-  { return string.Format("<event {0} on {1}>", info.Name, info.DeclaringType.FullName);
+  { return string.Format("<event '{0}' on '{1}'>", info.Name, info.DeclaringType.FullName);
   }
 
-  EventInfo info;
+  internal EventInfo info;
 }
 #endregion
 
@@ -157,30 +227,37 @@ public class ReflectedField : ReflectedMember, IDataDescriptor
   public void __delete__(object instance) { throw Ops.TypeError("can't delete field on built-in object"); }
 
   public override string ToString()
-  { return string.Format("<field {0} on {1}>", info.Name, info.DeclaringType.FullName);
+  { return string.Format("<field '{0}' on '{1}'>", info.Name, info.DeclaringType.FullName);
   }
 
-  FieldInfo info;
+  internal FieldInfo info;
 }
 #endregion
 
 #region ReflectedMethod
 public class ReflectedMethod : ReflectedMethodBase, IDescriptor
 { public ReflectedMethod(MethodInfo mi) : base(mi) { }
-  public ReflectedMethod(MethodBase[] sigs, object instance) : base(sigs, instance) { }
+  public ReflectedMethod(MethodBase[] sigs, object instance, string docs) : base(sigs, instance, docs) { }
 
-  public object __get__(object instance) { return instance==null ? this : new ReflectedMethod(sigs, instance); }
+  public object __get__(object instance)
+  { return instance==null ? this : new ReflectedMethod(sigs, instance, __doc__);
+  }
 
   public override string ToString()
-  { return string.Format("<method {0} on {1}>", __name__, sigs[0].DeclaringType.FullName);
+  { return string.Format("<method '{0}' on '{1}'>", __name__, sigs[0].DeclaringType.FullName);
   }
 }
 #endregion
 
 #region ReflectedMethodBase
 public abstract class ReflectedMethodBase : ReflectedMember, ICallable
-{ protected ReflectedMethodBase(MethodBase mb) : base(mb) { sigs = new MethodBase[] { mb }; }
-  protected ReflectedMethodBase(MethodBase[] sigs, object instance) { this.sigs=sigs; this.instance=instance; }
+{ protected ReflectedMethodBase(MethodBase mb) : base(mb)
+  { sigs = new MethodBase[] { mb };
+    allStatic = mb.IsStatic;
+  }
+  protected ReflectedMethodBase(MethodBase[] sigs, object instance, string docs) : base(docs)
+  { this.sigs=sigs; this.instance=instance;
+  }
 
   public string __name__ { get { return sigs[0].Name; } }
 
@@ -192,7 +269,8 @@ public abstract class ReflectedMethodBase : ReflectedMember, ICallable
     for(int i=0; i<args.Length; i++) types[i] = args[i]==null ? null : args[i].GetType();
 
     for(int mi=0; mi<sigs.Length; mi++) // TODO: cache the binding results somehow?
-    { ParameterInfo[] parms = sigs[mi].GetParameters();
+    { if(instance==null && !sigs[mi].IsStatic) continue;
+      ParameterInfo[] parms = sigs[mi].GetParameters();
       bool paramArray = parms.Length>0 && IsParamArray(parms[parms.Length-1]);
       int lastRP      = paramArray ? parms.Length-1 : parms.Length;
       byte alreadyPA  = 0;
@@ -295,6 +373,8 @@ public abstract class ReflectedMethodBase : ReflectedMember, ICallable
       if(docs.Length!=0) __doc__ = ((DocStringAttribute)docs[0]).Docs;
     }
 
+    if(!sig.IsStatic) allStatic=false;
+
     MethodBase[] narr = new MethodBase[sigs.Length+1];
     sigs.CopyTo(narr, 0);
     narr[sigs.Length] = sig;
@@ -323,41 +403,75 @@ public abstract class ReflectedMethodBase : ReflectedMember, ICallable
 
   static bool IsParamArray(ParameterInfo pi) { return pi.IsDefined(typeof(ParamArrayAttribute), false); }
 
-  protected MethodBase[] sigs;
+  internal MethodBase[] sigs;
   protected object instance;
+  protected bool   allStatic;
 }
 #endregion
 
-// TODO: either extend this to handle property parameters, or handle them some other way
 #region ReflectedProperty
 public class ReflectedProperty : ReflectedMember, IDataDescriptor
-{ public ReflectedProperty(PropertyInfo info) : base(info) { this.info=info; }
+{ public ReflectedProperty(PropertyInfo info) : base(info) { state=new State(info); Add(info); }
+  ReflectedProperty(State state, object instance, string docs) : base(docs)
+  { this.state=state; this.instance=instance;
+  }
+
+  public void __delete__(object instance) { throw Ops.TypeError("can't delete properties on built-in objects"); }
 
   public object __get__(object instance)
-  { if(!info.CanRead) throw Ops.TypeError("{0} is a non-readable attribute", info.Name);
-    MethodInfo mi = info.GetGetMethod();
+  { if(state.index) return instance==null ? this : new ReflectedProperty(state, instance, __doc__);
+    if(!state.canRead) throw Ops.TypeError("{0} is a non-readable attribute", state.info.Name);
+    MethodInfo mi = state.info.GetGetMethod();
     return instance!=null || mi.IsStatic ? mi.Invoke(instance, Misc.EmptyArray) : this;
   }
 
-  public void __set__(object instance, object value)
-  { if(!info.CanWrite) throw Ops.TypeError("{0} is a non-writeable attribute", info.Name);
-    MethodInfo mi = info.GetSetMethod();
-    if(instance==null && !mi.IsStatic) throw Ops.TypeError("{0} is an instance property", info.Name);
-    mi.Invoke(instance, new object[] { Ops.ConvertTo(value, info.PropertyType) });
+  public object __getitem__(params object[] args)
+  { if(!state.canRead) throw Ops.TypeError("{0} is a non-readable attribute", state.info.Name);
+    return ((ReflectedMethod)state.get.__get__(instance)).Call(args);
   }
 
-  public void __delete__(object instance) { throw Ops.TypeError("can't delete property on built-in object"); }
+  public void __set__(object instance, object value) { setitem(instance, value); }
+  public void __setitem__(params object[] args) { setitem(instance, args); }
+
+  public void Add(PropertyInfo info)
+  { if(info.GetIndexParameters().Length>0) state.index = true;
+
+    if(info.CanRead)
+    { if(state.get==null) state.get = new ReflectedMethod(info.GetGetMethod());
+      else state.get.Add(info.GetGetMethod());
+      state.canRead = true;
+    }
+    if(info.CanWrite)
+    { if(state.set==null) state.set = new ReflectedMethod(info.GetSetMethod());
+      else state.set.Add(info.GetSetMethod());
+      state.canWrite = true;
+    }
+  }
 
   public override string ToString()
-  { return string.Format("<property {0} on {1}>", info.Name, info.DeclaringType.FullName);
+  { return string.Format("<property '{0}' on '{1}'>", state.info.Name, state.info.DeclaringType.FullName);
   }
 
-  PropertyInfo info;
+  void setitem(object instance, params object[] args)
+  { if(!state.canWrite) throw Ops.TypeError("{0} is a non-writeable attribute", state.info.Name);
+    ((ReflectedMethod)state.set.__get__(instance)).Call(args);
+  }
+
+  internal class State
+  { public State(PropertyInfo info) { this.info=info; }
+    public PropertyInfo info;
+    public ReflectedMethod get, set;
+    public bool canRead, canWrite, index;
+  }
+
+  internal State state;
+
+  object instance;
 }
 #endregion
 
 #region ReflectedType
-public class ReflectedType : BoaType
+public class ReflectedType : BoaType, IRepresentable
 { ReflectedType(Type type) : base(type) { }
 
   public override object Call(params object[] args)
@@ -394,7 +508,11 @@ public class ReflectedType : BoaType
     Ops.SetDescriptor(slot, self, value);
   }
 
-  public override string ToString() { return string.Format("<type {0}>", Ops.Repr(__name__)); }
+  public override string ToString() { return __repr__(); }
+
+  #region IRepresentable Members
+  public string __repr__() { return string.Format("<type {0}>", Ops.Repr(__name__)); }
+  #endregion
 
   public static ReflectedType FromType(Type type)
   { ReflectedType rt = (ReflectedType)types[type];
@@ -403,6 +521,8 @@ public class ReflectedType : BoaType
   }
 
   public string __doc__;
+
+  internal Type Type { get { return type; } }
 
   protected override void Initialize()
   { if(initialized) return;
@@ -418,10 +538,11 @@ public class ReflectedType : BoaType
       if(!dict.Contains("reset")) dict["reset"] = dict["Reset"];
       if(!dict.Contains("value")) dict["value"] = dict["Current"];
     }
-    else if(typeof(IEnumerable).IsAssignableFrom(type))
+    if(typeof(IEnumerable).IsAssignableFrom(type))
     { if(!dict.Contains("__iter__")) dict["__iter__"] = dict["GetEnumerator"];
     }
-    else if(type.IsSubclassOf(typeof(Delegate)))
+
+    if(type.IsSubclassOf(typeof(Delegate)))
     { dict["__call__"] = SpecialAttr.DelegateCaller.Value;
     }
     else if(type==typeof(string))
@@ -432,6 +553,31 @@ public class ReflectedType : BoaType
     if(!dict.Contains("__doc__"))
     { object[] docs = type.GetCustomAttributes(typeof(DocStringAttribute), false);
       if(docs.Length!=0) __doc__ = ((DocStringAttribute)docs[0]).Docs;
+    }
+    
+    foreach(MemberInfo m in type.GetDefaultMembers())
+      if(m.MemberType==MemberTypes.Property)
+      { ReflectedProperty prop = dict[m.Name] as ReflectedProperty;
+        if(prop==null) continue;
+        if(prop.state.get!=null)
+        { if(!dict.Contains("__getitem__")) dict["__getitem__"] = prop.state.get;
+          else
+          { ReflectedMethod rm = dict["__getitem__"] as ReflectedMethod;
+            if(rm!=null) foreach(MethodInfo mi in prop.state.get.sigs) rm.Add(mi);
+          }
+        }
+        if(prop.state.set!=null && m.Name!="__setitem__")
+        { if(!dict.Contains("__setitem__")) dict["__setitem__"] = prop.state.set;
+          else
+          { ReflectedMethod rm = dict["__getitem__"] as ReflectedMethod;
+            if(rm!=null) foreach(MethodInfo mi in prop.state.set.sigs) rm.Add(mi);
+          }
+        }
+      }
+
+    if(type.IsSubclassOf(typeof(Array)))
+    { if(!dict.Contains("__getitem__")) dict["__getitem__"] = SpecialAttr.ArrayGetItem.Value;
+      if(!dict.Contains("__setitem__")) dict["__setitem__"] = SpecialAttr.ArraySetItem.Value;
     }
   }
 
@@ -445,12 +591,17 @@ public class ReflectedType : BoaType
   void AddField(FieldInfo fi) { dict[fi.Name] = new ReflectedField(fi); }
 
   void AddMethod(MethodInfo mi)
-  { ReflectedMethod rm = (ReflectedMethod)dict[mi.Name];
+  { if(mi.IsSpecialName) return;
+    ReflectedMethod rm = (ReflectedMethod)dict[mi.Name];
     if(rm==null) dict[mi.Name] = new ReflectedMethod(mi);
     else rm.Add(mi);
   }
 
-  void AddProperty(PropertyInfo pi) { dict[pi.Name] = new ReflectedProperty(pi); }
+  void AddProperty(PropertyInfo pi)
+  { ReflectedProperty rp = (ReflectedProperty)dict[pi.Name];
+    if(rp==null) dict[pi.Name] = new ReflectedProperty(pi);
+    else rp.Add(pi);
+  }
 
   ReflectedConstructor cons;
 

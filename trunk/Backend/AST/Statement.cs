@@ -10,6 +10,7 @@ namespace Boa.AST
 
 // TODO: possibly rework compiled closures
 // TODO: using exceptions is very slow
+// TODO: add versions optimized for System.Array ?
 #region Exceptions (used to aid implementation)
 public class BreakException : Exception
 { public static BreakException Value = new BreakException();
