@@ -34,16 +34,16 @@ public class List : IMutableSequence, IList, IComparable
   public override bool Equals(object o) { return CompareTo(o)==0; }
   public override int GetHashCode() { throw Ops.TypeError("list objects are unhashable"); }
 
-  public int index(object item) { return IndexOrError(Array.IndexOf(items, item, 0, size)); }
+  public int index(object item) { return IndexOrError(IndexOf(item, 0, size)); }
   public int index(object item, int start)
   { start = Ops.FixIndex(start, size);
-    return IndexOrError(Array.IndexOf(items, item, start, size-start));
+    return IndexOrError(IndexOf(item, start, size-start));
   }
   public int index(object item, int start, int end)
   { start = Ops.FixIndex(start, size);
     end   = Ops.FixIndex(end, size);
     if(start>end) { int t=end; end=start; start=t; }
-    return IndexOrError(Array.IndexOf(items, item, start, end-start));
+    return IndexOrError(IndexOf(item, start, end-start));
   }
 
   public void insert(int index, object o) { Insert(Ops.FixIndex(index, size), o); }
@@ -66,7 +66,7 @@ public class List : IMutableSequence, IList, IComparable
     return list;
   }
 
-  public bool __contains__(object value) { return Array.IndexOf(items, value, 0, size)>=0; }
+  public bool __contains__(object value) { return IndexOf(value, 0, size) != -1; }
   public void __delitem__(int index) { RemoveAt(Ops.FixIndex(index, size)); }
   public object __getitem__(int index) { return items[Ops.FixIndex(index, size)]; }
   public int __len__() { return size; }
@@ -102,7 +102,11 @@ public class List : IMutableSequence, IList, IComparable
   public void Remove(object value) { remove(value); }
   public bool Contains(object value) { return __contains__(value); }
   public void Clear() { size=0; }
-  public int IndexOf(object value) { return Array.IndexOf(items, value, 0, size); }
+  public int IndexOf(object value) { return IndexOf(value, 0, size); }
+  public int IndexOf(object value, int start, int length)
+  { for(int i=0; i<items.Length; i++) if(Ops.Compare(items[i], value)==0) return i;
+    return -1;
+  }
   public int Add(object value) { append(value); return size-1; }
   public bool IsFixedSize { get { return false; } }
   #endregion

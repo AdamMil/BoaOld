@@ -151,7 +151,7 @@ public abstract class ReflectedMethodBase : ICallable
 
     for(int i=0; i<args.Length; i++) types[i] = args[i]==null ? null : args[i].GetType();
 
-    for(int mi=0; mi<sigs.Length; mi++) // TODO: cache this somehow?
+    for(int mi=0; mi<sigs.Length; mi++) // TODO: cache the binding results somehow?
     { ParameterInfo[] parms = sigs[mi].GetParameters();
       bool paramArray = parms.Length>0 && IsParamArray(parms[parms.Length-1]), alreadyPA=false;
       int lastRP = paramArray ? parms.Length-1 : parms.Length;
@@ -161,13 +161,13 @@ public abstract class ReflectedMethodBase : ICallable
       // check types of all parameters except the parameter array if there is one
       for(int i=0; i<lastRP; i++)
       { Conversion conv = Ops.ConvertTo(types[i], parms[i].ParameterType);
-        if(conv<res[mi].Conv)
+        if(conv==Conversion.None || conv<res[mi].Conv)
         { res[mi].Conv=conv;
           if(conv==Conversion.None) goto nextSig;
         }
       }
 
-      if(paramArray)
+      if(paramArray) // TODO: allow tuples and possibly lists as well to be used here
       { if(args.Length==parms.Length) // check if the last argument is an array already
         { Conversion conv = Ops.ConvertTo(types[lastRP], parms[lastRP].ParameterType);
           if(conv==Conversion.Identity || conv==Conversion.Reference)
@@ -181,7 +181,7 @@ public abstract class ReflectedMethodBase : ICallable
         Type type = parms[lastRP].ParameterType.GetElementType();
         for(int i=lastRP; i<args.Length; i++)
         { Conversion conv = Ops.ConvertTo(types[i], type);
-          if(conv<res[mi].Conv)
+          if(conv==Conversion.None || conv<res[mi].Conv)
           { res[mi].Conv=conv;
             if(conv==Conversion.None) goto nextSig;
           }

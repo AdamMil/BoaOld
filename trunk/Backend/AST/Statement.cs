@@ -62,9 +62,9 @@ public abstract class Statement : Node
       { inDef=false;
 
         ArrayList inherit = innerFuncs.Count==0 ? null : new ArrayList();
-        foreach(BoaFunction def in innerFuncs)
+        foreach(BoaFunction func in innerFuncs)
         { NameDecorator dec = new NameDecorator();
-          def.Walk(dec);
+          func.Walk(dec);
           foreach(Name dname in dec.names.Values)
             if(dname.Scope==Scope.Free)
             { Name name = (Name)names[dname.String];
@@ -78,7 +78,7 @@ public abstract class Statement : Node
               }
             }
           if(inherit.Count>0)
-          { def.Inherit = (Name[])inherit.ToArray(typeof(Name));
+          { func.Inherit = (Name[])inherit.ToArray(typeof(Name));
             inherit.Clear();
           }
         }
@@ -115,28 +115,36 @@ public abstract class Statement : Node
           ne.Name = AddName(ne.Name);
         }
       }
-      else if(node is DefStatement)
+      else if(node is BoaFunction)
       { if(innerFuncs==null)
         { innerFuncs = new ArrayList();
           names = new SortedList();
         }
 
-        DefStatement def = (DefStatement)node;
-        foreach(Parameter p in def.Function.Parameters)
-        { if(def.Function.Globals!=null)
-            for(int i=0; i<def.Function.Globals.Length; i++)
-              if(def.Function.Globals[i].String==p.Name.String)
+        BoaFunction func = (BoaFunction)node;
+        foreach(Parameter p in func.Parameters)
+        { if(func.Globals!=null)
+            for(int i=0; i<func.Globals.Length; i++)
+              if(func.Globals[i].String==p.Name.String)
                 throw Ops.SyntaxError("'{0}' is both local and global", p.Name.String);
           names[p.Name.String] = p.Name;
         }
-        current=def; inDef=true;
+        current=func; inDef=true;
       }
       return true;
     }
 
     Name AddName(Name name)
     { Name lname = (Name)names[name.String];
-      if(lname==null) names[name.String] = lname = name;
+      if(lname==null)
+      { names[name.String] = lname = name;
+        if(current.Globals!=null)
+          for(int i=0; i<current.Globals.Length; i++)
+            if(current.Globals[i].String==name.String)
+            { name.Scope = Scope.Global;
+              break;
+            }
+      }
       return lname;
     }
     
@@ -144,13 +152,13 @@ public abstract class Statement : Node
     { if(assignedTo is NameExpression)
       { NameExpression ne = (NameExpression)assignedTo;
         ne.Name = AddName(ne.Name);
-        ne.Name.Scope = Scope.Local;
+        if(ne.Name.Scope!=Scope.Global) ne.Name.Scope = Scope.Local;
       }
       else if(assignedTo is TupleExpression)
         foreach(Expression e in ((TupleExpression)assignedTo).Expressions) HandleAssignment(e);
     }
 
-    DefStatement current;
+    BoaFunction current;
     ArrayList  innerFuncs;
     SortedList names;
     bool inDef;
@@ -550,7 +558,7 @@ public class ForStatement : Statement
   { AssignStatement ass = new AssignStatement(Names);
     Label start=cg.ILG.DefineLabel(), end=cg.ILG.DefineLabel();
 
-    Walk(new JumpFinder(start, end));
+    Body.Walk(new JumpFinder(start, end));
     Expression.Emit(cg);
     cg.EmitCall(typeof(Ops), "GetEnumerator", new Type[] { typeof(object) });
     cg.ILG.MarkLabel(start);
@@ -672,7 +680,7 @@ public class WhileStatement : Statement
 
   public override void Emit(CodeGenerator cg)
   { Label start=cg.ILG.DefineLabel(), end=cg.ILG.DefineLabel();
-    Walk(new JumpFinder(start, end));
+    Body.Walk(new JumpFinder(start, end));
     cg.ILG.MarkLabel(start);
     Test.Emit(cg);
     cg.EmitCall(typeof(Ops), "IsTrue");

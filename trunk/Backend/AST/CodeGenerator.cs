@@ -53,6 +53,7 @@ public class CodeGenerator
 
   public void EmitConstant(object value)
   { if(value==null) ILG.Emit(OpCodes.Ldnull);
+    else if(value is bool) EmitFieldGet(typeof(Ops), (bool)value ? "TRUE" : "FALSE");
     else
     { string s = value as string;
       if(s!=null) EmitString(s);

@@ -287,11 +287,14 @@ public class Parser
   // if_stmt := 'if' <expression> <suite> ('elif' <expression> <suite>)* ('else' <suite>)?
   Statement ParseIf()
   { if(token!=Token.If && token!=Token.Elif) Unexpected(token);
+    int indent=this.indent;
     NextToken();
     Expression test = ParseExpression();
     Statement  body = ParseSuite(), elze=null;
-    if(token==Token.Elif) elze = ParseIf();
-    else if(TryEat(Token.Else)) elze = ParseSuite();
+    if(this.indent==indent)
+    { if(token==Token.Elif) elze = ParseIf();
+      else if(TryEat(Token.Else)) elze = ParseSuite();
+    }
     return AP(new IfStatement(test, body, elze));
   }
 
@@ -316,7 +319,7 @@ public class Parser
             list.Add(new ImportName(ident, ParseIdentifier()));
           }
           else list.Add(new ImportName(ident));
-        } while(token!=Token.EOL && !TryEat(Token.Comma));
+        } while(token!=Token.EOL && TryEat(Token.Comma));
         stmt = AP(new ImportFromStatement(module, (ImportName[])list.ToArray(typeof(ImportName))));
       }
     }
@@ -330,7 +333,7 @@ public class Parser
           list.Add(new ImportName(module, ParseIdentifier()));
         }
         else list.Add(new ImportName(module));
-      } while(token!=Token.EOL && !TryEat(Token.Comma));
+      } while(token!=Token.EOL && TryEat(Token.Comma));
       stmt = AP(new ImportStatement((ImportName[])list.ToArray(typeof(ImportName))));
     }
     Eat(Token.EOL);
@@ -789,6 +792,7 @@ public class Parser
           c = ReadChar();
           if(c=='|') return Token.LogOr;
           lastChar = c; return Token.BitOr;
+        case '^': return Token.BitXor;
         case '+': return Token.Plus;
         case '-': return Token.Minus;
         case '*':
