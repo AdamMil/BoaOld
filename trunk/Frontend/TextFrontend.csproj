@@ -9,7 +9,7 @@
             <Settings
                 ApplicationIcon = ""
                 AssemblyKeyContainerName = ""
-                AssemblyName = "Frontend"
+                AssemblyName = "boa"
                 AssemblyOriginatorKeyFile = ""
                 DefaultClientScript = "JScript"
                 DefaultHTMLPageLayout = "Grid"
@@ -18,7 +18,7 @@
                 OutputType = "Exe"
                 PreBuildEvent = ""
                 PostBuildEvent = ""
-                RootNamespace = "Frontend"
+                RootNamespace = "Boa.TextFrontend"
                 RunPostBuildEvent = "OnBuildSuccess"
                 StartupObject = ""
             >
@@ -70,7 +70,7 @@
                     HintPath = "..\..\..\WINDOWS\Microsoft.NET\Framework\v1.1.4322\System.dll"
                 />
                 <Reference
-                    Name = "Backend"
+                    Name = "Boa.Backend"
                     Project = "{BAB470DE-C719-4410-8168-58DE0F20BD1E}"
                     Package = "{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}"
                 />
