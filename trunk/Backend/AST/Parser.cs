@@ -5,16 +5,11 @@ using System.IO;
 using System.Text;
 using Boa.Runtime;
 
-// TODO: implement backtick operator: `o` == repr(o)
-// TODO: raise OverflowError or ValueError for invalid literals
 // TODO: add switch?
-// TODO: implement 'in' and 'not in'
-// FIXME: having 'and', 'or', and 'not' be low precedence operators may screw up python code in subtle ways
 // TODO: add <=> operator
-// TODO: add support for complex numbers: 5j == complex(0, 5)
-// TODO: add parsing for numbers without whole parts: (eg, .5)
 // TODO: implement sets
-// TODO: make sure x < y < z works as expected
+// TODO: make sure precedence matches python's
+// TODO: make x < y < z work as expected
 namespace Boa.AST
 {
 
@@ -287,17 +282,29 @@ public class Parser
   }
 
   // compare    := <bitwise> (<compare_op> <bitwise>)*
-  // compare_op := '==' | '!=' | '<' | '>' | '<=' | '>=' | '===' | '!==' | 'is' | 'is not'
+  // compare_op := '==' | '!=' | '<' | '>' | '<=' | '>=' | 'is' | 'is not' | 'in' | 'not in'
   Expression ParseCompare()
   { Expression expr = ParseBitwise();
-    while(token==Token.Compare || token==Token.Is)
+    while(true)
     { BinaryOperator op;
-      if(token==Token.Is)
-        op = NextToken()==Token.Not ? BinaryOperator.NotIdentical : (BinaryOperator)BinaryOperator.Identical;
-      else { op = (BinaryOperator)value; NextToken(); }
+      next:
+      switch(token) // token==Token.Compare || token==Token.Is || token==Token.In || token==Token.Not
+      { case Token.Compare: op = (BinaryOperator)value; NextToken(); break;
+        case Token.Is:
+          op = NextToken()==Token.Not ? BinaryOperator.NotIdentical : (BinaryOperator)BinaryOperator.Identical;
+          break;
+        case Token.In: case Token.Not:
+        { bool not = token==Token.Not;
+          NextToken();
+          if(not) Eat(Token.In);
+          expr = AP(new InExpression(expr, ParseBitwise(), not));
+          goto next;
+        }
+        default: goto done;
+      }
       expr = AP(new BinaryOpExpression(op, expr, ParseBitwise()));
     }
-    return expr;
+    done: return expr;
   }
 
   // def_stmt := 'def' <identifier> '(' <param_list> ')' ':' <suite>
@@ -478,13 +485,18 @@ public class Parser
     return AP(new ListCompExpression(expr, (ListCompFor[])list.ToArray(typeof(ListCompFor))));
   }
 
-  // logand := <compare> ('&&' <compare>)*
+  // logand := <lognot> ('&&' <lognot>)*
   Expression ParseLogAnd()
-  { Expression expr = ParseCompare();
-    while(TryEat(Token.LogAnd)) expr = AP(new AndExpression(expr, ParseCompare()));
+  { Expression expr = ParseLogNot();
+    while(TryEat(Token.LogAnd)) expr = AP(new AndExpression(expr, ParseLogNot()));
     return expr;
   }
 
+  // lognot := 'not' <lognot> | <compare>
+  Expression ParseLogNot()
+  { return TryEat(Token.Not) ? new UnaryExpression(ParseLogNot(), UnaryOperator.LogicalNot) : ParseCompare();
+  }
+  
   // logor := <logand> ('||' <logand>)*
   Expression ParseLogOr()
   { Expression expr = ParseLogAnd();
@@ -493,7 +505,7 @@ public class Parser
   }
 
   // primary := LITERAL | <ident> | '(' <expression> ')' | '[' <array_list> ']' | '{' <hash_list> '}' |
-  //            '[' <list_comprehension> ']' | <tuple of <expression>>
+  //            '[' <list_comprehension> ']' | <tuple of <expression>> | '`' <expression> '`'
   // tuple of T := '(' (<T> ',')+ <T>? ')'
   Expression ParsePrimary()
   { Expression expr;
@@ -574,6 +586,12 @@ public class Parser
           expr = AP(new HashExpression((DictionaryEntry[])list.ToArray(typeof(DictionaryEntry))));
         }
         Expect(Token.RBrace);
+        break;
+      case Token.BackQuote:
+        NextToken();
+        expr = ParseExpression();
+        Expect(Token.BackQuote);
+        expr = AP(new ReprExpression(expr));
         break;
       default: Unexpected(token); return null;
     }
@@ -812,11 +830,11 @@ public class Parser
   }
 
   // unary     := <unary_op> <unary>
-  // unary_op  := '!' | 'not' | '~' | '-' | '+'
+  // unary_op  := '!' | '~' | '-' | '+'
   Expression ParseUnary()
   { UnaryOperator op=null;
     switch(token)
-    { case Token.LogNot: case Token.Not: op = UnaryOperator.LogicalNot; break;
+    { case Token.LogNot: op = UnaryOperator.LogicalNot; break;
       case Token.Minus:  op = UnaryOperator.UnaryMinus; break;
       case Token.BitNot: op = UnaryOperator.BitwiseNot; break;
       case Token.Plus:   NextToken(); return ParseUnary();
@@ -871,9 +889,15 @@ public class Parser
       }
       else do c=ReadChar(); while(c!='\n' && c!=0 && char.IsWhiteSpace(c));
 
-      if(char.IsDigit(c))
-      { string s = string.Empty;
-        bool period = false;
+      if(char.IsDigit(c) || c=='.')
+      { if(c=='.')
+        { lastChar = ReadChar();
+          if(!char.IsDigit(lastChar)) return Token.Period;
+        }
+
+        string s=string.Empty;
+        bool period=false;
+
         while(true)
         { if(c=='.')
           { if(period) SyntaxError("invalid number");
@@ -884,9 +908,19 @@ public class Parser
           c = ReadChar();
         }
         try
-        { if(char.ToUpper(c)=='F') value = float.Parse(s);
-          else lastChar=c;
-          value = period ? (object)double.Parse(s) : (object)int.Parse(s);
+        { if(char.ToUpper(c)=='J') value = new Complex(0, double.Parse(s));
+          else if(period)
+          { if(char.ToUpper(c)=='L') throw new NotImplementedException("decimal type");
+            else { lastChar=c; value = double.Parse(s); }
+          }
+          else
+          { if(char.ToUpper(c)!='L') lastChar=c;
+            try { value = int.Parse(s); }
+            catch(OverflowException)
+            { try { value = long.Parse(s); }
+              catch(OverflowException) { value = Integer.Parse(s); }
+            }
+          }
           return Token.Literal;
         }
         catch(FormatException) { SyntaxError("invalid number"); }
@@ -1012,7 +1046,6 @@ public class Parser
         case ':': return Token.Colon;
         case '`': return Token.BackQuote;
         case ',': return Token.Comma;
-        case '.': return Token.Period;
         case '(': return Token.LParen;
         case ')': return Token.RParen;
         case '[': return Token.LBracket;

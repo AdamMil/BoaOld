@@ -19,7 +19,7 @@ public sealed class ModuleGenerator
 
       ConstructorBuilder cons = tg.TypeBuilder.DefineDefaultConstructor(MethodAttributes.Public);
       CodeGenerator icg = tg.DefineMethod(MethodAttributes.Virtual|MethodAttributes.Public|MethodAttributes.HideBySig,
-                                          "Run", typeof(object), new Type[] { typeof(Boa.Runtime.Frame) });
+                                          "Run", typeof(void), new Type[] { typeof(Boa.Runtime.Frame) });
       FrameNamespace ns = new FrameNamespace(tg, icg);
       icg.Namespace = ns;
       icg.ILG.Emit(OpCodes.Ldarg_0);
@@ -30,9 +30,7 @@ public sealed class ModuleGenerator
       icg.EmitString("__name__");
       icg.EmitString(name);
       icg.EmitCall(typeof(Boa.Runtime.Frame), "SetGlobal");
-
       body.Emit(icg);
-      icg.ILG.Emit(OpCodes.Ldnull);
       icg.ILG.Emit(OpCodes.Ret);
 
       return (Boa.Runtime.Module)tg.FinishType().GetConstructor(Type.EmptyTypes).Invoke(null);

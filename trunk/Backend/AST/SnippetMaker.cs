@@ -7,7 +7,7 @@ namespace Boa.AST
 {
 
 public abstract class Snippet
-{ public abstract object Run(Frame frame);
+{ public abstract void Run(Frame frame);
 }
 
 public class SnippetMaker
@@ -24,7 +24,7 @@ public class SnippetMaker
     tg.TypeBuilder.DefineDefaultConstructor(MethodAttributes.Public);
 
     CodeGenerator cg = tg.DefineMethod(MethodAttributes.Public|MethodAttributes.Virtual, "Run",
-                                       typeof(object), new Type[] { typeof(Frame) });
+                                       typeof(void), new Type[] { typeof(Frame) });
     FrameNamespace fns = new FrameNamespace(tg, cg);
     cg.Namespace = fns;
 
@@ -36,7 +36,7 @@ public class SnippetMaker
     tg.ModuleField.EmitSet(cg);
 
     body.Emit(cg);
-    if(!(body is ReturnStatement)) cg.EmitReturn(null);
+    cg.ILG.Emit(OpCodes.Ret);
     return (Snippet)tg.FinishType().GetConstructor(Type.EmptyTypes).Invoke(null);
   }
 

@@ -22,12 +22,15 @@ public struct Complex : IRepresentable
   public double abs() { return Math.Sqrt(real*real+imag*imag); }
   public Complex conjugate() { return new Complex(real, -imag); }
 
-  public override string ToString()
-  { return '(' + real.ToString() + '+' + imag.ToString() + "j)";
-  }
-  
+  public override string ToString() { return ToString("G"); }
   public string ToString(string s)
-  { return '(' + real.ToString(s) + '+' + imag.ToString(s) + "j)";
+  { System.Text.StringBuilder sb = new System.Text.StringBuilder();
+    sb.Append('(');
+    sb.Append(real.ToString(s));
+    if(imag>=0) sb.Append('+');
+    sb.Append(imag.ToString(s));
+    sb.Append("j)");
+    return sb.ToString();
   }
 
   public double real, imag;

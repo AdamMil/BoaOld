@@ -65,6 +65,8 @@ public class CodeGenerator
     }
   }
 
+  public void EmitDouble(double value) { ILG.Emit(OpCodes.Ldc_R8, value); }
+
   public void EmitExpression(Expression e)
   { if(e==null) ILG.Emit(OpCodes.Ldnull);
     else e.Emit(this);

@@ -20,7 +20,8 @@ public sealed class IntOps
         case TypeCode.Int32: return checked(a + (int)b); // TODO: add these elsewhere
         case TypeCode.Int64: return checked(a + (long)b);
         case TypeCode.Object:
-          if(b is Integer) return (Integer)b + a;
+          if(b is Integer) return a + (Integer)b;
+          if(b is Complex) return a + (Complex)b;
           IConvertible ic = b as IConvertible;
           return ic!=null ? checked(a + ic.ToInt32(NumberFormatInfo.InvariantInfo))
                           : Ops.Invoke(b, "__radd__", a);
@@ -316,7 +317,8 @@ public sealed class IntOps
         case TypeCode.Int16: return checked(a * (short)b);
         case TypeCode.Int64: return checked(a * (long)b);
         case TypeCode.Object:
-          if(b is Integer) return (Integer)b * a;
+          if(b is Integer) return a * (Integer)b;
+          if(b is Complex) return a * (Complex)b;
           IConvertible ic = b as IConvertible;
           return ic!=null ? checked(a * ic.ToInt32(NumberFormatInfo.InvariantInfo))
                           : Ops.Invoke(b, "__rmul__", a);
@@ -419,7 +421,8 @@ public sealed class IntOps
         case TypeCode.Int16: return checked(a - (short)b);
         case TypeCode.Int64: return checked(a - (long)b);
         case TypeCode.Object:
-          if(b is Integer) return (Integer)b - a;
+          if(b is Integer) return a - (Integer)b;
+          if(b is Complex) return a - (Complex)b;
           IConvertible ic = b as IConvertible;
           return ic!=null ? checked(a - ic.ToInt32(NumberFormatInfo.InvariantInfo))
                           : Ops.Invoke(b, "__rsub__", a);

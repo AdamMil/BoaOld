@@ -14,7 +14,7 @@ public class Module : Boa.AST.Snippet, IHasAttributes, IRepresentable
   public Module() { __dict__ = new Dict(); }
   public Module(IDictionary dict) { __dict__ = dict; }
 
-  public override object Run(Frame frame) { throw new NotImplementedException("Run() not implemented!"); }
+  public override void Run(Frame frame) { throw new NotImplementedException("Run() not implemented!"); }
 
   public string __repr__()
   { object name = __dict__["__name__"];

@@ -35,6 +35,7 @@ public class AndExpression : BinaryExpression
 
   public override void Emit(CodeGenerator cg)
   { if(IsConstant) cg.EmitConstant(GetValue());
+    else if(LHS.IsConstant && Ops.IsTrue(LHS.GetValue())) RHS.Emit(cg);
     else
     { LHS.Emit(cg);
       cg.ILG.Emit(OpCodes.Dup);
@@ -50,6 +51,10 @@ public class AndExpression : BinaryExpression
   public override object Evaluate(Frame frame)
   { object value = LHS.Evaluate(frame);
     return Ops.IsTrue(value) ? RHS.Evaluate(frame) : value;
+  }
+
+  public override void Optimize()
+  { IsConstant = LHS.IsConstant ? Ops.IsTrue(LHS.GetValue()) ? RHS.IsConstant : true : false;
   }
 
   public override void ToCode(System.Text.StringBuilder sb, int indent)
@@ -590,6 +595,32 @@ public class IndexExpression : Expression
 }
 #endregion
 
+#region InExpression
+public class InExpression : BinaryExpression
+{ public InExpression(Expression lhs, Expression rhs, bool not) { LHS=lhs; RHS=rhs; Not=not; }
+
+  public override void Emit(CodeGenerator cg)
+  { if(IsConstant) cg.EmitConstant(GetValue());
+    else
+    { LHS.Emit(cg);
+      RHS.Emit(cg);
+      cg.EmitBool(Not);
+      cg.EmitCall(typeof(Ops), "IsIn");
+    }
+  }
+  
+  public override object Evaluate(Frame frame) { return Ops.IsIn(LHS.Evaluate(frame), RHS.Evaluate(frame), Not); }
+
+  public override void ToCode(System.Text.StringBuilder sb, int indent)
+  { LHS.ToCode(sb, 0);
+    sb.Append(Not ? " not in " : " in ");
+    RHS.ToCode(sb, 0);
+  }
+
+  public bool Not;
+}
+#endregion
+
 #region LambdaExpression
 public class LambdaExpression : Expression
 { public LambdaExpression(Parameter[] parms, Statement body)
@@ -845,6 +876,7 @@ public class OrExpression : BinaryExpression
 
   public override void Emit(CodeGenerator cg)
   { if(IsConstant) cg.EmitConstant(GetValue());
+    else if(LHS.IsConstant && !Ops.IsTrue(LHS.GetValue())) RHS.Emit(cg);
     else
     { LHS.Emit(cg);
       cg.ILG.Emit(OpCodes.Dup);
@@ -860,6 +892,10 @@ public class OrExpression : BinaryExpression
   public override object Evaluate(Frame frame)
   { object value = LHS.Evaluate(frame);
     return Ops.IsTrue(value) ? value : RHS.Evaluate(frame);
+  }
+
+  public override void Optimize()
+  { IsConstant = LHS.IsConstant ? Ops.IsTrue(LHS.GetValue()) ? true : RHS.IsConstant : false;
   }
 
   public override void ToCode(System.Text.StringBuilder sb, int indent)
@@ -896,6 +932,36 @@ public class ParenExpression : Expression
   public Expression Expression;
 }
 
+#endregion
+
+#region ReprExpression
+public class ReprExpression : Expression
+{ public ReprExpression(Expression expr) { Expression=expr; }
+
+  public override void Emit(CodeGenerator cg)
+  { if(IsConstant) cg.EmitConstant(GetValue());
+    else
+    { Expression.Emit(cg);
+      cg.EmitCall(typeof(Ops), "Repr");
+    }
+  }
+  
+  public override object Evaluate(Frame frame) { return Ops.Repr(Expression.Evaluate(frame)); }
+  public override void Optimize() { IsConstant = Expression.IsConstant; }
+
+  public override void ToCode(System.Text.StringBuilder sb, int indent)
+  { sb.Append('`');
+    Expression.ToCode(sb, 0);
+    sb.Append('`');
+  }
+
+  public override void Walk(IWalker w)
+  { if(w.Walk(this)) Expression.Walk(w);
+    w.PostWalk(this);
+  }
+
+  public Expression Expression;
+}
 #endregion
 
 #region SliceExpression
