@@ -19,8 +19,36 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 
-using System;using System.Collections;using System.Reflection;using System.Reflection.Emit;using Boa.Runtime;namespace Boa.AST{public sealed class BoaFunction : Node{ public BoaFunction(Node from, Parameter[] parms, Statement body)  { Parameters=parms; Body=body; SetLocation(from.Source, from.Line, from.Column);    Yields = YieldFinder.Find(body);    if(Yields!=null) body.Walk(new ReturnMarker());    docstring = Misc.BodyToDocString(Body);
-  }  public BoaFunction(Node from, string name, Parameter[] parms, Statement body) : this(from, parms, body)  { Name=new Name(name);  }  public Name   Name;  public Name[] Inherit, Globals;  public Parameter[] Parameters;  public YieldStatement[] Yields;  public Statement Body;  public string FuncName { get { return Name==null ? "lambda" : Name.String; } }  public void Emit(CodeGenerator cg)  { Initialize();
+using System;
+using System.Collections;
+using System.Reflection;
+using System.Reflection.Emit;
+using Boa.Runtime;
+
+namespace Boa.AST
+{
+
+public sealed class BoaFunction : Node
+{ public BoaFunction(Node from, Parameter[] parms, Statement body)
+  { Parameters=parms; Body=body; SetLocation(from.Source, from.Line, from.Column);
+    Yields = YieldFinder.Find(body);
+    if(Yields!=null) body.Walk(new ReturnMarker());
+    docstring = Misc.BodyToDocString(Body);
+  }
+  public BoaFunction(Node from, string name, Parameter[] parms, Statement body) : this(from, parms, body)
+  { Name=new Name(name);
+  }
+
+  public Name   Name;
+  public Name[] Inherit, Globals;
+  public Parameter[] Parameters;
+  public YieldStatement[] Yields;
+  public Statement Body;
+
+  public string FuncName { get { return Name==null ? "lambda" : Name.String; } }
+
+  public void Emit(CodeGenerator cg)
+  { Initialize();
     CodeGenerator impl = MakeImplMethod(cg);
     Type targetType = Inherit==null ? typeof(CallTargetN) : typeof(CallTargetFN);
     Type funcType   = Inherit==null ? typeof(CompiledFunctionN) : typeof(CompiledFunctionFN);
@@ -29,7 +57,11 @@ using System;using System.Collections;using System.Reflection;using System.Re
 
     cg.EmitString(Name==null ? null : Name.String);
     EmitNames(cg);
-    EmitDefaults(cg);    cg.EmitBool(hasList);    cg.EmitBool(hasDict);    cg.EmitInt(numRequired);    EmitClosedGet(cg);
+    EmitDefaults(cg);
+    cg.EmitBool(hasList);
+    cg.EmitBool(hasDict);
+    cg.EmitInt(numRequired);
+    EmitClosedGet(cg);
     cg.ILG.Emit(OpCodes.Ldnull); // create delegate
     cg.ILG.Emit(OpCodes.Ldftn, impl.MethodBuilder);
     cg.EmitNew((ConstructorInfo)targetType.GetMember(".ctor")[0]);
@@ -40,11 +72,299 @@ using System;using System.Collections;using System.Reflection;using System.Re
       cg.EmitFieldSet(typeof(Function), "__doc__");
     }
     index++;
-  }  public object MakeFunction(Frame frame)  { Initialize();    object[] defaults = numOptional==0 ? null : new object[numOptional]; // TODO: optimize this if expressions are constant?    for(int i=0; i<numOptional; i++) defaults[i] = Parameters[i+optionalStart].Default.Evaluate(frame);    return new InterpretedFunction(Name==null ? null : Name.String, names, defaults, hasList, hasDict, numRequired,                                   Globals, frame, Body, docstring);  }    public override void Optimize()
+  }
+
+  public object MakeFunction(Frame frame)
+  { Initialize();
+    object[] defaults = numOptional==0 ? null : new object[numOptional]; // TODO: optimize this if expressions are constant?
+    for(int i=0; i<numOptional; i++) defaults[i] = Parameters[i+optionalStart].Default.Evaluate(frame);
+    return new InterpretedFunction(Name==null ? null : Name.String, names, defaults, hasList, hasDict, numRequired,
+                                   Globals, frame, Body, docstring);
+  }
+  
+  public override void Optimize()
   { Optimizer o = new Optimizer();
     for(int i=0; i<Parameters.Length; i++) if(Parameters[i].Default!=null) Parameters[i].Default.Walk(o);
   }
 
   public override void ToCode(System.Text.StringBuilder sb, int indent) { throw new NotSupportedException(); }
-  public override void Walk(IWalker w)  { if(w.Walk(this))    { for(int i=0; i<Parameters.Length; i++) if(Parameters[i].Default!=null) Parameters[i].Default.Walk(w);      Body.Walk(w);    }    w.PostWalk(this);  }  #region Walkers  class LabelMaker : IWalker  { public LabelMaker(CodeGenerator cg) { this.cg=cg; }    public void PostWalk(Node n) { }    public bool Walk(Node n)    { if(n is TryStatement)      { TryStatement ts = (TryStatement)n;        foreach(YieldStatement ys in ts.Yields) DefineLabels(ys);        return false;      }      else if(n is YieldStatement) { DefineLabels((YieldStatement)n); return false; }      return true;    }    void DefineLabels(YieldStatement ys)    { for(int i=0; i<ys.Targets.Length; i++) ys.Targets[i].Label = cg.ILG.DefineLabel();    }    CodeGenerator cg;  }  class ReturnMarker : IWalker  { public void PostWalk(Node n) { }    public bool Walk(Node n)    { if(n is BoaFunction) return false;      else if(n is ReturnStatement)      { ReturnStatement rs = (ReturnStatement)n;        if(rs.Expression!=null) throw Ops.SyntaxError(n, "'return expression' not allowed in a generator function");        rs.InGenerator = true;        return false;      }      return true;    }  }  class YieldFinder : IWalker  { public static YieldStatement[] Find(Node n)    { YieldFinder yf = new YieldFinder();      n.Walk(yf);      return yf.yields.Count==0 ? null : (YieldStatement[])yf.yields.ToArray(typeof(YieldStatement));    }    public void PostWalk(Node n)    { if(n is TryStatement)      { tries.RemoveAt(tries.Count-1);        int start = (int)locals.Pop();        if(localYields.Count==start) return;        else        { TryStatement ts = (TryStatement)n;          if(ts.Finally!=null)            throw Ops.SyntaxError(ts.Finally, "'finally' clause not allowed on a try block that contains a 'yield'");          YieldStatement[] ys = ((TryStatement)n).Yields = new YieldStatement[localYields.Count-start];          for(int i=0; i<ys.Length; i++) ys[i] = (YieldStatement)localYields[i+start];        }      }    }    public bool Walk(Node n)    { if(n is BoaFunction) return false;      else if(n is TryStatement)      { TryStatement ts = (TryStatement)n;        bool invalid=false;        if(ts.Else!=null && HasYield.Check(ts.Else) || ts.Finally!=null && HasYield.Check(ts.Finally)) invalid=true;        else foreach(ExceptClause ec in ts.Except) if(HasYield.Check(ec.Body)) { invalid=true; break; }        if(invalid) throw Ops.SyntaxError(ts, "'yield' not allowed in the 'else', 'except', or 'finally' "+                                              "section of a try block");        tries.Add(n);        locals.Push(localYields.Count);      }      else if(n is YieldStatement)      { YieldStatement ys = (YieldStatement)n;        ys.YieldNumber = yields.Count;        ys.Targets = new YieldStatement.YieldTarget[tries.Count+1];        for(int i=0; i<tries.Count; i++) ys.Targets[i].Statement = (TryStatement)tries[i];        yields.Add(n); localYields.Add(n);        return false;      }      return true;    }    class HasYield : IWalker    { public static bool Check(Node n)      { HasYield w = new HasYield();        n.Walk(w);        return w.found;      }      public void PostWalk(Node n) { }      public bool Walk(Node n)      { if(n is TryStatement || n is BoaFunction) return false;        if(n is YieldStatement) found=true;        return !found;      }      bool found;    }    ArrayList tries=new ArrayList(), yields=new ArrayList(), localYields=new ArrayList();    Stack locals = new Stack();  }  #endregion  void EmitBody(CodeGenerator cg, Name[] parmNames)  { bool interactive = Options.Interactive;    Options.Interactive = false;    try    { if(Yields==null)      { Body.Emit(cg);        cg.EmitReturn(null);      }      else      { TypeGenerator tg = cg.TypeGenerator.DefineNestedType(TypeAttributes.Sealed, FuncName+index,                                                             typeof(Generator));        CodeGenerator ncg = tg.DefineMethod(MethodAttributes.Virtual|MethodAttributes.Family,                                             "InnerNext", typeof(bool), new Type[] { Misc.TypeOfObjectRef });        ncg.IsGenerator = true;        ncg.Namespace   = new FieldNamespace(cg.Namespace, "_", ncg, new ThisSlot(tg.TypeBuilder));        ncg.Namespace.SetArgs(parmNames, 0, ncg.MethodBuilder);        Body.Walk(new LabelMaker(ncg));        ncg.ILG.BeginExceptionBlock();        Label[] jumps = new Label[Yields.Length];        for(int i=0; i<Yields.Length; i++) jumps[i] = Yields[i].Targets[0].Label;        ncg.ILG.Emit(OpCodes.Ldarg_0);        ncg.EmitFieldGet(typeof(Generator).GetField("jump", BindingFlags.Instance|BindingFlags.NonPublic));        ncg.ILG.Emit(OpCodes.Switch, jumps);        Body.Emit(ncg);        ncg.ILG.BeginCatchBlock(typeof(StopIterationException));        ncg.ILG.Emit(OpCodes.Pop);        ncg.ILG.EndExceptionBlock();        ncg.ILG.Emit(OpCodes.Ldc_I4_0);
-        ncg.ILG.Emit(OpCodes.Ret);        ncg.Finish();        cg.EmitNew(tg.TypeBuilder.DefineDefaultConstructor(MethodAttributes.Public));        for(int i=0; i<parmNames.Length; i++)        { cg.ILG.Emit(OpCodes.Dup);          cg.EmitGet(parmNames[i]);          cg.EmitFieldSet(((FieldSlot)ncg.Namespace.GetSlotForSet(parmNames[i])).Info);        }        cg.ILG.Emit(OpCodes.Ret);      }    }    finally { Options.Interactive = interactive; }  }  void EmitClosedGet(CodeGenerator cg)  { if(Inherit==null) cg.ILG.Emit(OpCodes.Ldnull);    else    { cg.EmitNewArray(typeof(ClosedVar), Inherit.Length);      ConstructorInfo ci = typeof(ClosedVar).GetConstructor(new Type[] { typeof(string) });      FieldInfo fi = typeof(ClosedVar).GetField("Value");      for(int i=0; i<Inherit.Length; i++)      { cg.ILG.Emit(OpCodes.Dup);        cg.EmitInt(i);        Slot slot = cg.Namespace.GetLocalSlot(Inherit[i]);        ClosedSlot cs = slot as ClosedSlot;        if(cs!=null) cs.Storage.EmitGet(cg);        else        { cg.EmitString(Inherit[i].String);          cg.EmitNew(ci);          cg.ILG.Emit(OpCodes.Dup);          slot.EmitGet(cg);          cg.EmitFieldSet(fi);        }        cg.ILG.Emit(OpCodes.Stelem_Ref);      }    }  }    void EmitDefaults(CodeGenerator cg)  { if(numOptional==0) { cg.ILG.Emit(OpCodes.Ldnull); return; }    if(defaultSlot!=null) { defaultSlot.EmitGet(cg); return; }    bool constant = true;    for(int i=0; i<numOptional; i++) if(!Parameters[i+optionalStart].Default.IsConstant) { constant=false; break; }      if(constant)    { defaultSlot = cg.TypeGenerator.AddStaticSlot(FuncName + "$d" + index, typeof(object[]));      CodeGenerator icg = cg.TypeGenerator.GetInitializer();      icg.EmitNewArray(typeof(object), numOptional);      for(int i=0; i<numOptional; i++)      { icg.ILG.Emit(OpCodes.Dup);        icg.EmitInt(i);        icg.EmitConstant(Parameters[i+optionalStart].Default.GetValue());        icg.ILG.Emit(OpCodes.Stelem_Ref);      }      defaultSlot.EmitSet(icg);      defaultSlot.EmitGet(cg);      return;    }        cg.EmitNewArray(typeof(object), numOptional);    for(int i=0; i<numOptional; i++)    { cg.ILG.Emit(OpCodes.Dup);      cg.EmitInt(i);      Parameters[i+optionalStart].Default.Emit(cg);      cg.ILG.Emit(OpCodes.Stelem_Ref);    }  }  void EmitNames(CodeGenerator cg)  { if(namesSlot==null)    { namesSlot = cg.TypeGenerator.AddStaticSlot(FuncName + "$n" + index, typeof(string[]));      CodeGenerator icg = cg.TypeGenerator.GetInitializer();      icg.EmitStringArray(names);      namesSlot.EmitSet(icg);    }    namesSlot.EmitGet(cg);  }  void Initialize()  { if(names!=null) return;    bool os = false;    names = new string[Parameters.Length];    for(int i=0; i<Parameters.Length; i++)    { names[i] = Parameters[i].Name.String;      switch(Parameters[i].Type)      { case ParamType.Required: numRequired++; break;        case ParamType.Optional:          if(os) numOptional++;          else { optionalStart=i; numOptional=1; os=true; }          break;        case ParamType.List: hasList=true; break;        case ParamType.Dict: hasDict=true; break;      }    }  }  CodeGenerator MakeImplMethod(CodeGenerator cg)  { Name[] names = new Name[Parameters.Length];     for(int i=0; i<Parameters.Length; i++) names[i] = Parameters[i].Name;    Type[] parmTypes = Inherit==null ? new Type[] { typeof(object[]) }                                     : new Type[] { typeof(CompiledFunction), typeof(object[]) };    CodeGenerator icg = cg.TypeGenerator.DefineMethod(FuncName + "$f" + index, typeof(object), parmTypes);    LocalNamespace ns = new LocalNamespace(cg.Namespace, icg);    icg.Namespace = ns;    //icg.SetArgs(names, 1);    ns.SetArgs(names, icg, new ArgSlot(icg.MethodBuilder, Inherit==null ? 0 : 1, "$names", typeof(object[])));    if(Inherit!=null && Inherit.Length>0)    { icg.EmitArgGet(0);      icg.EmitFieldGet(typeof(CompiledFunction), "Closed");      for(int i=0; i<Inherit.Length; i++)      { if(i!=Inherit.Length-1) icg.ILG.Emit(OpCodes.Dup);        icg.EmitInt(i);        icg.ILG.Emit(OpCodes.Ldelem_Ref);        ns.UnpackClosedVar(Inherit[i], icg);      }    }    EmitBody(icg, names);    icg.Finish();    return icg;  }  Slot namesSlot, defaultSlot;  string[] names;  string docstring;  int optionalStart, numOptional, numRequired;  bool hasList, hasDict;  static int index;}} // namespace Boa.AST
+
+  public override void Walk(IWalker w)
+  { if(w.Walk(this))
+    { for(int i=0; i<Parameters.Length; i++) if(Parameters[i].Default!=null) Parameters[i].Default.Walk(w);
+      Body.Walk(w);
+    }
+    w.PostWalk(this);
+  }
+
+  #region Walkers
+  class LabelMaker : IWalker
+  { public LabelMaker(CodeGenerator cg) { this.cg=cg; }
+
+    public void PostWalk(Node n) { }
+
+    public bool Walk(Node n)
+    { if(n is TryStatement)
+      { TryStatement ts = (TryStatement)n;
+        foreach(YieldStatement ys in ts.Yields) DefineLabels(ys);
+        return false;
+      }
+      else if(n is YieldStatement) { DefineLabels((YieldStatement)n); return false; }
+      return true;
+    }
+
+    void DefineLabels(YieldStatement ys)
+    { for(int i=0; i<ys.Targets.Length; i++) ys.Targets[i].Label = cg.ILG.DefineLabel();
+    }
+
+    CodeGenerator cg;
+  }
+
+  class ReturnMarker : IWalker
+  { public void PostWalk(Node n) { }
+
+    public bool Walk(Node n)
+    { if(n is BoaFunction) return false;
+      else if(n is ReturnStatement)
+      { ReturnStatement rs = (ReturnStatement)n;
+        if(rs.Expression!=null) throw Ops.SyntaxError(n, "'return expression' not allowed in a generator function");
+        rs.InGenerator = true;
+        return false;
+      }
+      return true;
+    }
+  }
+
+  class YieldFinder : IWalker
+  { public static YieldStatement[] Find(Node n)
+    { YieldFinder yf = new YieldFinder();
+      n.Walk(yf);
+      return yf.yields.Count==0 ? null : (YieldStatement[])yf.yields.ToArray(typeof(YieldStatement));
+    }
+
+    public void PostWalk(Node n)
+    { if(n is TryStatement)
+      { tries.RemoveAt(tries.Count-1);
+        int start = (int)locals.Pop();
+        if(localYields.Count==start) return;
+        else
+        { TryStatement ts = (TryStatement)n;
+          if(ts.Finally!=null)
+            throw Ops.SyntaxError(ts.Finally, "'finally' clause not allowed on a try block that contains a 'yield'");
+          YieldStatement[] ys = ((TryStatement)n).Yields = new YieldStatement[localYields.Count-start];
+          for(int i=0; i<ys.Length; i++) ys[i] = (YieldStatement)localYields[i+start];
+        }
+      }
+    }
+
+    public bool Walk(Node n)
+    { if(n is BoaFunction) return false;
+      else if(n is TryStatement)
+      { TryStatement ts = (TryStatement)n;
+        bool invalid=false;
+        if(ts.Else!=null && HasYield.Check(ts.Else) || ts.Finally!=null && HasYield.Check(ts.Finally)) invalid=true;
+        else foreach(ExceptClause ec in ts.Except) if(HasYield.Check(ec.Body)) { invalid=true; break; }
+        if(invalid) throw Ops.SyntaxError(ts, "'yield' not allowed in the 'else', 'except', or 'finally' "+
+                                              "section of a try block");
+        tries.Add(n);
+        locals.Push(localYields.Count);
+      }
+      else if(n is YieldStatement)
+      { YieldStatement ys = (YieldStatement)n;
+        ys.YieldNumber = yields.Count;
+        ys.Targets = new YieldStatement.YieldTarget[tries.Count+1];
+        for(int i=0; i<tries.Count; i++) ys.Targets[i].Statement = (TryStatement)tries[i];
+        yields.Add(n); localYields.Add(n);
+        return false;
+      }
+      return true;
+    }
+
+    class HasYield : IWalker
+    { public static bool Check(Node n)
+      { HasYield w = new HasYield();
+        n.Walk(w);
+        return w.found;
+      }
+
+      public void PostWalk(Node n) { }
+      public bool Walk(Node n)
+      { if(n is TryStatement || n is BoaFunction) return false;
+        if(n is YieldStatement) found=true;
+        return !found;
+      }
+
+      bool found;
+    }
+
+    ArrayList tries=new ArrayList(), yields=new ArrayList(), localYields=new ArrayList();
+    Stack locals = new Stack();
+  }
+  #endregion
+
+  void EmitBody(CodeGenerator cg, Name[] parmNames)
+  { bool interactive = Options.Interactive;
+    Options.Interactive = false;
+    try
+    { if(Yields==null)
+      { Body.Emit(cg);
+        cg.EmitReturn(null);
+      }
+      else
+      { TypeGenerator tg = cg.TypeGenerator.DefineNestedType(TypeAttributes.Sealed, FuncName+index,
+                                                             typeof(Generator));
+        CodeGenerator ncg = tg.DefineMethod(MethodAttributes.Virtual|MethodAttributes.Family, 
+                                            "InnerNext", typeof(bool), new Type[] { Misc.TypeOfObjectRef });
+        ncg.IsGenerator = true;
+        ncg.Namespace   = new FieldNamespace(cg.Namespace, "_", ncg, new ThisSlot(tg.TypeBuilder));
+        ncg.Namespace.SetArgs(parmNames, 0, ncg.MethodBuilder);
+        Body.Walk(new LabelMaker(ncg));
+        ncg.ILG.BeginExceptionBlock();
+
+        Label[] jumps = new Label[Yields.Length];
+        for(int i=0; i<Yields.Length; i++) jumps[i] = Yields[i].Targets[0].Label;
+
+        ncg.ILG.Emit(OpCodes.Ldarg_0);
+        ncg.EmitFieldGet(typeof(Generator).GetField("jump", BindingFlags.Instance|BindingFlags.NonPublic));
+        ncg.ILG.Emit(OpCodes.Switch, jumps);
+        Body.Emit(ncg);
+        ncg.ILG.BeginCatchBlock(typeof(StopIterationException));
+        ncg.ILG.Emit(OpCodes.Pop);
+        ncg.ILG.EndExceptionBlock();
+        ncg.ILG.Emit(OpCodes.Ldc_I4_0);
+        ncg.ILG.Emit(OpCodes.Ret);
+        ncg.Finish();
+
+        cg.EmitNew(tg.TypeBuilder.DefineDefaultConstructor(MethodAttributes.Public));
+        for(int i=0; i<parmNames.Length; i++)
+        { cg.ILG.Emit(OpCodes.Dup);
+          cg.EmitGet(parmNames[i]);
+          cg.EmitFieldSet(((FieldSlot)ncg.Namespace.GetSlotForSet(parmNames[i])).Info);
+        }
+        cg.ILG.Emit(OpCodes.Ret);
+      }
+    }
+    finally { Options.Interactive = interactive; }
+  }
+
+  void EmitClosedGet(CodeGenerator cg)
+  { if(Inherit==null) cg.ILG.Emit(OpCodes.Ldnull);
+    else
+    { cg.EmitNewArray(typeof(ClosedVar), Inherit.Length);
+      ConstructorInfo ci = typeof(ClosedVar).GetConstructor(new Type[] { typeof(string) });
+      FieldInfo fi = typeof(ClosedVar).GetField("Value");
+
+      for(int i=0; i<Inherit.Length; i++)
+      { cg.ILG.Emit(OpCodes.Dup);
+        cg.EmitInt(i);
+        Slot slot = cg.Namespace.GetLocalSlot(Inherit[i]);
+        ClosedSlot cs = slot as ClosedSlot;
+        if(cs!=null) cs.Storage.EmitGet(cg);
+        else
+        { cg.EmitString(Inherit[i].String);
+          cg.EmitNew(ci);
+          cg.ILG.Emit(OpCodes.Dup);
+          slot.EmitGet(cg);
+          cg.EmitFieldSet(fi);
+        }
+        cg.ILG.Emit(OpCodes.Stelem_Ref);
+      }
+    }
+  }
+  
+  void EmitDefaults(CodeGenerator cg)
+  { if(numOptional==0) { cg.ILG.Emit(OpCodes.Ldnull); return; }
+    if(defaultSlot!=null) { defaultSlot.EmitGet(cg); return; }
+
+    bool constant = true;
+    for(int i=0; i<numOptional; i++) if(!Parameters[i+optionalStart].Default.IsConstant) { constant=false; break; }
+  
+    if(constant)
+    { defaultSlot = cg.TypeGenerator.AddStaticSlot(FuncName + "$d" + index, typeof(object[]));
+      CodeGenerator icg = cg.TypeGenerator.GetInitializer();
+      icg.EmitNewArray(typeof(object), numOptional);
+      for(int i=0; i<numOptional; i++)
+      { icg.ILG.Emit(OpCodes.Dup);
+        icg.EmitInt(i);
+        icg.EmitConstant(Parameters[i+optionalStart].Default.GetValue());
+        icg.ILG.Emit(OpCodes.Stelem_Ref);
+      }
+      defaultSlot.EmitSet(icg);
+      defaultSlot.EmitGet(cg);
+      return;
+    }
+    
+    cg.EmitNewArray(typeof(object), numOptional);
+    for(int i=0; i<numOptional; i++)
+    { cg.ILG.Emit(OpCodes.Dup);
+      cg.EmitInt(i);
+      Parameters[i+optionalStart].Default.Emit(cg);
+      cg.ILG.Emit(OpCodes.Stelem_Ref);
+    }
+  }
+
+  void EmitNames(CodeGenerator cg)
+  { if(namesSlot==null)
+    { namesSlot = cg.TypeGenerator.AddStaticSlot(FuncName + "$n" + index, typeof(string[]));
+      CodeGenerator icg = cg.TypeGenerator.GetInitializer();
+      icg.EmitStringArray(names);
+      namesSlot.EmitSet(icg);
+    }
+    namesSlot.EmitGet(cg);
+  }
+
+  void Initialize()
+  { if(names!=null) return;
+    bool os = false;
+    names = new string[Parameters.Length];
+
+    for(int i=0; i<Parameters.Length; i++)
+    { names[i] = Parameters[i].Name.String;
+      switch(Parameters[i].Type)
+      { case ParamType.Required: numRequired++; break;
+        case ParamType.Optional:
+          if(os) numOptional++;
+          else { optionalStart=i; numOptional=1; os=true; }
+          break;
+        case ParamType.List: hasList=true; break;
+        case ParamType.Dict: hasDict=true; break;
+      }
+    }
+  }
+
+  CodeGenerator MakeImplMethod(CodeGenerator cg)
+  { Name[] names = new Name[Parameters.Length]; 
+    for(int i=0; i<Parameters.Length; i++) names[i] = Parameters[i].Name;
+
+    Type[] parmTypes = Inherit==null ? new Type[] { typeof(object[]) }
+                                     : new Type[] { typeof(CompiledFunction), typeof(object[]) };
+    CodeGenerator icg = cg.TypeGenerator.DefineMethod(FuncName + "$f" + index, typeof(object), parmTypes);
+    LocalNamespace ns = new LocalNamespace(cg.Namespace, icg);
+    icg.Namespace = ns;
+    //icg.SetArgs(names, 1);
+    ns.SetArgs(names, icg, new ArgSlot(icg.MethodBuilder, Inherit==null ? 0 : 1, "$names", typeof(object[])));
+
+    if(Inherit!=null && Inherit.Length>0)
+    { icg.EmitArgGet(0);
+      icg.EmitFieldGet(typeof(CompiledFunction), "Closed");
+      for(int i=0; i<Inherit.Length; i++)
+      { if(i!=Inherit.Length-1) icg.ILG.Emit(OpCodes.Dup);
+        icg.EmitInt(i);
+        icg.ILG.Emit(OpCodes.Ldelem_Ref);
+        ns.UnpackClosedVar(Inherit[i], icg);
+      }
+    }
+    EmitBody(icg, names);
+    icg.Finish();
+    return icg;
+  }
+
+  Slot namesSlot, defaultSlot;
+  string[] names;
+  string docstring;
+  int optionalStart, numOptional, numRequired;
+  bool hasList, hasDict;
+  static int index;
+}
+
+} // namespace Boa.AST
