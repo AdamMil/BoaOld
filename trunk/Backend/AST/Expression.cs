@@ -7,6 +7,8 @@ using Boa.Runtime;
 namespace Boa.AST
 {
 
+// TODO: add versions optimized for System.Array ?
+
 #region Expression
 public abstract class Expression : Node
 { public virtual void Assign(object value, Frame frame) { throw new NotSupportedException("Assign: "+GetType()); }

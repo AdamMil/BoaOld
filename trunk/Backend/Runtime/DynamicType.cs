@@ -25,7 +25,7 @@ public abstract class DynamicType
   public virtual string Repr(object self)
   { object ret;
     if(Ops.TryInvoke(self, "__repr__", out ret)) return (string)ret;
-    return self.ToString();
+    return Ops.Str(self);
   }
   
   public virtual void SetAttr(object self, string name, object value)

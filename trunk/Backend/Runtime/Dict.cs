@@ -6,7 +6,7 @@ namespace Boa.Runtime
 {
 
 [BoaType("dict")]
-public class Dict : HybridDictionary, IComparable, IMapping, ICloneable
+public class Dict : HybridDictionary, IComparable, IMapping, ICloneable, IRepresentable
 { public Dict() { }
   public Dict(IDictionary dict) { foreach(DictionaryEntry e in dict) Add(e.Key, e.Value); }
   internal Dict(int size) : base(size) { }
@@ -31,25 +31,10 @@ public class Dict : HybridDictionary, IComparable, IMapping, ICloneable
     foreach(DictionaryEntry e in this) ret.Add(new Tuple(e.Key, e.Value));
     return ret;
   }
-
   public List keys() { return new List(Keys); }
-
-  public override string ToString()
-  { System.Text.StringBuilder sb = new System.Text.StringBuilder();
-    sb.Append('{');
-    bool first=true;
-    foreach(DictionaryEntry e in this)
-    { if(first) first=false;
-      else sb.Append(", ");
-      sb.Append(Ops.Repr(e.Key));
-      sb.Append(": ");
-      sb.Append(Ops.Repr(e.Value));
-    }
-    sb.Append('}');
-    return sb.ToString();
-  }
-
   public List values() { return new List(Values); }
+
+  public override string ToString() { return __repr__(); }
 
   #region IComparable Members
   public int CompareTo(object o)
@@ -82,6 +67,23 @@ public class Dict : HybridDictionary, IComparable, IMapping, ICloneable
 
   #region ICloneable Members
   public object Clone() { return new Dict(this); }
+  #endregion
+
+  #region IRepresentable Members
+  public string __repr__()
+  { System.Text.StringBuilder sb = new System.Text.StringBuilder();
+    sb.Append('{');
+    bool first=true;
+    foreach(DictionaryEntry e in this)
+    { if(first) first=false;
+      else sb.Append(", ");
+      sb.Append(Ops.Repr(e.Key));
+      sb.Append(": ");
+      sb.Append(Ops.Repr(e.Value));
+    }
+    sb.Append('}');
+    return sb.ToString();
+  }
   #endregion
 }
 

@@ -5,7 +5,7 @@ namespace Boa.Runtime
 {
 
 [BoaType("list")]
-public class List : IMutableSequence, IList, IComparable, ICloneable
+public class List : IMutableSequence, IList, IComparable, ICloneable, IRepresentable
 { public List() { items = new object[16]; }
   public List(int capacity) { items = new object[Math.Max(capacity, 4)]; }
   public List(ICollection c) : this(c.Count) { c.CopyTo(items, 0); size=c.Count; }
@@ -220,7 +220,8 @@ public class List : IMutableSequence, IList, IComparable, ICloneable
   public object Clone() { return new List(this); }
   #endregion
 
-  public override string ToString()
+  #region IRepresentable Members
+  public string __repr__()
   { System.Text.StringBuilder sb = new System.Text.StringBuilder();
     sb.Append('[');
     for(int i=0; i<size; i++)
@@ -230,6 +231,9 @@ public class List : IMutableSequence, IList, IComparable, ICloneable
     sb.Append(']');
     return sb.ToString();
   }
+  #endregion
+
+  public override string ToString() { return __repr__(); }
 
   class FunctionComparer : IComparer
   { public FunctionComparer(object func) { this.func=func; }
