@@ -42,8 +42,4 @@ public class Frame
   HybridDictionary globalNames;
 }
 
-public abstract class FrameCode
-{ public abstract object Run(Frame frame);
-}
-
 } // namespace Boa.Runtime

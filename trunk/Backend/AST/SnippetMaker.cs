@@ -6,7 +6,10 @@ using Boa.Runtime;
 namespace Boa.AST
 {
 
-// FIXME: persistance of frames causes variables to not be freed
+public abstract class Snippet
+{ public abstract object Run(Frame frame);
+}
+
 public class SnippetMaker
 { private SnippetMaker() { }
 
@@ -15,9 +18,9 @@ public class SnippetMaker
     Assembly = new AssemblyGenerator("snippets"+assCount, "snippets"+ assCount++ +".dll");
   }
 
-  public static FrameCode Generate(Statement body) { return Generate(body, "code_"+typeCount++); }
-  public static FrameCode Generate(Statement body, string typeName)
-  { TypeGenerator tg = Assembly.DefineType(typeName, typeof(FrameCode));
+  public static Snippet Generate(Statement body) { return Generate(body, "code_"+typeCount++); }
+  public static Snippet Generate(Statement body, string typeName)
+  { TypeGenerator tg = Assembly.DefineType(typeName, typeof(Snippet));
     tg.TypeBuilder.DefineDefaultConstructor(MethodAttributes.Public);
 
     CodeGenerator cg = tg.DefineMethod(MethodAttributes.Public|MethodAttributes.Virtual, "Run",
@@ -34,7 +37,7 @@ public class SnippetMaker
 
     body.Emit(cg);
     if(!(body is ReturnStatement)) cg.EmitReturn(null);
-    return (FrameCode)tg.FinishType().GetConstructor(Type.EmptyTypes).Invoke(null);
+    return (Snippet)tg.FinishType().GetConstructor(Type.EmptyTypes).Invoke(null);
   }
 
   public static AssemblyGenerator Assembly = new AssemblyGenerator("snippets", "snippets.dll");

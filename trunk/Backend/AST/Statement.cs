@@ -340,12 +340,14 @@ public class ExpressionStatement : Statement
 
   public override void Emit(CodeGenerator cg)
   { Expression.Emit(cg);
-    if(Options.Interactive) cg.Namespace.GetGlobalSlot("_").EmitSet(cg);
+    if(Options.Interactive)
+    { // TODO: add call to sys.displayhook()
+    }
     else cg.ILG.Emit(OpCodes.Pop);
   }
   public override void Execute(Frame frame)
   { object ret = Expression.Evaluate(frame);
-    if(Options.Interactive) frame.SetGlobal("_", ret);
+    if(Options.Interactive) Ops.Call(Boa.Modules.sys.displayhook, ret);
   }
 
   public override void Walk(IWalker w)
