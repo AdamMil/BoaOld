@@ -1,9 +1,9 @@
 using System;
 using System.Reflection;
 using System.Reflection.Emit;
-using Language.Runtime;
+using Boa.Runtime;
 
-namespace Language.AST
+namespace Boa.AST
 {
 
 // FIXME: persistance of frames causes variables to not be freed
@@ -19,7 +19,7 @@ public class SnippetMaker
   public static FrameCode Generate(Statement body, string typeName)
   { TypeGenerator tg = Assembly.DefineType(typeName, typeof(FrameCode));
 
-    tg.AddModuleSlot(typeof(Language.Runtime.Module));
+    tg.AddModuleSlot(typeof(Boa.Runtime.Module));
     tg.TypeBuilder.DefineDefaultConstructor(MethodAttributes.Public);
 
     CodeGenerator cg = tg.DefineMethod(MethodAttributes.Public|MethodAttributes.Virtual, "Run",

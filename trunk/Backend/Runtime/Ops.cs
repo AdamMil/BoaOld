@@ -1,6 +1,6 @@
 using System;
 
-namespace Language.Runtime
+namespace Boa.Runtime
 {
 
 public class Ops
@@ -169,4 +169,4 @@ public class Ops
   public static readonly object FALSE=false, TRUE=true;
 }
 
-} // namespace Language.Runtime
+} // namespace Boa.Runtime

@@ -2,38 +2,38 @@ using System;
 using System.Collections;
 using System.Reflection;
 using System.Reflection.Emit;
-using Language.Runtime;
+using Boa.Runtime;
 
-namespace Language.AST
+namespace Boa.AST
 {
 
 #region Namespace
 public abstract class Namespace
 { public Namespace(Namespace parent) { Parent=parent; }
 
-  public Slot GetSlotForGet(string name)
+  public Slot GetSlotForGet(Name name)
   { Slot s = (Slot)slots[name];
     return s==null ? GetGlobalSlot(name) : s;
   }
-  public Slot GetSlotForSet(string name) { return GetSlot(name); }
+  public Slot GetSlotForSet(Name name) { return GetSlot(name); }
   
-  public virtual void SetArgs(string[] names, MethodBuilder mb)
+  public virtual void SetArgs(Name[] names, MethodBuilder mb)
   { throw new NotImplementedException("SetArgs: "+GetType());
   }
 
   public Namespace Parent;
   
-  protected abstract Slot MakeSlot(string name);
+  protected abstract Slot MakeSlot(Name name);
   protected Hashtable slots = new Hashtable();
 
-  Slot GetGlobalSlot(string name) { return Parent==null ? GetSlot(name) : Parent.GetGlobalSlot(name); }
-  Slot GetSlot(string name)
+  Slot GetGlobalSlot(Name name) { return Parent==null ? GetSlot(name) : Parent.GetGlobalSlot(name); }
+  Slot GetSlot(Name name)
   { Slot ret = (Slot)slots[name];
     if(ret!=null) return ret;
     slots[name] = ret = MakeSlot(name);
     return ret;
   }
-  Slot MakeGlobalSlot(string name) { return Parent==null ? MakeSlot(name) : Parent.MakeGlobalSlot(name); }
+  Slot MakeGlobalSlot(Name name) { return Parent==null ? MakeSlot(name) : Parent.MakeGlobalSlot(name); }
 }
 #endregion
 
@@ -46,13 +46,13 @@ public class FrameNamespace : Namespace
     FrameSlot = new FrameObjectSlot(cg, new ArgSlot(cg.MethodBuilder, 0, "frame"), field);
   }
 
-  public override void SetArgs(string[] names, MethodBuilder mb)
-  { foreach(string name in names) slots[name] = MakeSlot(name);
+  public override void SetArgs(Name[] names, MethodBuilder mb)
+  { foreach(Name name in names) slots[name.String] = MakeSlot(name);
   }
 
   public FrameObjectSlot FrameSlot;
 
-  protected override Slot MakeSlot(string name) { return new NamedFrameSlot(FrameSlot, name); }
+  protected override Slot MakeSlot(Name name) { return new NamedFrameSlot(FrameSlot, name.String); }
 
   CodeGenerator codeGen;
 }
@@ -62,12 +62,13 @@ public class FrameNamespace : Namespace
 public class LocalNamespace : Namespace
 { public LocalNamespace(Namespace parent, CodeGenerator cg) : base(parent) { codeGen=cg; }
   
-  public override void SetArgs(string[] names, MethodBuilder mb)
-  { for(int i=0; i<names.Length; i++) slots[names[i]] = new ArgSlot(mb, i, names[i]);
+  public override void SetArgs(Name[] names, MethodBuilder mb)
+  { for(int i=0; i<names.Length; i++) slots[names[i].String] = new ArgSlot(mb, i, names[i].String);
   }
 
-  protected override Slot MakeSlot(string name)
+  protected override Slot MakeSlot(Name name)
   { LocalBuilder b = codeGen.ILG.DeclareLocal(typeof(object));
+    // TODO: reenable this
     //b.SetLocalSymInfo(name);
     return new LocalSlot(b);
   }
@@ -76,4 +77,4 @@ public class LocalNamespace : Namespace
 }
 #endregion
 
-} // namespace Language.AST
+} // namespace Boa.AST

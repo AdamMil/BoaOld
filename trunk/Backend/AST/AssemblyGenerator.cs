@@ -1,9 +1,9 @@
 using System;
 using System.Reflection;
 using System.Reflection.Emit;
-using Language.Runtime;
+using Boa.Runtime;
 
-namespace Language.AST
+namespace Boa.AST
 {
 
 public class AssemblyGenerator
@@ -28,4 +28,4 @@ public class AssemblyGenerator
   public string OutFileName;
 }
 
-} // namespace Language.AST
+} // namespace Boa.AST

@@ -1,6 +1,6 @@
 using System;
 
-namespace Language.Runtime
+namespace Boa.Runtime
 {
 
 public interface ICallable
@@ -15,4 +15,4 @@ public interface IFastCallable : ICallable
 	object Call(object arg0, object arg1, object arg2, object arg3);
 }
 
-} // namespace Language.Runtime
+} // namespace Boa.Runtime
