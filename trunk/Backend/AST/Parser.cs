@@ -29,8 +29,9 @@ using Boa.Runtime;
 // TODO: add switch?
 // TODO: add <=> operator
 // TODO: implement sets
-// TODO: make sure precedence matches python's
-// TODO: make x < y < z work as expected
+// TODO: try to make precedence match python's where it makes sense
+// TODO: support unicode strings
+
 namespace Boa.AST
 {
 
@@ -256,7 +257,7 @@ public class Parser
         default: return expr;
       }
       NextToken();
-      expr = AP(new BinaryOpExpression(op, expr, ParseShift()));
+      expr = new BinaryOpExpression(op, expr, ParseShift());
     }
   }
   
@@ -302,30 +303,47 @@ public class Parser
     return AP(new ClassStatement(name, bases, ParseSuite()));
   }
 
-  // compare    := <bitwise> (<compare_op> <bitwise>)*
-  // compare_op := '==' | '!=' | '<' | '>' | '<=' | '>=' | 'is' | 'is not' | 'in' | 'not in'
+  // compare    := <isin> (<compare_op> <isin>)*
+  // compare_op := '==' | '!=' | '<' | '>' | '<=' | '>=' | 'is' | 'is not'
   Expression ParseCompare()
-  { Expression expr = ParseBitwise();
+  { Expression expr = ParseIsIn();
+    ArrayList comps = null;
     while(true)
-    { BinaryOperator op;
-      next:
-      switch(token) // token==Token.Compare || token==Token.Is || token==Token.In || token==Token.Not
-      { case Token.Compare: op = (BinaryOperator)value; NextToken(); break;
-        case Token.Is:
-          op = NextToken()==Token.Not ? BinaryOperator.NotIdentical : (BinaryOperator)BinaryOperator.Identical;
-          break;
-        case Token.In: case Token.Not:
-        { bool not = token==Token.Not;
-          NextToken();
-          if(not) Eat(Token.In);
-          expr = AP(new InExpression(expr, ParseBitwise(), not));
-          goto next;
+    { if(token==Token.Compare || token==Token.Is)
+      { if(comps==null)
+        { comps = new ArrayList();
+          comps.Add(expr);
         }
-        default: goto done;
+
+        if(token==Token.Compare)
+        { comps.Add(value);
+          NextToken();
+        }
+        else // token==Token.Is
+        { if(comps==null) comps = new ArrayList();
+          bool not = NextToken()==Token.Not;
+          comps.Add(not ? BinaryOperator.NotIdentical : (BinaryOperator)BinaryOperator.Identical);
+          if(not) NextToken();
+        }
+        comps.Add(ParseIsIn());
       }
-      expr = AP(new BinaryOpExpression(op, expr, ParseBitwise()));
+      else break;
     }
-    done: return expr;
+    if(comps!=null)
+    { if(comps.Count==3)
+        expr = new BinaryOpExpression((BinaryOperator)comps[1], (Expression)comps[0], (Expression)comps[2]);
+      else
+      { Expression[] exprs = new Expression[(comps.Count+1)/2];
+        BinaryOperator[] ops = new BinaryOperator[comps.Count/2];
+        exprs[0] = (Expression)comps[0];
+        for(int i=1,j=0; i<comps.Count; )
+        { ops[j] = (BinaryOperator)comps[i++];
+          exprs[++j] = (Expression)comps[i++];
+        }
+        expr = new CompareExpression(exprs, ops);
+      }
+    }
+    return expr;
   }
 
   // def_stmt := 'def' <identifier> '(' <param_list> ')' ':' <suite>
@@ -380,7 +398,7 @@ public class Parser
         default: return expr;
       }
       NextToken();
-      expr = AP(new BinaryOpExpression(op, expr, ParsePower()));
+      expr = new BinaryOpExpression(op, expr, ParsePower());
     }
   }
 
@@ -462,6 +480,19 @@ public class Parser
     }
     Eat(Token.EOL);
     return stmt;
+  }
+
+  // isin := <bitwise> ('not'? 'in' <bitwise>)*
+  Expression ParseIsIn()
+  { Expression expr = ParseBitwise();
+    while(true)
+    { if(TryEat(Token.In)) expr = AP(new InExpression(expr, ParseBitwise(), false));
+      else if(TryEat(Token.Not))
+      { Eat(Token.In);
+        expr = AP(new InExpression(expr, ParseBitwise(), true));
+      }
+      else return expr;
+    }
   }
 
   // lambda := 'lambda' <namelist> ':' <lambda_body>
@@ -695,7 +726,7 @@ public class Parser
   // power := <unary> ('**' <unary>)*
   Expression ParsePower()
   { Expression expr = ParseUnary();
-    while(TryEat(Token.Power)) expr = AP(new BinaryOpExpression(BinaryOperator.Power, expr, ParseUnary()));
+    while(TryEat(Token.Power)) expr = new BinaryOpExpression(BinaryOperator.Power, expr, ParseUnary());
     return expr;
   }
 
@@ -710,7 +741,7 @@ public class Parser
         default: return expr;
       }
       NextToken();
-      expr = AP(new BinaryOpExpression(op, expr, ParseTerm()));
+      expr = new BinaryOpExpression(op, expr, ParseTerm());
     }
   }
 
@@ -813,7 +844,7 @@ public class Parser
         default: return expr;
       }
       NextToken();
-      expr = AP(new BinaryOpExpression(op, expr, ParseFactor()));
+      expr = new BinaryOpExpression(op, expr, ParseFactor());
     }
   }
 

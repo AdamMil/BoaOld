@@ -28,11 +28,12 @@ using Boa.Runtime;
 namespace Boa.AST
 {
 
-// TODO: add versions optimized for System.Array ?
 // TODO: implement decimal: http://python.org/peps/pep-0327.html
 // TODO: implement other stuff here: http://python.org/2.4/highlights.html
 // TODO: implement sets
-// TODO: make sure generator functions/expressions and list comprehensions can access closed variables
+// FIXME: allow generator functions/expressions to access closed variables
+//   eg: def fun(n): return (i+n for i in range(10)) # should be able to access 'n' after return
+// TODO: implement interpreted generator functions/expressions
 
 #region Expression
 public abstract class Expression : Node
@@ -52,7 +53,7 @@ public abstract class Expression : Node
 
 #region AndExpression
 public class AndExpression : BinaryExpression
-{ public AndExpression(Expression lhs, Expression rhs) { LHS=lhs; RHS=rhs; }
+{ public AndExpression(Expression lhs, Expression rhs) { LHS=lhs; RHS=rhs; SetLocation(lhs); }
 
   public override void Emit(CodeGenerator cg)
   { if(IsConstant) cg.EmitConstant(GetValue());
@@ -148,7 +149,10 @@ public abstract class BinaryExpression : Expression
 
 #region BinaryOpExpression
 public class BinaryOpExpression : BinaryExpression
-{ public BinaryOpExpression(BinaryOperator op, Expression lhs, Expression rhs) { Op=op; LHS=lhs; RHS=rhs; }
+{ public BinaryOpExpression(BinaryOperator op, Expression lhs, Expression rhs)
+  { Op=op; LHS=lhs; RHS=rhs;
+    SetLocation(lhs);
+  }
 
   public override void Emit(CodeGenerator cg)
   { if(IsConstant) cg.EmitConstant(GetValue());
@@ -431,6 +435,80 @@ public class CallExpression : Expression
         values[ai++] = Arguments[start].Expression.Evaluate(frame);
     return values;
   }
+}
+#endregion
+
+#region CompareExpression
+public class CompareExpression : Expression
+{ public CompareExpression(Expression[] exprs, BinaryOperator[] ops)
+  { Expressions=exprs; Ops=ops; SetLocation(exprs[0]);
+  }
+
+  public override void Emit(CodeGenerator cg)
+  { if(IsConstant) cg.EmitConstant(GetValue());
+    else
+    { Slot tmp = cg.AllocLocalTemp(typeof(object));
+      MethodInfo istrue = typeof(Ops).GetMethod("IsTrue");
+      Label end = cg.ILG.DefineLabel();
+      int i=0;
+
+      Expressions[0].Emit(cg);
+      Expressions[1].Emit(cg);
+      cg.ILG.Emit(OpCodes.Dup);
+      tmp.EmitSet(cg);
+      while(true)
+      { Ops[i].Emit(cg);
+        if(++i==Ops.Length) break;
+        cg.ILG.Emit(OpCodes.Dup);
+        cg.EmitCall(istrue);
+        cg.ILG.Emit(OpCodes.Brfalse, end);
+        cg.ILG.Emit(OpCodes.Pop);
+        tmp.EmitGet(cg);
+        Expressions[i+1].Emit(cg);
+        if(i<Ops.Length-1)
+        { cg.ILG.Emit(OpCodes.Dup);
+          tmp.EmitSet(cg);
+        }
+      }
+      cg.ILG.MarkLabel(end);
+      
+      cg.FreeLocalTemp(tmp);
+    }
+  }
+
+  public override object Evaluate(Frame frame)
+  { object a=Expressions[0].Evaluate(frame), b=Expressions[1].Evaluate(frame);
+    int i=0;
+    while(true)
+    { if(!Boa.Runtime.Ops.IsTrue(Ops[i].Evaluate(a, b))) return Boa.Runtime.Ops.FALSE;
+      a = b;
+      if(++i==Ops.Length) break;
+      b = Expressions[i+1].Evaluate(frame);
+    }
+    return Boa.Runtime.Ops.TRUE;
+  }
+
+  public override void Optimize()
+  { bool isconst = true;
+    for(int i=0; i<Expressions.Length; i++) if(!Expressions[i].IsConstant) { isconst=false; break; }
+    IsConstant = isconst;
+  }
+  
+  public override void ToCode(System.Text.StringBuilder sb, int indent)
+  { Expressions[0].ToCode(sb, 0);
+    for(int i=0; i<Ops.Length; )
+    { sb.Append(Ops[i].ToString());
+      Expressions[++i].ToCode(sb, 0);
+    }
+  }
+
+  public override void Walk(IWalker w)
+  { if(w.Walk(this)) foreach(Expression e in Expressions) e.Walk(w);
+    w.PostWalk(this);
+  }
+
+  public Expression[] Expressions;
+  public BinaryOperator[] Ops;
 }
 #endregion
 
@@ -893,7 +971,7 @@ public class NameExpression : Expression
 
 #region OrExpression
 public class OrExpression : BinaryExpression
-{ public OrExpression(Expression lhs, Expression rhs) { LHS=lhs; RHS=rhs; }
+{ public OrExpression(Expression lhs, Expression rhs) { LHS=lhs; RHS=rhs; SetLocation(lhs); }
 
   public override void Emit(CodeGenerator cg)
   { if(IsConstant) cg.EmitConstant(GetValue());
