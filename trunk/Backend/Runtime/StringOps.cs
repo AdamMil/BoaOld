@@ -92,10 +92,10 @@ public sealed class StringOps
         char type = f.Type;
         switch(type) // TODO: support long integers
         { case 'd': case 'i': case 'u': case 'x': case 'X':
-          { int i = Ops.ToInt(GetArg(f.Key));
+          { long i = Ops.ToLong(GetArg(f.Key));
             string s = null;
             bool neg, prefix=false, althex=false;
-            if(type=='d' || type=='i') { s=i.ToString(); neg=prefix=i<0; }
+            if(type=='d' || type=='i') { int iv=(int)i; s=iv.ToString(); neg=prefix=iv<0; }
             else
             { uint ui = (uint)i;
               if(type=='u') s=ui.ToString();

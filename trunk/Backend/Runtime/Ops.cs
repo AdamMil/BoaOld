@@ -641,7 +641,6 @@ public sealed class Ops
 
   public static bool GetEnumerator(object o, out IEnumerator e)
   { if(o is string) e=new BoaCharEnumerator((string)o);
-    else if(o is IDictionary) e=((IDictionary)o).Keys.GetEnumerator();
     else if(o is IEnumerable) e=((IEnumerable)o).GetEnumerator();
     else if(o is ISequence) e=new ISeqEnumerator((ISequence)o);
     else if(o is IEnumerator) e=(IEnumerator)o;
