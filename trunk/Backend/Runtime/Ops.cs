@@ -697,9 +697,8 @@ public sealed class Ops
         }
     }
     else
-    { Module m = (Module)mod;
-      if(exports==null)
-      { foreach(string name in m.__dict__.Keys) if(name[0]!='_') module.__setattr__(name, mod.__getattr__(name));
+    { if(exports==null)
+      { foreach(string name in mod.__attrs__()) if(name[0]!='_') module.__setattr__(name, mod.__getattr__(name));
       }
       else
         for(int i=0,len=exports.__len__(); i<len; i++)
