@@ -199,6 +199,9 @@ public sealed class IntegerOps
   { switch(Convert.GetTypeCode(b))
     { case TypeCode.Boolean: return a % ((bool)b ? 1 : 0);
       case TypeCode.Byte: return a % (byte)b;
+      case TypeCode.Decimal:
+        return Math.IEEERemainder(a.ToDouble(), ((IConvertible)b).ToDouble(NumberFormatInfo.InvariantInfo));
+      case TypeCode.Double: return Math.IEEERemainder(a.ToDouble(), (double)b);
       case TypeCode.Int16: return a % (short)b;
       case TypeCode.Int32: return a % (int)b;
       case TypeCode.Int64: return a % (long)b;
@@ -208,6 +211,7 @@ public sealed class IntegerOps
         return ic!=null ? a % ic.ToInt64(NumberFormatInfo.InvariantInfo)
                         : Ops.Invoke(b, "__rmod__", a);
       case TypeCode.SByte: return a % (sbyte)b;
+      case TypeCode.Single: return Math.IEEERemainder(a.ToDouble(), (float)b);
       case TypeCode.UInt16: return a % (ushort)b;
       case TypeCode.UInt32: return a % (uint)b;
       case TypeCode.UInt64: return a % (ulong)b;

@@ -174,6 +174,7 @@ public class LocalNamespace : Namespace
         return par.GetGlobalSlot(name);
       }
       case Scope.Local: return new LocalSlot(codeGen.ILG.DeclareLocal(typeof(object)), name.String);
+      case Scope.Private: return new LocalSlot(codeGen.ILG.DeclareLocal(typeof(object)));
       default: throw new Exception("unhandled scope type");
     }
   }

@@ -49,14 +49,27 @@ public class TypeGenerator
   }
 
   public Slot GetConstant(object value)
-  { Slot slot = (Slot)constants[value]; FIXNOW; // this will throw an exception if value is a List or Dict
-    if(slot!=null) return slot;
+  { Slot slot;
+    bool hash = Convert.GetTypeCode(value)!=TypeCode.Object || value is Slice;
 
-    FieldBuilder fb = TypeBuilder.DefineField("c$"+constants.Count, typeof(object), FieldAttributes.Static);
-    constants[value] = slot = new StaticSlot(fb);
-    EmitConstantInitializer(value);
-    initGen.EmitFieldSet(fb);
+    if(hash) slot = (Slot)constants[value];
+    else
+    { if(constobjs==null) { constobjs = new ArrayList(); constslots = new ArrayList(); }
+      else
+      { int index = constobjs.IndexOf(value);
+        if(index!=-1) return (Slot)constslots[index];
+      }
+      slot = null;
+    }
 
+    if(slot==null)
+    { FieldBuilder fb = TypeBuilder.DefineField("c$"+constants.Count, typeof(object), FieldAttributes.Static);
+      slot = new StaticSlot(fb);
+      if(hash) constants[value] = slot;
+      else { constobjs.Add(value); constslots.Add(slot); }
+      EmitConstantInitializer(value);
+      initGen.EmitFieldSet(fb);
+    }
     return slot;
   }
 
@@ -120,7 +133,7 @@ public class TypeGenerator
   public TypeBuilder TypeBuilder;
 
   HybridDictionary constants = new HybridDictionary();
-  ArrayList nestedTypes;
+  ArrayList nestedTypes, constobjs, constslots;
   CodeGenerator initGen;
   Slot moduleField;
 }

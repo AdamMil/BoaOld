@@ -232,6 +232,8 @@ public sealed class LongOps
     else switch(Convert.GetTypeCode(b))
     { case TypeCode.Boolean: bv = (bool)b ? 1 : 0; break;
       case TypeCode.Byte: bv = (byte)b; break;
+      case TypeCode.Decimal: return Math.IEEERemainder(a, ((IConvertible)b).ToDouble(NumberFormatInfo.InvariantInfo));
+      case TypeCode.Double: return Math.IEEERemainder(a, (double)b);
       case TypeCode.Int16: bv = (short)b; break;
       case TypeCode.Int32: bv = (int)b; break;
       case TypeCode.Int64: bv = (long)b; break;
@@ -251,6 +253,7 @@ public sealed class LongOps
         bv = ic.ToInt64(NumberFormatInfo.InvariantInfo);
         break;
       case TypeCode.SByte: bv = (sbyte)b; break;
+      case TypeCode.Single: return Math.IEEERemainder(a, (float)b);
       case TypeCode.UInt16: bv = (ushort)b; break;
       case TypeCode.UInt32: bv = (uint)b; break;
       case TypeCode.UInt64:

@@ -25,9 +25,9 @@ public abstract class Generator : IEnumerator
   
   public override string ToString() { return "<generator function>"; }
 
-  public int jump = Int32.MaxValue; // TODO: protect this from tampering somehow?
-
   protected abstract bool InnerNext(out object current);
+
+  protected int jump = Int32.MaxValue;
 
   enum State { Before, In, Done }
   object current;
