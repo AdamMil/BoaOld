@@ -22,16 +22,40 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 
 using System;
+using System.Collections;
 using System.IO;
-using Boa.Runtime;
+using System.Windows.Forms;
 
 namespace Boa.IDE
 {
 
 class App
-{ static void Main()
-  { Importer.ImportStandardModules();
-    System.Windows.Forms.Application.Run(new MainForm());
+{ public static readonly MainForm MainForm = new MainForm();
+
+  public static string[] GetRawLines(TextBoxBase box)
+  { ArrayList list = new ArrayList();
+    string text = box.Text;
+    int pos=0;
+    while(pos<text.Length)
+    { int index = text.IndexOf('\n', pos);
+      if(index==-1) { list.Add(text.Substring(pos)); break; }
+      else { list.Add(text.Substring(pos, index-pos+1)); pos=index+1; }
+    }
+    return (string[])list.ToArray(typeof(string));
+  }
+
+  static void Main()
+  { Application.ThreadException += new System.Threading.ThreadExceptionEventHandler(Application_ThreadException);
+
+    Runtime.Importer.ImportStandardModules();
+    Modules.sys.path[0] = "";
+
+    Application.Run(MainForm);
+  }
+
+  static void Application_ThreadException(object sender, System.Threading.ThreadExceptionEventArgs e)
+  { ExceptionForm form = new ExceptionForm(e.Exception);
+    form.ShowDialog();
   }
 }
 

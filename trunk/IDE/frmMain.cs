@@ -8,36 +8,45 @@ namespace Boa.IDE
 {
 	public class MainForm : Form
 	{
-    private System.Windows.Forms.MainMenu menuBar;
-    private System.Windows.Forms.MenuItem menuFile;
-    private System.Windows.Forms.MenuItem menuSaveAs;
-    private System.Windows.Forms.MenuItem menuSep1;
-    private System.Windows.Forms.MenuItem menuWindow;
-    private System.Windows.Forms.MenuItem menuNew;
-    private System.Windows.Forms.MenuItem menuOpen;
-    private System.Windows.Forms.MenuItem menuClose;
-    private System.Windows.Forms.MenuItem menuSave;
-    private System.Windows.Forms.MenuItem menuExit;
-    private System.Windows.Forms.MenuItem menuDebug;
-    private System.Windows.Forms.MenuItem menuExamine;
-    private System.Windows.Forms.MenuItem menuSep2;
-    private System.Windows.Forms.MenuItem menuCascade;
-    private System.Windows.Forms.MenuItem menuHorz;
-    private System.Windows.Forms.MenuItem menuVert;
-    private System.Windows.Forms.MenuItem menuWindowOutput;
-    private System.Windows.Forms.MenuItem menuCompile;
-    private System.Windows.Forms.MenuItem menuEdit;
-    private System.Windows.Forms.MenuItem menuUndo;
-    private System.Windows.Forms.MenuItem menuRedo;
-    private OutputForm outputForm;
+    System.Windows.Forms.MainMenu menuBar;
+    System.Windows.Forms.MenuItem menuFile;
+    System.Windows.Forms.MenuItem menuSaveAs;
+    System.Windows.Forms.MenuItem menuSep1;
+    System.Windows.Forms.MenuItem menuWindow;
+    System.Windows.Forms.MenuItem menuNew;
+    System.Windows.Forms.MenuItem menuOpen;
+    System.Windows.Forms.MenuItem menuClose;
+    System.Windows.Forms.MenuItem menuSave;
+    System.Windows.Forms.MenuItem menuExit;
+    System.Windows.Forms.MenuItem menuDebug;
+    System.Windows.Forms.MenuItem menuExamine;
+    System.Windows.Forms.MenuItem menuSep2;
+    System.Windows.Forms.MenuItem menuCascade;
+    System.Windows.Forms.MenuItem menuHorz;
+    System.Windows.Forms.MenuItem menuVert;
+    System.Windows.Forms.MenuItem menuWindowOutput;
+    System.Windows.Forms.MenuItem menuCompile;
+    System.Windows.Forms.MenuItem menuEdit;
+    System.Windows.Forms.MenuItem menuUndo;
+    System.Windows.Forms.MenuItem menuRedo;
+    System.Windows.Forms.MenuItem menuGotoLine;
+    System.Windows.Forms.MenuItem menuFind;
+    System.Windows.Forms.MenuItem menuFindNext;
+    System.Windows.Forms.MenuItem menuRun;
+    System.Windows.Forms.MenuItem menuSep4;
+    System.Windows.Forms.MenuItem menuSep3;
+    System.Windows.Forms.MenuItem menuAutoChdir;
+    OutputForm outputForm;
   
 		public MainForm()
 		{ InitializeComponent();
 		  outputForm = new OutputForm();
 		}
 
+    public bool AutoChdir { get { return menuAutoChdir.Checked; } }
+
 		#region Windows Form Designer generated code
-		private void InitializeComponent()
+		void InitializeComponent()
     {
       System.Resources.ResourceManager resources = new System.Resources.ResourceManager(typeof(MainForm));
       this.menuBar = new System.Windows.Forms.MainMenu();
@@ -53,8 +62,15 @@ namespace Boa.IDE
       this.menuEdit = new System.Windows.Forms.MenuItem();
       this.menuUndo = new System.Windows.Forms.MenuItem();
       this.menuRedo = new System.Windows.Forms.MenuItem();
+      this.menuSep4 = new System.Windows.Forms.MenuItem();
+      this.menuGotoLine = new System.Windows.Forms.MenuItem();
+      this.menuFind = new System.Windows.Forms.MenuItem();
+      this.menuFindNext = new System.Windows.Forms.MenuItem();
       this.menuDebug = new System.Windows.Forms.MenuItem();
       this.menuExamine = new System.Windows.Forms.MenuItem();
+      this.menuRun = new System.Windows.Forms.MenuItem();
+      this.menuSep3 = new System.Windows.Forms.MenuItem();
+      this.menuAutoChdir = new System.Windows.Forms.MenuItem();
       this.menuWindow = new System.Windows.Forms.MenuItem();
       this.menuWindowOutput = new System.Windows.Forms.MenuItem();
       this.menuSep2 = new System.Windows.Forms.MenuItem();
@@ -101,20 +117,17 @@ namespace Boa.IDE
       // 
       // menuClose
       // 
-      this.menuClose.Enabled = false;
       this.menuClose.Index = 2;
       this.menuClose.Text = "Close";
       this.menuClose.Click += new System.EventHandler(this.menuClose_Click);
       // 
       // menuCompile
       // 
-      this.menuCompile.Enabled = false;
       this.menuCompile.Index = 3;
       this.menuCompile.Text = "&Compile...";
       // 
       // menuSave
       // 
-      this.menuSave.Enabled = false;
       this.menuSave.Index = 4;
       this.menuSave.Shortcut = System.Windows.Forms.Shortcut.CtrlS;
       this.menuSave.Text = "&Save";
@@ -122,9 +135,8 @@ namespace Boa.IDE
       // 
       // menuSaveAs
       // 
-      this.menuSaveAs.Enabled = false;
       this.menuSaveAs.Index = 5;
-      this.menuSaveAs.Text = "Save &as...";
+      this.menuSaveAs.Text = "Save &As...";
       this.menuSaveAs.Click += new System.EventHandler(this.menuSaveAs_Click);
       // 
       // menuSep1
@@ -143,13 +155,16 @@ namespace Boa.IDE
       this.menuEdit.Index = 1;
       this.menuEdit.MenuItems.AddRange(new System.Windows.Forms.MenuItem[] {
                                                                              this.menuUndo,
-                                                                             this.menuRedo});
+                                                                             this.menuRedo,
+                                                                             this.menuSep4,
+                                                                             this.menuGotoLine,
+                                                                             this.menuFind,
+                                                                             this.menuFindNext});
       this.menuEdit.Text = "&Edit";
       this.menuEdit.Popup += new System.EventHandler(this.menuEdit_Popup);
       // 
       // menuUndo
       // 
-      this.menuUndo.Enabled = false;
       this.menuUndo.Index = 0;
       this.menuUndo.Shortcut = System.Windows.Forms.Shortcut.CtrlZ;
       this.menuUndo.Text = "&Undo";
@@ -157,17 +172,43 @@ namespace Boa.IDE
       // 
       // menuRedo
       // 
-      this.menuRedo.Enabled = false;
       this.menuRedo.Index = 1;
       this.menuRedo.Shortcut = System.Windows.Forms.Shortcut.CtrlY;
       this.menuRedo.Text = "&Redo";
       this.menuRedo.Click += new System.EventHandler(this.menuRedo_Click);
       // 
+      // menuSep4
+      // 
+      this.menuSep4.Index = 2;
+      this.menuSep4.Text = "-";
+      // 
+      // menuGotoLine
+      // 
+      this.menuGotoLine.Index = 3;
+      this.menuGotoLine.Shortcut = System.Windows.Forms.Shortcut.CtrlG;
+      this.menuGotoLine.Text = "&Go to Line...";
+      this.menuGotoLine.Click += new System.EventHandler(this.menuGotoLine_Click);
+      // 
+      // menuFind
+      // 
+      this.menuFind.Index = 4;
+      this.menuFind.Shortcut = System.Windows.Forms.Shortcut.CtrlF;
+      this.menuFind.Text = "&Find...";
+      // 
+      // menuFindNext
+      // 
+      this.menuFindNext.Index = 5;
+      this.menuFindNext.Shortcut = System.Windows.Forms.Shortcut.F3;
+      this.menuFindNext.Text = "Find &Next";
+      // 
       // menuDebug
       // 
       this.menuDebug.Index = 2;
       this.menuDebug.MenuItems.AddRange(new System.Windows.Forms.MenuItem[] {
-                                                                              this.menuExamine});
+                                                                              this.menuExamine,
+                                                                              this.menuRun,
+                                                                              this.menuSep3,
+                                                                              this.menuAutoChdir});
       this.menuDebug.MergeOrder = 1;
       this.menuDebug.MergeType = System.Windows.Forms.MenuMerge.MergeItems;
       this.menuDebug.Text = "&Debug";
@@ -176,7 +217,26 @@ namespace Boa.IDE
       // menuExamine
       // 
       this.menuExamine.Index = 0;
-      this.menuExamine.Text = "&Examine object";
+      this.menuExamine.Text = "&Examine Object";
+      // 
+      // menuRun
+      // 
+      this.menuRun.Index = 1;
+      this.menuRun.Shortcut = System.Windows.Forms.Shortcut.F5;
+      this.menuRun.Text = "&Run file";
+      this.menuRun.Click += new System.EventHandler(this.menuRun_Click);
+      // 
+      // menuSep3
+      // 
+      this.menuSep3.Index = 2;
+      this.menuSep3.Text = "-";
+      // 
+      // menuAutoChdir
+      // 
+      this.menuAutoChdir.Checked = true;
+      this.menuAutoChdir.Index = 3;
+      this.menuAutoChdir.Text = "Auto chdir on Run";
+      this.menuAutoChdir.Click += new System.EventHandler(this.menuToggleCheck_Click);
       // 
       // menuWindow
       // 
@@ -189,12 +249,13 @@ namespace Boa.IDE
                                                                                this.menuVert});
       this.menuWindow.MergeOrder = 2;
       this.menuWindow.Text = "&Window";
+      this.menuWindow.Popup += new System.EventHandler(this.menuWindow_Popup);
       // 
       // menuWindowOutput
       // 
       this.menuWindowOutput.Index = 0;
       this.menuWindowOutput.Shortcut = System.Windows.Forms.Shortcut.CtrlShiftO;
-      this.menuWindowOutput.Text = "Show &output";
+      this.menuWindowOutput.Text = "Show &Output Window";
       this.menuWindowOutput.Click += new System.EventHandler(this.menuWindowOutput_Click);
       // 
       // menuSep2
@@ -211,13 +272,13 @@ namespace Boa.IDE
       // menuHorz
       // 
       this.menuHorz.Index = 3;
-      this.menuHorz.Text = "Tile horizontally";
+      this.menuHorz.Text = "Tile Horizontally";
       this.menuHorz.Click += new System.EventHandler(this.menuHorz_Click);
       // 
       // menuVert
       // 
       this.menuVert.Index = 4;
-      this.menuVert.Text = "Tile vertically";
+      this.menuVert.Text = "Tile Vertically";
       this.menuVert.Click += new System.EventHandler(this.menuVert_Click);
       // 
       // MainForm
@@ -234,26 +295,26 @@ namespace Boa.IDE
     }
 		#endregion
 
-    private void menuFile_Popup(object sender, EventArgs e)
+    void menuFile_Popup(object sender, EventArgs e)
     { menuClose.Enabled = menuCompile.Enabled = menuSave.Enabled = menuSaveAs.Enabled = ActiveMdiChild is EditForm;
     }
 
-    private void menuDebug_Popup(object sender, EventArgs e)
-    { menuExamine.Enabled = ActiveMdiChild is EditForm;
+    void menuDebug_Popup(object sender, EventArgs e)
+    { menuExamine.Enabled = menuRun.Enabled = ActiveMdiChild is EditForm;
     }
 
-    private void menuClose_Click(object sender, System.EventArgs e)
+    void menuClose_Click(object sender, System.EventArgs e)
     { EditForm form = ActiveMdiChild as EditForm;
       if(form!=null) form.Close();
     }
 
-    private void menuNew_Click(object sender, System.EventArgs e)
+    void menuNew_Click(object sender, System.EventArgs e)
     { EditForm form = new EditForm();
       form.MdiParent = this;
       form.Show();
     }
 
-    private void menuOpen_Click(object sender, System.EventArgs e)
+    void menuOpen_Click(object sender, System.EventArgs e)
     { EditForm form = ActiveMdiChild as EditForm;
       if(form!=null && form.Filename==null) form=null;
 
@@ -271,21 +332,21 @@ namespace Boa.IDE
       }
     }
 
-    private void menuSave_Click(object sender, System.EventArgs e)
+    void menuSave_Click(object sender, System.EventArgs e)
     { EditForm form = ActiveMdiChild as EditForm;
       if(form!=null) form.Save();
     }
 
-    private void menuSaveAs_Click(object sender, System.EventArgs e)
+    void menuSaveAs_Click(object sender, System.EventArgs e)
     { EditForm form = ActiveMdiChild as EditForm;
       if(form!=null) form.SaveAs();
     }
 
-    private void menuCascade_Click(object sender, System.EventArgs e) { LayoutMdi(MdiLayout.Cascade); }
-    private void menuHorz_Click(object sender, System.EventArgs e) { LayoutMdi(MdiLayout.TileHorizontal); }
-    private void menuVert_Click(object sender, System.EventArgs e) { LayoutMdi(MdiLayout.TileVertical); }
+    void menuCascade_Click(object sender, System.EventArgs e) { LayoutMdi(MdiLayout.Cascade); }
+    void menuHorz_Click(object sender, System.EventArgs e) { LayoutMdi(MdiLayout.TileHorizontal); }
+    void menuVert_Click(object sender, System.EventArgs e) { LayoutMdi(MdiLayout.TileVertical); }
 
-    private void menuWindowOutput_Click(object sender, System.EventArgs e)
+    void menuWindowOutput_Click(object sender, System.EventArgs e)
     { if(outputForm.MdiParent==null)
       { outputForm.MdiParent = this;
         outputForm.Show();
@@ -293,25 +354,62 @@ namespace Boa.IDE
       else outputForm.Show();
     }
 
-    private void menuExit_Click(object sender, System.EventArgs e) { Close(); }
+    void menuExit_Click(object sender, System.EventArgs e) { Close(); }
 
-    private void menuEdit_Popup(object sender, EventArgs e)
+    void menuEdit_Popup(object sender, EventArgs e)
     { Form form = ActiveMdiChild;
       Control ctl = form==null ? null : form.ActiveControl;
-      menuRedo.Enabled = ctl is RichTextBox;
-      menuUndo.Enabled = menuRedo.Enabled ? true : ctl is TextBoxBase;
+      TextBoxBase text = ctl as TextBoxBase;
+      RichTextBox rich = ctl as RichTextBox;
+
+      menuRedo.Enabled = rich!=null && rich.CanRedo;
+      menuUndo.Enabled = text!=null && text.CanUndo;
+      menuGotoLine.Enabled = menuFind.Enabled = text!=null;
     }
 
-    private void menuUndo_Click(object sender, System.EventArgs e)
+    void menuUndo_Click(object sender, System.EventArgs e)
     { Form form = ActiveMdiChild;
       TextBoxBase ctl = form==null ? null : form.ActiveControl as TextBoxBase;
-      ctl.Undo();
+      if(ctl!=null) ctl.Undo();
     }
 
-    private void menuRedo_Click(object sender, System.EventArgs e)
+    void menuRedo_Click(object sender, System.EventArgs e)
     { Form form = ActiveMdiChild;
       RichTextBox ctl = form==null ? null : form.ActiveControl as RichTextBox;
-      ctl.Redo();
+      if(ctl!=null) ctl.Redo();
+    }
+
+    void menuGotoLine_Click(object sender, System.EventArgs e)
+    { Form form = ActiveMdiChild;
+      TextBoxBase box = form==null ? null : form.ActiveControl as TextBoxBase;
+      if(box!=null)
+      { GotoLineForm gl = new GotoLineForm();
+        if(gl.ShowDialog()==DialogResult.OK)
+        { int line = gl.Line;
+          if(line<0) return;
+
+          string[] lines = App.GetRawLines(box);
+          int pos=0;
+          line = Math.Max(1, Math.Min(line, lines.Length))-1;
+          for(int i=0; i<line; i++) pos += lines[i].Length;
+          box.SelectionStart  = pos;
+          box.SelectionLength = 0;
+        }
+      }
+    }
+
+    void menuRun_Click(object sender, System.EventArgs e)
+    { EditForm form = ActiveMdiChild as EditForm;
+      if(form!=null) form.Run();
+    }
+
+    void menuWindow_Popup(object sender, EventArgs e)
+    { menuHorz.Enabled = menuVert.Enabled = menuCascade.Enabled = MdiChildren.Length!=0;
+    }
+
+    void menuToggleCheck_Click(object sender, System.EventArgs e)
+    { MenuItem item = (MenuItem)sender;
+      item.Checked = !item.Checked;
     }
   }
 }

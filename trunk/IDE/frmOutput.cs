@@ -46,10 +46,10 @@ public class OutputForm : System.Windows.Forms.Form
     System.Windows.Forms.TextBox box;
   }
 
-  private System.Windows.Forms.TextBox textBox;
+  System.Windows.Forms.TextBox textBox;
 
 	#region Windows Form Designer generated code
-	private void InitializeComponent()
+	void InitializeComponent()
 	{
     System.Resources.ResourceManager resources = new System.Resources.ResourceManager(typeof(OutputForm));
     this.textBox = new System.Windows.Forms.TextBox();

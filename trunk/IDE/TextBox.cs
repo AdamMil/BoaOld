@@ -1,5 +1,6 @@
 using System;
 using System.Drawing;
+using System.Text.RegularExpressions;
 using System.Windows.Forms;
 using Boa.AST;
 using Boa.Runtime;
@@ -7,16 +8,48 @@ using Boa.Runtime;
 namespace Boa.IDE
 {
 
-#region TextBox
-public class TextBox : RichTextBox
-{ public TextBox() { AcceptsTab=true; WordWrap=false; }
+#region BoaBox
+public class BoaBox : RichTextBox
+{ public BoaBox() { AcceptsTab=true; DetectUrls=false; WordWrap=false; }
+
+  public void PerformSyntaxHighlighting()
+  { if((DateTime.Now-lastUserChange).TotalSeconds < 5) return;
+
+    if(!redoHighlight) return;
+    redoHighlight=false;
+
+    bool old=myChange; myChange=true;
+    int start=Math.Max(SelectionStart, 0), len=Math.Max(SelectionLength, 0);
+
+    for(Match m=highlightre.Match(Text); m.Success; m=m.NextMatch())
+    { Highlight type;
+      string value = m.Value;
+      char c = value[0];
+      if(char.IsLetter(c) || c=='_') type=Highlight.Identifier;
+      else if(char.IsDigit(c)) type=Highlight.Number;
+      else if(c=='#' || value.StartsWith("/*")) type = Highlight.Comment;
+      else type = Highlight.Operator;
+
+      Color newColor = HighlightColor(Classify(value, type));
+      SelectionStart  = m.Index;
+      SelectionLength = m.Length;
+      if(SelectionColor!=newColor) SelectionColor = newColor;
+    }
+
+    SelectionLength = 0;
+    SelectionColor  = Color.Black;
+    SelectionStart  = start;
+    SelectionLength = len;
+    
+    myChange=old;
+  }
 
   protected AutoCompleteBox AcBox { get { return EditForm.AcBox; } }
 
   protected bool AtEndOfLine
   { get { return GetLineFromCharIndex(SelectionStart) != GetLineFromCharIndex(SelectionStart+1); }
   }
-  
+
   protected Frame BoaFrame { get { return EditForm.boaFrame; } }
 
   protected EditForm EditForm
@@ -27,21 +60,16 @@ public class TextBox : RichTextBox
     }
   }
 
-  protected ImmediateBox Immediate { get { return EditForm.immediate; } }
-
   protected internal void AppendLine(string format, params object[] args) { AppendLine(string.Format(format, args)); }
   protected internal void AppendLine(string line)
   { line += "\n";
-    Text += Text.EndsWith("\n") ? line : "\n"+line;
-    SelectionStart  = TextLength;
-    SelectionLength = 0;
+    string text = Text + (Text.EndsWith("\n") ? line : "\n"+line);
+    SetText(text, text.Length);
   }
 
   protected void InsertText(string text)
   { int start=SelectionStart, end=start+SelectionLength;
-    Text = Text.Substring(0, start) + text + Text.Substring(end, TextLength-end);
-    SelectionStart  = start + text.Length;
-    SelectionLength = 0;
+    SetText(Text=Text.Substring(0, start) + text + Text.Substring(end, TextLength-end), start+text.Length);
   }
 
   protected void MoveToNextLine()
@@ -60,22 +88,23 @@ public class TextBox : RichTextBox
   { if(e.Handled) goto done;
     else if(e.KeyCode==Keys.Return && e.Alt && !e.Control && !e.Shift) // Alt-enter
     { string code = SelectedText;
+      bool nextline;
       if(code=="")
       { string[] lines = Lines;
         if(lines.Length==0) goto done;
         code = lines[GetLineFromCharIndex(SelectionStart)].Trim();
-        MoveToNextLine();
-        if(code=="") goto done;
+        nextline = true;
+        if(code=="") goto move;
       }
-      else if(code.Trim().Length==0) goto done;
+      else nextline = false;
+      EditForm.Run(code, true);
 
-      Options.Interactive = true;
-      try
-      { Statement stmt = Parser.FromString(code).Parse();
-        stmt.PostProcessForCompile();
-        SnippetMaker.Generate(stmt).Run(BoaFrame);
+      move:
+      if(nextline) MoveToNextLine();
+      else
+      { SelectionStart  = SelectionStart+SelectionLength;
+        SelectionLength = 0;
       }
-      catch(Exception ex) { Immediate.AppendLine("Error {0}: {1}", ex.GetType().Name, ex.Message); }
     }
     else if(e.KeyData==Keys.OemPeriod)
     { if(!AcBox.Visible)
@@ -90,7 +119,11 @@ public class TextBox : RichTextBox
 
           cpt.X += xoff+2;
           cpt.Y += yoff+(int)Math.Ceiling(Font.GetHeight())+2;
-          if(cpt.Y+AcBox.Height > Parent.ClientSize.Height) cpt.Y = yoff + y - AcBox.Height - 2;
+
+          if(cpt.Y+AcBox.Height > Parent.ClientSize.Height)
+          { y = yoff+y-AcBox.Height+2;
+            if(y>=0) cpt.Y=y;
+          }
 
           AcBox.Location = cpt;
           AcBox.BringToFront();
@@ -107,7 +140,7 @@ public class TextBox : RichTextBox
     else if(e.KeyCode==Keys.Back)
     { if(typed.Length!=0) typed = typed.Substring(0, typed.Length-1);
       int curPos = SelectionStart;
-      if(curPos>0 && Text.Substring(curPos-1, 1)==".") AcBox.Hide();
+      if(curPos>0 && Text[curPos-1]=='.') AcBox.Hide();
     }
     else if(!AcBox.Visible) goto done;
     else if(e.KeyCode==Keys.Up)
@@ -142,18 +175,16 @@ public class TextBox : RichTextBox
   protected override void OnKeyPress(KeyPressEventArgs e)
   { if(e.Handled) goto done;
 
-    if(e.KeyChar=='.' || e.KeyChar=='\b') goto done;
+    if(!AcBox.Visible || e.KeyChar=='.' || e.KeyChar=='\b') goto done;
     else if(e.KeyChar<127 && !char.IsLetterOrDigit(e.KeyChar) && e.KeyChar!='_')
-    { if(AcBox.Visible)
-      { if(e.KeyChar=='(' || e.KeyChar=='[' || e.KeyChar=='\n' || e.KeyChar=='\r' || e.KeyChar=='\t' || e.KeyChar==' ')
-        { if(AcBox.SelectedIndex!=-1) SelectItem();
-          if((int)e.KeyChar<32) e.Handled = true;
-        }
-        AcBox.Hide();
-        typed = "";
+    { if(e.KeyChar=='(' || e.KeyChar=='[' || e.KeyChar=='\n' || e.KeyChar=='\r' || e.KeyChar=='\t' || e.KeyChar==' ')
+      { if(AcBox.SelectedIndex!=-1) SelectItem();
+        if((int)e.KeyChar<32) e.Handled = true;
       }
+      AcBox.Hide();
+      typed = "";
     }
-    else if(AcBox.Visible && e.KeyChar>32 && e.KeyChar<127)
+    else if(e.KeyChar>32 && e.KeyChar<127)
     { typed += e.KeyChar;
       int index = AcBox.FindString(typed);
       if(index!=ListBox.NoMatches) AcBox.SelectedIndex = index;
@@ -166,7 +197,96 @@ public class TextBox : RichTextBox
   { AcBox.Hide();
     base.OnMouseDown(e);
   }
+
+  protected override void OnTextChanged(EventArgs e)
+  { base.OnTextChanged(e);
+    if(myChange) return;
+
+    Modified = true;
+    lastUserChange = DateTime.Now;
+
+    int pos=SelectionStart, end;
+    if(pos<=0) { redoHighlight=true; return; }
+
+    char c = Text[--pos];
+    if(char.IsLetterOrDigit(c)) return;
+
+    string text=Text;
+
+    while(pos>=0 && char.IsWhiteSpace(text[pos])) pos--;
+    if(pos<0) return;
+    end=pos+1;
+
+    Highlight type;
+    if(char.IsLetter(c=text[pos]) || c=='_')
+    { while(--pos>=0 && (char.IsLetter(c=text[pos]) || c=='_'));
+      type = Highlight.Identifier;
+    }
+    else if(char.IsNumber(text[pos])) // TODO: improve number recognition
+    { while(--pos>=0 && (char.IsDigit(c=text[pos]) || c=='.'));
+      type = Highlight.Number;
+    }
+    else if(char.IsPunctuation(c=text[pos]) || char.IsSymbol(c)) // TODO: improve symbol recognition
+    { while(--pos>=0 && (char.IsPunctuation(c=text[pos]) || char.IsSymbol(c)));
+      type = Highlight.Operator;
+    }
+    else return;
+
+    pos++;
+    string word = end<=0 ? "" : text.Substring(pos, end-pos);
+    if(word=="") return;
+
+    Color newColor = HighlightColor(Classify(word, type));
+
+    int start=SelectionStart, len=SelectionLength;
+    SelectionStart  = pos;
+    SelectionLength = end-pos;
+    if(SelectionColor!=newColor) SelectionColor = newColor;
+
+    SelectionStart  = start;
+    SelectionLength = 0;
+    SelectionColor  = Color.Black;
+    SelectionLength = len;
+  }
   #endregion
+
+  enum Highlight
+  { Identifier, Keyword, CallKeyword, DeclareKeyword, Operator, Punctuation, Number, Comment
+  };
+
+  Highlight Classify(string word, Highlight type)
+  { if(type==Highlight.Identifier)
+      switch(word)
+      { case "while": case "return": case "from": case "for": case "if": case "elif": case "else": case "break":
+        case "continue": case "in": case "try": case "except": case "finally": case "is":
+        case "not": case "and": case "or":
+          type=Highlight.Keyword; break;
+
+        case "import": case "pass": case "global": case "raise": case "assert": case "del": case "yield":
+        case "exec":
+          type=Highlight.CallKeyword; break;
+
+        case "def": case "lambda": case "class":
+          type=Highlight.DeclareKeyword; break;
+      }
+    else if(type==Highlight.Operator)
+      switch(word[0])
+      { case '(': case ')': case '[': case ']': case '{': case '}': case ':': case ',':
+          type=Highlight.Punctuation; break;
+      }
+    return type;
+  }
+
+  Color HighlightColor(Highlight type)
+  { switch(type)
+    { case Highlight.Operator: return Color.OrangeRed;
+      case Highlight.CallKeyword: case Highlight.Keyword: return Color.Blue;
+      case Highlight.Number: return Color.DarkRed;
+      case Highlight.Comment: return Color.Green;
+      case Highlight.DeclareKeyword: return Color.DarkCyan;
+      default: return Color.Black;
+    }
+  }
 
   void PopulateBox()
   { AcBox.Items.Clear();
@@ -197,15 +317,28 @@ public class TextBox : RichTextBox
   internal void SelectItem()
   { int start=SelectionStart, prefix=start-typed.Length, suffix=Math.Min(start+typed.Length, TextLength);
     string item = AcBox.GetItemText(AcBox.SelectedItem);
-    Text = Text.Substring(0, prefix) + item + Text.Substring(suffix, TextLength-suffix);
-    SelectionStart = prefix + item.Length;
+    SetText(Text.Substring(0, prefix) + item + Text.Substring(suffix, TextLength-suffix), prefix+item.Length);
+  }
+  
+  void SetText(string text, int newCaretPos)
+  { bool old=myChange; myChange=true;
+    Text = text;
+    SelectAll();
+    SelectionColor  = Color.Black;
+    SelectionLength = 0;
+    SelectionStart  = newCaretPos;
   }
 
   string typed="";
+  DateTime lastUserChange;
+  bool redoHighlight=true, myChange;
+  
+  static Regex highlightre = new Regex(@"/\*.*?\*/|#.*?(?:\n|$)|\w+|\d+(?:\.\d+)?|<>|(?:&&|\|\||[~^&*-=+<>/?|])=?",
+                                       RegexOptions.Compiled|RegexOptions.Singleline);
 }
 #endregion
 
-public class ImmediateBox : TextBox
+public class ImmediateBox : BoaBox
 { public ImmediateBox()
   { displayhook = Ops.GenerateFunction("display", new Parameter[] { new Parameter("value") },
                                        new CallTargetN(display));
