@@ -23,6 +23,7 @@ enum Token
   
   // keywords
   Def, Print, Return, And, Or, Not, While, If, Elif, Else, Pass, Break, Continue, Global, Import, From, For, In,
+  Lambda,
   
   // abstract
   Identifier, Literal, Assign, Compare, Call, Member, Index, Slice, Hash, List, Tuple, Suite,
@@ -44,6 +45,7 @@ public class Parser
     Token[] tokens =
     { Token.Def, Token.Print, Token.Return, Token.And, Token.Or, Token.Not, Token.While, Token.Import, Token.From,
       Token.For, Token.If,  Token.Elif, Token.Else, Token.Pass, Token.Break, Token.Continue, Token.Global, Token.In,
+      Token.Lambda,
     };
     foreach(Token token in tokens) stringTokens.Add(Enum.GetName(typeof(Token), token).ToLower(), token);
   }
@@ -65,10 +67,11 @@ public class Parser
     return new Suite((Statement[])stmts.ToArray(typeof(Statement)));
   }
   
-  // expression := <lowlogand> ('or' <lowlogand>)*
+  // expression := <lowlogand> ('or' <lowlogand>)* | <lambda>
   public Expression ParseExpression()
-  { Expression expr = ParseLowLogAnd();
-    while(TryEat(Token.Or)) expr = new OrExpression(expr, ParseLowLogAnd());
+  { if(token==Token.Lambda) return ParseLambda();
+    Expression expr = ParseLowLogAnd();
+    while(TryEat(Token.Or)) expr = AP(new OrExpression(expr, ParseLowLogAnd()));
     return expr;
   }
   // statement     := <stmt_line> | <compound_stmt>
@@ -86,6 +89,9 @@ public class Parser
   }
 
   bool InLoop { get { return loopDepth>0; } }
+
+  Expression AP(Expression e) { e.SetLocation(sourceFile, line, column); return e; }
+  Statement AP(Statement s) { s.SetLocation(sourceFile, line, column); return s; }
 
   #region GetEscapeChar
   /*
@@ -185,7 +191,7 @@ public class Parser
         default: return expr;
       }
       NextToken();
-      expr = new BinaryOpExpression(op, expr, ParseShift());
+      expr = AP(new BinaryOpExpression(op, expr, ParseShift()));
     }
   }
   
@@ -194,7 +200,7 @@ public class Parser
   { Expression expr = ParseMember();
     while(true)
     { if(TryEat(Token.LParen))
-      { expr = new CallExpression(expr, ParseArguments());
+      { expr = AP(new CallExpression(expr, ParseArguments()));
         Eat(Token.RParen);
       }
       else if(TryEat(Token.LBracket)) throw new NotImplementedException();
@@ -209,7 +215,7 @@ public class Parser
     while(token==Token.Compare)
     { BinaryOperator op = (BinaryOperator)value;
       NextToken();
-      expr = new BinaryOpExpression(op, expr, ParseBitwise());
+      expr = AP(new BinaryOpExpression(op, expr, ParseBitwise()));
     }
     return expr;
   }
@@ -221,20 +227,20 @@ public class Parser
     Eat(Token.LParen);
     Parameter[] parms = ParseParamList(Token.RParen);
     Eat(Token.RParen);
-    return new DefStatement(name, parms, ParseSuite());
+    return AP(new DefStatement(name, parms, ParseSuite()));
   }
 
-  // expr_stmt  := <lvalue> '=' (<expression> | <tuple>)
+  // expr_stmt  := <expression> | <lvalue> '=' (<expression> | <tuple>)
   // assignable := <name> | <index> | <slice>
   // lvalue     := <assignable> | <tuple of <assignable>>
   Statement ParseExprStmt()
   { Expression lhs = ParseExpression();
     if(TryEat(Token.Assign))
     { if(lhs is NameExpression || lhs is AttrExpression || lhs is TupleExpression)
-        return new AssignStatement(lhs, ParseExpression());
+        return AP(new AssignStatement(lhs, ParseExpression()));
       throw Ops.SyntaxError("can't assign to {0}", lhs.GetType());
     }
-    else return new ExpressionStatement(lhs);
+    else return AP(new ExpressionStatement(lhs));
   }
 
   // factor    := <power> (<factor_op> <power>)*
@@ -251,7 +257,7 @@ public class Parser
         default: return expr;
       }
       NextToken();
-      expr = new BinaryOpExpression(op, expr, ParsePower());
+      expr = AP(new BinaryOpExpression(op, expr, ParsePower()));
     }
   }
 
@@ -260,7 +266,7 @@ public class Parser
   { Eat(Token.For);
     Name[] names = ParseNameList();
     Eat(Token.In);
-    return new ForStatement(names, ParseExpression(), ParseSuite());
+    return AP(new ForStatement(names, ParseExpression(), ParseSuite()));
   }
 
   // global_stmt := 'global' <namelist> EOL
@@ -269,7 +275,7 @@ public class Parser
     ArrayList names = new ArrayList();
     do names.Add(ParseIdentifier()); while(TryEat(Token.Comma));
     Eat(Token.EOL);
-    return new GlobalStatement((string[])names.ToArray(typeof(string)));
+    return AP(new GlobalStatement((string[])names.ToArray(typeof(string))));
   }
 
   string ParseIdentifier()
@@ -287,7 +293,7 @@ public class Parser
     Statement  body = ParseSuite(), elze=null;
     if(token==Token.Elif) elze = ParseIf();
     else if(TryEat(Token.Else)) elze = ParseSuite();
-    return new IfStatement(test, body, elze);
+    return AP(new IfStatement(test, body, elze));
   }
 
   // import_stmt := 'import' <import_package> (',' <import_package>)* EOL |
@@ -300,7 +306,7 @@ public class Parser
     if(TryEat(Token.From))
     { string module = ParseModule();
       Eat(Token.Import);
-      if(TryEat(Token.Asterisk)) stmt = new ImportFromStatement(module, new ImportName("*"));
+      if(TryEat(Token.Asterisk)) stmt = AP(new ImportFromStatement(module, new ImportName("*")));
       else
       { Expect(Token.Identifier);
         ArrayList list = new ArrayList();
@@ -312,7 +318,7 @@ public class Parser
           }
           else list.Add(new ImportName(ident));
         } while(token!=Token.EOL && !TryEat(Token.Comma));
-        stmt = new ImportFromStatement(module, (ImportName[])list.ToArray(typeof(ImportName)));
+        stmt = AP(new ImportFromStatement(module, (ImportName[])list.ToArray(typeof(ImportName))));
       }
     }
     else
@@ -326,36 +332,77 @@ public class Parser
         }
         else list.Add(new ImportName(module));
       } while(token!=Token.EOL && !TryEat(Token.Comma));
-      stmt = new ImportStatement((ImportName[])list.ToArray(typeof(ImportName)));
+      stmt = AP(new ImportStatement((ImportName[])list.ToArray(typeof(ImportName))));
     }
     Eat(Token.EOL);
     return stmt;
   }
 
+  // lambda := 'lambda' <namelist> ':' <lambda_body>
+  Expression ParseLambda()
+  { Eat(Token.Lambda);
+    Parameter[] parms = ParseParamList(Token.Colon);
+    Eat(Token.Colon);
+    return AP(new LambdaExpression(parms, ParseLambdaBody()));
+  }
+  
+  // lambda_body := <simple_stmt> (';' <simple_stmt>)* (';' <lambda_end>?) | <lambda_end>
+  // lambda_end := <return_stmt> | <pass_stmt>
+  Statement ParseLambdaBody() { return ParseLambdaBody(false); }
+  Statement ParseLambdaBody(bool inside)
+  { if(TryEat(Token.Return))
+      switch(token)
+      { case Token.EOL: case Token.Comma: case Token.RParen: case Token.RBrace: case Token.RBracket: case Token.For:
+          return AP(new ReturnStatement());
+        default: return AP(new ReturnStatement(ParseExpression()));
+      }
+    else if(TryEat(Token.Pass)) return AP(new PassStatement());
+
+    Statement stmt = ParseSimpleStmt();
+    if(!inside && TryEat(Token.Semicolon))
+    { ArrayList list = new ArrayList();
+      list.Add(stmt);
+      do
+      { stmt = ParseLambdaBody(true);
+        list.Add(stmt);
+      } while(!(stmt is ReturnStatement || stmt is PassStatement) && TryEat(Token.Semicolon));
+      stmt = new Suite((Statement[])list.ToArray(typeof(Statement)));
+    }
+    return stmt;
+  }
+
+  // list_comprehension := <expression> 'for' <namelist> 'in' <expression> ('if' <expression>)?
+  Expression ParseListComprehension(Expression expr)
+  { Eat(Token.For);
+    Name[] names = ParseNameList();
+    Eat(Token.In);
+    return AP(new ListCompExpression(expr, names, ParseExpression(), TryEat(Token.If) ? ParseExpression() : null));
+  }
+
   // logand := <compare> ('&&' <compare>)*
   Expression ParseLogAnd()
   { Expression expr = ParseCompare();
-    while(TryEat(Token.LogAnd)) expr = new AndExpression(expr, ParseCompare());
+    while(TryEat(Token.LogAnd)) expr = AP(new AndExpression(expr, ParseCompare()));
     return expr;
   }
 
   // logor := <logand> ('||' <logand>)*
   Expression ParseLogOr()
   { Expression expr = ParseLogAnd();
-    while(TryEat(Token.LogOr)) expr = new OrExpression(expr, ParseLogAnd());
+    while(TryEat(Token.LogOr)) expr = AP(new OrExpression(expr, ParseLogAnd()));
     return expr;
   }
 
   // lowlogand := <lowlognot> ("and" <lowlognot>)*
   Expression ParseLowLogAnd()
   { Expression expr = ParseLowLogNot();
-    while(TryEat(Token.And)) expr = new AndExpression(expr, ParseLowLogNot());
+    while(TryEat(Token.And)) expr = AP(new AndExpression(expr, ParseLowLogNot()));
     return expr;
   }
 
   // lowlognot := "not" <lowlognot> | <typelow>
   Expression ParseLowLogNot()
-  { if(TryEat(Token.Not)) return new UnaryExpression(ParseLowLogNot(), UnaryOperator.LogicalNot);
+  { if(TryEat(Token.Not)) return AP(new UnaryExpression(ParseLowLogNot(), UnaryOperator.LogicalNot));
     return ParseTypeLow();
   }
   
@@ -363,7 +410,7 @@ public class Parser
   // member_access ::= '.' LITERAL
   Expression ParseMember()
   { Expression expr = ParsePrimary();
-    while(TryEat(Token.Period)) expr = new AttrExpression(expr, ParseIdentifier());
+    while(TryEat(Token.Period)) expr = AP(new AttrExpression(expr, ParseIdentifier()));
     return expr;
   }
 
@@ -375,16 +422,16 @@ public class Parser
   }
 
   // primary := LITERAL | <ident> | '(' <expression> ')' | '[' <array_list> ']' | '{' <hash_list> '}' |
-  //            <tuple of <expression>>
+  //            '[' <list_comprehension> ']' | <tuple of <expression>>
   // tuple of T := '(' (<T> ',')+ <T>? ')'
   Expression ParsePrimary()
   { Expression expr;
     switch(token)
-    { case Token.Literal: expr = new ConstantExpression(value); break;
-      case Token.Identifier: expr = new NameExpression(new Name((string)value)); break;
+    { case Token.Literal: expr = AP(new ConstantExpression(value)); break;
+      case Token.Identifier: expr = AP(new NameExpression(new Name((string)value))); break;
       case Token.LParen:
         NextToken();
-        if(token==Token.RParen) expr = new TupleExpression();
+        if(token==Token.RParen) expr = AP(new TupleExpression());
         else
         { expr = ParseExpression();
           if(token==Token.Comma)
@@ -392,24 +439,30 @@ public class Parser
             ArrayList list = new ArrayList();
             list.Add(expr);
             while(token!=Token.RParen) { list.Add(ParseExpression()); if(!TryEat(Token.Comma)) break; }
-            expr = new TupleExpression((Expression[])list.ToArray(typeof(Expression)));
+            expr = AP(new TupleExpression((Expression[])list.ToArray(typeof(Expression))));
           }
         }
         Expect(Token.RParen);
         break;
       case Token.LBracket:
         NextToken();
-        if(token==Token.RBracket) expr = new ListExpression();
+        if(token==Token.RBracket) expr = AP(new ListExpression());
         else
-        { ArrayList list = new ArrayList();
-          while(token!=Token.RBracket) { list.Add(ParseExpression()); if(!TryEat(Token.Comma)) break; }
-          expr = new ListExpression((Expression[])list.ToArray(typeof(Expression)));
+        { Expression fe = ParseExpression();
+          if(token==Token.For) expr = ParseListComprehension(fe);
+          else
+          { ArrayList list = new ArrayList();
+            list.Add(fe);
+            TryEat(Token.Comma);
+            while(token!=Token.RBracket) { list.Add(ParseExpression()); if(!TryEat(Token.Comma)) break; }
+            expr = AP(new ListExpression((Expression[])list.ToArray(typeof(Expression))));
+          }
         }
         Expect(Token.RBracket);
         break;
       case Token.LBrace:
         NextToken();
-        if(token==Token.RBrace) expr = new HashExpression();
+        if(token==Token.RBrace) expr = AP(new HashExpression());
         else
         { ArrayList list = new ArrayList();
           while(token!=Token.RBrace)
@@ -418,7 +471,7 @@ public class Parser
             list.Add(new DictionaryEntry(e, ParseExpression()));
             if(!TryEat(Token.Comma)) break;
           }
-          expr = new HashExpression((DictionaryEntry[])list.ToArray(typeof(DictionaryEntry)));
+          expr = AP(new HashExpression((DictionaryEntry[])list.ToArray(typeof(DictionaryEntry))));
         }
         Expect(Token.RBrace);
         break;
@@ -431,7 +484,7 @@ public class Parser
   // print_stmt := 'print' (<expression> (',' <expression>)* ','?)?
   Statement ParsePrintStmt()
   { Eat(Token.Print);
-    if(token==Token.EOL) return new PrintStatement();
+    if(token==Token.EOL) return AP(new PrintStatement());
 
     ArrayList stmts = new ArrayList();
     bool comma;
@@ -441,7 +494,7 @@ public class Parser
       if(TryEat(Token.Comma)) comma=true;
     } while(token!=Token.EOL && token!=Token.Semicolon);
     
-    return new PrintStatement((Expression[])stmts.ToArray(typeof(Expression)), !comma);
+    return AP(new PrintStatement((Expression[])stmts.ToArray(typeof(Expression)), !comma));
   }
 
   // namelist := <identifier> (',' <identifier>)*
@@ -466,7 +519,7 @@ public class Parser
   // power := <unary> ('**' <unary>)*
   Expression ParsePower()
   { Expression expr = ParseUnary();
-    while(TryEat(Token.Power)) expr = new BinaryOpExpression(BinaryOperator.Power, expr, ParseUnary());
+    while(TryEat(Token.Power)) expr = AP(new BinaryOpExpression(BinaryOperator.Power, expr, ParseUnary()));
     return expr;
   }
 
@@ -481,7 +534,7 @@ public class Parser
         default: return expr;
       }
       NextToken();
-      expr = new BinaryOpExpression(op, expr, ParseTerm());
+      expr = AP(new BinaryOpExpression(op, expr, ParseTerm()));
     }
   }
 
@@ -501,22 +554,23 @@ public class Parser
   { Statement stmt;
     switch(token)
     { case Token.Break:
+        // FIXME: this doesn't work if you have a break in a function nested in a loop
         if(!InLoop) throw Ops.SyntaxError("'break' encountered outside loop");
         NextToken();
-        stmt = new BreakStatement();
+        stmt = AP(new BreakStatement());
         break;
       case Token.Continue:
         if(!InLoop) throw Ops.SyntaxError("'break' encountered outside loop");
         NextToken();
-        stmt = new ContinueStatement();
+        stmt = AP(new ContinueStatement());
         break;
       case Token.Pass:
         NextToken();
-        stmt = new PassStatement();
+        stmt = AP(new PassStatement());
         break;
       case Token.Return:
         NextToken();
-        stmt = token==Token.EOL ? new ReturnStatement() : new ReturnStatement(ParseExpression());
+        stmt = AP(token==Token.EOL ? new ReturnStatement() : new ReturnStatement(ParseExpression()));
         break;
       default:
         stmt = ParseSimpleStmt();
@@ -560,7 +614,7 @@ public class Parser
         default: return expr;
       }
       NextToken();
-      expr = new BinaryOpExpression(op, expr, ParseFactor());
+      expr = AP(new BinaryOpExpression(op, expr, ParseFactor()));
     }
   }
 
@@ -570,7 +624,7 @@ public class Parser
     if(TryEat(Token.Question))
     { Expression it = ParseExpression();
       Eat(Token.Colon);
-      expr = new TernaryExpression(expr, it, ParseExpression());
+      expr = AP(new TernaryExpression(expr, it, ParseExpression()));
     }
     return expr;
   }
@@ -592,7 +646,7 @@ public class Parser
     }
     if(op!=null)
     { NextToken();
-      return new UnaryExpression(ParseUnary(), op);
+      return AP(new UnaryExpression(ParseUnary(), op));
     }
     return ParseCallIndex();
   }
@@ -604,7 +658,7 @@ public class Parser
     loopDepth++;
     Statement body = ParseSuite();
     loopDepth--;
-    return new WhileStatement(expr, body);
+    return AP(new WhileStatement(expr, body));
   }
 
   Token PeekToken()

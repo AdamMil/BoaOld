@@ -103,8 +103,10 @@ public class CodeGenerator
   public void EmitIsTrue() { EmitCall(typeof(Ops), "IsTrue"); }
   public void EmitIsTrue(Expression e) { e.Emit(this); EmitIsTrue(); }
 
-  // TODO: reenable this
-  //public void EmitLine(int line) { ILG.MarkSequencePoint(TypeGenerator.Document, line, 0, line+1, 0); }
+  public void EmitLine(int line)
+  { if(TypeGenerator.Assembly.Symbols!=null)
+      ILG.MarkSequencePoint(TypeGenerator.Assembly.Symbols, line, 0, line+1, 0);
+  }
 
   public void EmitNew(Type type) { ILG.Emit(OpCodes.Newobj, type.GetConstructor(Type.EmptyTypes)); }
   public void EmitNew(Type type, Type[] paramTypes) { ILG.Emit(OpCodes.Newobj, type.GetConstructor(paramTypes)); }
@@ -126,9 +128,11 @@ public class CodeGenerator
   }
 
   // TODO: make this use actual spans
-  // TODO: reenable this
-  //public void EmitPosition(Node node) { ILG.MarkSequencePoint(TypeGenerator.Document, node.Line, 0, node.Line+1, 0); }
-  
+  public void EmitPosition(Node node)
+  { if(TypeGenerator.Assembly.Symbols!=null)
+      ILG.MarkSequencePoint(TypeGenerator.Assembly.Symbols, node.Line, node.Column, node.Line, node.Column+1);
+  }
+
   public void EmitReturn() { ILG.Emit(OpCodes.Ret); }
   public void EmitReturn(Expression expr)
   { if(expr==null) ILG.Emit(OpCodes.Ldnull);

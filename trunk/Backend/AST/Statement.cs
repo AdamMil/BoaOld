@@ -142,11 +142,11 @@ public abstract class Statement : Node
 
 #region Suite
 public class Suite : Statement
-{ public Suite(Statement[] stmts) { Statements=stmts; }
-  
+{ public Suite(Statement[] stmts) { Statements=stmts; SetLocation(stmts[0].Source, stmts[0].Line, stmts[0].Column); }
+
   public override void Emit(CodeGenerator cg)
   { foreach(Statement stmt in Statements)
-    { //cg.EmitPosition(stmt);
+    { cg.EmitPosition(stmt);
       stmt.Emit(cg);
     }
   }

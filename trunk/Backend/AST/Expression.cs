@@ -4,6 +4,7 @@ using System.Reflection;
 using System.Reflection.Emit;
 using Boa.Runtime;
 
+// FIXME: make compiled list comprehension respect 'StopIteration'
 namespace Boa.AST
 {
 
@@ -164,6 +165,28 @@ public class HashExpression : Expression
 }
 #endregion
 
+#region LambdaExpression
+public class LambdaExpression : Expression
+{ public LambdaExpression(Parameter[] parms, Statement body) { Parameters=parms; Body=body; }
+
+  public override void Emit(CodeGenerator cg)
+  { throw new NotImplementedException();
+  }
+  
+  public override object Evaluate(Frame frame)
+  { return new InterpretedFunction(frame, null, Parameters, null, Body);
+  }
+
+  public override void Walk(IWalker w)
+  { if(w.Walk(this)) Body.Walk(w);
+    w.PostWalk(this);
+  }
+
+  public Parameter[] Parameters;
+  public Statement Body;
+}
+#endregion
+
 #region ListExpression
 public class ListExpression : Expression
 { public ListExpression() : this(new Expression[0]) { }
@@ -187,6 +210,52 @@ public class ListExpression : Expression
   }
 
   public Expression[] Expressions;
+}
+#endregion
+
+#region ListCompExpression
+public class ListCompExpression : Expression
+{ public ListCompExpression(Expression item, Name[] names, Expression list, Expression test)
+  { Item=item; List=list; Test=test;
+
+    if(names.Length==1) Names = new NameExpression(names[0]);
+    else
+    { Expression[] ne = new Expression[names.Length];
+      for(int i=0; i<names.Length; i++) ne[i] = new NameExpression(names[i]);
+      Names=new TupleExpression(ne);
+    }
+  }
+
+  public override void Emit(CodeGenerator cg)
+  { throw new NotImplementedException();
+  }
+
+  public override object Evaluate(Frame frame)
+  { ConstantExpression ce = new ConstantExpression(null);
+    AssignStatement ass = new AssignStatement(Names, ce);
+    List list = new List();
+    IEnumerator e = Ops.GetEnumerator(List.Evaluate(frame));
+    try
+    { while(e.MoveNext())
+      { ce.Value = e.Current;
+        ass.Execute(frame);
+        if(Test==null || Ops.IsTrue(Test.Evaluate(frame))) list.append(Item.Evaluate(frame));
+      }
+    }
+    catch(StopIterationException) { }
+    return list;
+  }
+
+  public override void Walk(IWalker w)
+  { if(w.Walk(this))
+    { Item.Walk(w);
+      List.Walk(w);
+      if(Test!=null) Test.Walk(w);
+    }
+    w.PostWalk(this);
+  }
+
+  public Expression Item, Names, List, Test;
 }
 #endregion
 

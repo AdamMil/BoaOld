@@ -22,7 +22,7 @@ public sealed class Misc
 public sealed class Options
 { private Options() { }
 
-  public static bool Interactive;
+  public static bool Debug, Interactive;
 }
 
 }
