@@ -15,6 +15,8 @@ public class Frame
     else { Module=new Module(Locals); }
   }
 
+  public void Delete(string name) { Locals.Remove(name); }
+
   public object Get(string name) // TODO: eliminate double lookup
   { if(globalNames!=null && globalNames.Contains(name)) return GetGlobal(name);
     if(Locals.Contains(name)) return Locals[name];

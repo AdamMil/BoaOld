@@ -15,6 +15,8 @@ public abstract class Namespace
     Global = parent==null || parent.Parent==null ? parent : parent.Parent;
   }
 
+  // TODO: make sure this works with closures, etc
+  public virtual void DeleteSlot(Name name) { slots.Remove(name.String); }
   public Slot GetLocalSlot(Name name) { return (Slot)slots[name.String]; } // does NOT make the slot!
   public Slot GetGlobalSlot(string name) { return GetGlobalSlot(new Name(name, Scope.Global)); }
   public Slot GetGlobalSlot(Name name) { return Parent==null ? GetSlot(name) : Parent.GetGlobalSlot(name); }
@@ -52,6 +54,12 @@ public class FrameNamespace : Namespace
     FrameSlot = new FrameObjectSlot(cg, new ArgSlot(cg.MethodBuilder, 0, "frame"), field);
   }
 
+  public override void DeleteSlot(Name name)
+  { FrameSlot.EmitGet(codeGen);
+    codeGen.EmitString(name.String);
+    codeGen.EmitCall(typeof(Frame), "Delete");
+  }
+
   public override void SetArgs(Name[] names, int offset, MethodBuilder mb)
   { foreach(Name name in names) slots[name.String] = MakeSlot(name);
   }
@@ -67,6 +75,19 @@ public class FrameNamespace : Namespace
 #region LocalNamespace
 public class LocalNamespace : Namespace
 { public LocalNamespace(Namespace parent, CodeGenerator cg) : base(parent) { codeGen=cg; }
+
+  public override void DeleteSlot(Name name)
+  { if(name.Scope==Scope.Global) // TODO: handle Free variables here?
+    { Namespace par = Parent;
+      while(par!=null && !(par is FrameNamespace)) par = par.Parent;
+      if(par==null) throw new InvalidOperationException("There is no FrameNamespace in the hierachy");
+      par.DeleteSlot(name);
+    }
+    else
+    { codeGen.ILG.Emit(OpCodes.Ldnull);
+      GetSlotForSet(name).EmitSet(codeGen);
+    }
+  }
 
   public override void SetArgs(Name[] names, int offset, MethodBuilder mb)
   { for(int i=0; i<names.Length; i++) slots[names[i].String] = new ArgSlot(mb, i+offset, names[i].String);

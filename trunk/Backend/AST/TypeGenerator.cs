@@ -82,6 +82,13 @@ public class TypeGenerator
         cg.EmitCall(mi);
       }
     }
+    else if(value is Slice)
+    { Slice slice = (Slice)value;
+      cg.EmitInt(slice.start);
+      cg.EmitInt(slice.stop);
+      cg.EmitInt(slice.step);
+      cg.EmitNew(typeof(Slice), new Type[] { typeof(int), typeof(int), typeof(int) });
+    }
     else switch(Convert.GetTypeCode(value)) // TODO: see if this is faster than using 'is'
     { case TypeCode.Int32:
         cg.EmitInt((int)value);
@@ -94,7 +101,7 @@ public class TypeGenerator
       default: throw new NotImplementedException("constant: "+value.GetType());
     }
   }
-  
+
   public CodeGenerator GetInitializer()
   { if(initGen==null) initGen = new CodeGenerator(this, null, TypeBuilder.DefineTypeInitializer().GetILGenerator());
     return initGen;

@@ -84,14 +84,20 @@ public class NotEqualOperator : BinaryOperator
 }
 
 public class IdenticalOperator : BinaryOperator
-{ public override void Emit(CodeGenerator cg) { cg.ILG.Emit(OpCodes.Ceq); }
-  public override object Evaluate(object lhs, object rhs) { return lhs==rhs; }
+{ public override void Emit(CodeGenerator cg)
+  { cg.ILG.Emit(OpCodes.Ceq);
+    cg.EmitCall(typeof(Ops), "FromBool");
+  }
+  public override object Evaluate(object lhs, object rhs) { return Ops.FromBool(lhs==rhs); }
   public override string ToString() { return " is "; }
 }
 
 public class NotIdenticalOperator : BinaryOperator
-{ public override void Emit(CodeGenerator cg) { cg.ILG.Emit(OpCodes.Ceq); cg.ILG.Emit(OpCodes.Not); }
-  public override object Evaluate(object lhs, object rhs) { return lhs!=rhs; }
+{ public override void Emit(CodeGenerator cg)
+  { cg.ILG.Emit(OpCodes.Ceq); cg.ILG.Emit(OpCodes.Not);
+    cg.EmitCall(typeof(Ops), "FromBool");
+  }
+  public override object Evaluate(object lhs, object rhs) { return Ops.FromBool(lhs!=rhs); }
   public override string ToString() { return " is not "; }
 }
 

@@ -72,8 +72,11 @@ public sealed class __builtin__
     public XRange(int start, int stop, int step)
     { if(step==0) throw Ops.ValueError("step of 0 passed to xrange()");
       this.start=start; this.stop=stop; this.step=step;
-      if(start<=stop && step<0 || start>=stop && step>0) length = 0;
-      else length = (stop-start)/step;
+      if(step<0 && start<=stop || step>0 && start>=stop) length = 0;
+      else
+      { int sign = Math.Sign(step);
+        length = (stop-start+step-sign)/step;
+      }
     }
 
     public override string ToString() { return __repr__(); }
@@ -89,6 +92,8 @@ public sealed class __builtin__
     { if(index<0 || index>=length) throw Ops.IndexError("xrange object index out of range");
       return start + step*index;
     }
+
+    public object __getitem__(Slice slice) { return Ops.SequenceSlice(this, slice); }
 
     public int __len__() { return length; }
 
@@ -153,6 +158,7 @@ public sealed class __builtin__
   public static int cmp(object a, object b) { return Ops.Compare(a, b); }
   public static void delattr(object o, string name) { Ops.DelAttr(o, name); }
 
+  // FIXME: dir() without args should return local variables, not module variables (but this is complicated)
   public static List dir() { return dir(Ops.GetExecutingModule()); }
   public static List dir(object o)
   { List list = Ops.GetAttrNames(o);
@@ -353,24 +359,17 @@ public sealed class __builtin__
   public static object pow(object value, object power) { return Ops.Power(value, power); }
   public static object pow(object value, object power, object mod) { return Ops.PowerMod(value, power, mod); }
 
-  public static List range(int stop)
-  { List ret = new List(stop);
-    for(int i=0; i<stop; i++) ret.append(i);
-    return ret;
-  }
-  public static List range(int start, int stop)
-  { List ret = new List(stop-start);
-    for(; start<stop; start++) ret.append(start);
-    return ret;
-  }
+  public static List range(int stop) { return range(0, stop, 1); }
+  public static List range(int start, int stop) { return range(start, stop, 1); }
   public static List range(int start, int stop, int step)
   { if(step==0) throw Ops.ValueError("step of 0 passed to range()");
-    if(start<=stop && step<0 || start>=stop && step>0) return new List();
-    List ret = new List((stop-start)/step);
+    if(step<0 && start<=stop || step>0 && start>=stop) return new List();
+    int sign = Math.Sign(step);
+    List ret = new List((stop-start+step-sign)/step);
     for(; start<stop; start += step) ret.append(start);
     return ret;
   }
-  
+
   public static object reduce(object function, object seq)
   { IEnumerator e = Ops.GetEnumerator(seq);
     if(!e.MoveNext()) throw Ops.TypeError("reduce() of empty sequence with no initial value");
@@ -440,6 +439,7 @@ public sealed class __builtin__
   //public static readonly object @int    = ReflectedType.FromType(typeof(int));
   public static readonly object list    = ReflectedType.FromType(typeof(List));
   public static readonly object @object = ReflectedType.FromType(typeof(object));
+  public static readonly object slice   = ReflectedType.FromType(typeof(Slice));
   public static readonly object @string = ReflectedType.FromType(typeof(string));
   public static readonly object tuple   = ReflectedType.FromType(typeof(Tuple));
   public static readonly object xrange  = ReflectedType.FromType(typeof(XRange));

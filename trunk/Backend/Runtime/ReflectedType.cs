@@ -5,6 +5,8 @@ using System.Reflection;
 namespace Boa.Runtime
 {
 
+// TODO: add accessor methods to 'string' (eg, __getitem__)
+
 #region Specialized attributes
 public class SpecialAttr
 {
@@ -153,8 +155,9 @@ public abstract class ReflectedMethodBase : ICallable
 
     for(int mi=0; mi<sigs.Length; mi++) // TODO: cache the binding results somehow?
     { ParameterInfo[] parms = sigs[mi].GetParameters();
-      bool paramArray = parms.Length>0 && IsParamArray(parms[parms.Length-1]), alreadyPA=false;
-      int lastRP = paramArray ? parms.Length-1 : parms.Length;
+      bool paramArray = parms.Length>0 && IsParamArray(parms[parms.Length-1]);
+      int lastRP      = paramArray ? parms.Length-1 : parms.Length;
+      byte alreadyPA  = 0;
       if(args.Length<lastRP || !paramArray && args.Length!=parms.Length) continue;
 
       res[mi].Conv = Conversion.Identity;
@@ -172,13 +175,26 @@ public abstract class ReflectedMethodBase : ICallable
         { Conversion conv = Ops.ConvertTo(types[lastRP], parms[lastRP].ParameterType);
           if(conv==Conversion.Identity || conv==Conversion.Reference)
           { if(conv<res[mi].Conv) res[mi].Conv=conv;
-            alreadyPA = true;
+            alreadyPA = 2;
             goto done;
           }
         }
 
         // check that all remaining arguments can be converted to the member type of the parameter array
         Type type = parms[lastRP].ParameterType.GetElementType();
+        if(args.Length==parms.Length && types[lastRP]==typeof(Tuple))
+        { if(type!=typeof(object))
+          { object[] items = ((Tuple)args[lastRP]).items;
+            for(int i=0; i<items.Length; i++)
+            { Conversion conv = Ops.ConvertTo(items[i].GetType(), type);
+              if(conv==Conversion.None) goto notCPA;
+            }
+          }
+          alreadyPA = 1;
+          goto done;
+        }
+
+        notCPA:
         for(int i=lastRP; i<args.Length; i++)
         { Conversion conv = Ops.ConvertTo(types[i], type);
           if(conv==Conversion.None || conv<res[mi].Conv)
@@ -208,10 +224,10 @@ public abstract class ReflectedMethodBase : ICallable
                               __name__, sigs[0].DeclaringType.FullName);
 
     // do the actual conversion
-    for(int i=0, end=best.APA ? args.Length : best.Last; i<end; i++)
+    for(int i=0, end=best.APA==2 ? args.Length : best.Last; i<end; i++)
       args[i] = Ops.ConvertTo(args[i], best.Parms[i].ParameterType);
 
-    if(best.Last!=best.Parms.Length && !best.APA)
+    if(best.Last!=best.Parms.Length && best.APA==0)
     { object[] narr = new object[best.Parms.Length];
       Array.Copy(args, 0, narr, 0, best.Last);
 
@@ -219,6 +235,16 @@ public abstract class ReflectedMethodBase : ICallable
       Array pa = Array.CreateInstance(type, args.Length-best.Last);
       for(int i=0; i<pa.Length; i++) pa.SetValue(Ops.ConvertTo(args[i+best.Last], type), i);
       args=narr; args[best.Last]=pa;
+    }
+    else if(best.APA==1)
+    { Type type = best.Parms[best.Last].ParameterType.GetElementType();
+      object[] items = ((Tuple)args[best.Last]).items;
+      if(type==typeof(object)) args[best.Last] = items;
+      else
+      { Array pa = Array.CreateInstance(type, items.Length);
+        for(int i=0; i<items.Length; i++) pa.SetValue(Ops.ConvertTo(items[i], type), i);
+        args[best.Last] = pa;
+      }
     }
 
     return sigs[bestMatch].IsConstructor ? ((ConstructorInfo)sigs[bestMatch]).Invoke(args)
@@ -233,14 +259,14 @@ public abstract class ReflectedMethodBase : ICallable
   }
 
   struct Match
-  { public Match(Conversion conv, ParameterInfo[] parms, int last, bool apa, bool pa)
-    { Conv=conv; Parms=parms; Last=last; APA=apa; PA=pa; Exact=!pa || apa;
+  { public Match(Conversion conv, ParameterInfo[] parms, int last, byte apa, bool pa)
+    { Conv=conv; Parms=parms; Last=last; APA=apa; PA=pa;;
     }
 
-    public static bool operator<(Match a, Match b) { return a.Conv<b.Conv || !a.Exact && b.Exact; }
-    public static bool operator>(Match a, Match b) { return a.Conv>b.Conv || a.Exact && !b.Exact; }
-    public static bool operator==(Match a, Match b) { return a.Conv==b.Conv && a.Exact==b.Exact; }
-    public static bool operator!=(Match a, Match b) { return a.Conv!=b.Conv || a.Exact!=b.Exact; }
+    public static bool operator<(Match a, Match b) { return a.Conv<b.Conv || a.APA<b.APA || a.PA && !b.PA; }
+    public static bool operator>(Match a, Match b) { return a.Conv>b.Conv || a.APA>b.APA || !a.PA && b.PA; }
+    public static bool operator==(Match a, Match b) { return a.Conv==b.Conv && a.APA==b.APA && a.PA==b.PA; }
+    public static bool operator!=(Match a, Match b) { return a.Conv!=b.Conv || a.APA!=b.APA || a.PA!=b.PA; }
     
     public override bool Equals(object obj) { return  obj is Match ? this==(Match)obj : false; }
     public override int GetHashCode() { throw new NotImplementedException(); }
@@ -248,7 +274,8 @@ public abstract class ReflectedMethodBase : ICallable
     public Conversion Conv;
     public ParameterInfo[] Parms;
     public int Last;
-    public bool APA, Exact, PA;
+    public byte APA;
+    public bool PA;
   }
 
   static bool IsParamArray(ParameterInfo pi) { return pi.IsDefined(typeof(ParamArrayAttribute), false); }

@@ -1,5 +1,7 @@
 using System;
 
+// TODO: respect this: http://rgruet.free.fr/PQR2.3.html
+
 namespace Boa.Runtime
 {
 
@@ -39,11 +41,14 @@ public interface IHasAttributes
 public interface ISequence : IContainer
 { object __add__(object o);
   object __getitem__(int index);
+  object __getitem__(Slice slice);
 }
 
 public interface IMutableSequence : ISequence
 { void __delitem__(int index);
+  void __delitem__(Slice slice);
   void __setitem__(int index, object value);
+  void __setitem__(Slice slice, object value);
 }
 
 public interface IMapping : IContainer

@@ -11,7 +11,7 @@ public abstract class BoaException : Exception
   public void SetPosition(string source, int line, int column) { SourceFile=source; Line=line; Column=column; }
 
   public override string Message
-  { get { return string.Format("{0}({1},{2}: {3}", SourceFile, Line, Column, base.Message); }
+  { get { return string.Format("{0}({1},{2}): {3}", SourceFile, Line, Column, base.Message); }
   }
 
   public string SourceFile;

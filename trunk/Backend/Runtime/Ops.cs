@@ -234,6 +234,16 @@ public sealed class Ops
     return TryInvoke(desc, "__delete__", out dummy, instance);
   }
 
+  public static void DelIndex(object obj, object index)
+  { IMutableSequence seq = obj as IMutableSequence;
+    if(seq!=null)
+    { Slice slice = index as Slice;
+      if(slice!=null) seq.__delitem__(slice);
+      else seq.__delitem__(Ops.ToInt(index));
+    }
+    else Ops.Invoke(obj, "__delitem__", index);
+  }
+
   public static object Divide(object a, object b)
   { if(a is int && b is int) return (int)a/(int)b;
     if(a is double && b is double) return (double)a/(double)b;
@@ -255,12 +265,22 @@ public sealed class Ops
     return index;
   }
 
+  public static int FixSliceIndex(int index, int length)
+  { if(index<0)
+    { index += length;
+      if(index<0) index=0;
+    }
+    else if(index>length) index=length;
+    return index;
+  }
+
   public static object FloorDivide(object a, object b)
   { if(a is int && b is int) return (int)Math.Floor((double)a/(int)b);
     if(a is double && b is double) return Math.Floor((double)a/(double)b);
     throw TypeError("unsupported operand type(s) for //: '{0}' and '{1}'", GetDynamicType(a).__name__, GetDynamicType(b).__name__);
   }
 
+  // TODO: check whether we can eliminate this (ie, "true is true" still works)
   public static object FromBool(bool value) { return value ? TRUE : FALSE; }
 
   public static object GetAttr(object o, string name)
@@ -338,6 +358,15 @@ public sealed class Ops
     }
     if(Frames.Count>0) return ((Frame)Frames.Peek()).Module;
     throw new InvalidOperationException("No executing module");
+  }
+
+  public static object GetIndex(object obj, object index)
+  { ISequence seq = obj as ISequence;
+    if(seq!=null)
+    { Slice slice = index as Slice;
+      return slice==null ? seq.__getitem__(ToInt(index)) : seq.__getitem__(slice);
+    }
+    else return Ops.Invoke(obj, "__getitem__", index);
   }
 
   public static void Import(Module module, string[] names, string[] asNames)
@@ -478,6 +507,18 @@ public sealed class Ops
   { return new RuntimeException(string.Format(format, args));
   }
 
+  public static List SequenceSlice(ISequence seq, Slice slice)
+  { Tuple tup = slice.indices(seq.__len__());
+    return SequenceSlice(seq, (int)tup.items[0], (int)tup.items[1], (int)tup.items[2]);
+  }
+  public static List SequenceSlice(ISequence seq, int start, int stop, int step)
+  { int sign = Math.Sign(step);
+    List ret = new List((stop-start+step-sign)/step);
+    if(step<0) for(; start>stop; start+=step) ret.append(seq.__getitem__(start));
+    else for(; start<stop; start+=step) ret.append(seq.__getitem__(start));
+    return ret;
+  }
+
   public static void SetAttr(object value, object o, string name)
   { IHasAttributes iha = o as IHasAttributes;
     if(iha!=null)  iha.__setattr__(name, value);
@@ -489,6 +530,16 @@ public sealed class Ops
     if(dd!=null) { dd.__set__(instance, value); return true; }
     object dummy;
     return TryInvoke(desc, "__set__", out dummy, instance, value);
+  }
+
+  public static void SetIndex(object value, object obj, object index)
+  { IMutableSequence seq = obj as IMutableSequence;
+    if(seq!=null)
+    { Slice slice = index as Slice;
+      if(slice!=null) seq.__setitem__(slice, value);
+      else seq.__setitem__(Ops.ToInt(index), value);
+    }
+    else Ops.Invoke(obj, "__setitem__", index);
   }
 
   public static string Str(object o)
@@ -548,9 +599,19 @@ public sealed class Ops
   public static TypeErrorException TypeError(string format, params object[] args)
   { return new TypeErrorException(string.Format(format, args));
   }
+  public static TypeErrorException TypeError(Boa.AST.Node node, string format, params object[] args)
+  { TypeErrorException e = new TypeErrorException(string.Format(format, args));
+    e.SetPosition(node);
+    return e;
+  }
 
   public static ValueErrorException ValueError(string format, params object[] args)
   { return new ValueErrorException(string.Format(format, args));
+  }
+  public static ValueErrorException ValueError(Boa.AST.Node node, string format, params object[] args)
+  { ValueErrorException e = new ValueErrorException(string.Format(format, args));
+    e.SetPosition(node);
+    return e;
   }
 
   public static Stack Frames = new Stack();

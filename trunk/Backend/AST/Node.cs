@@ -81,6 +81,7 @@ public abstract class Node
   }
 
   public virtual object GetValue() { throw new NotImplementedException(); }
+  public virtual void Optimize() { }
 
   public string ToCode()
   { System.Text.StringBuilder sb = new System.Text.StringBuilder();

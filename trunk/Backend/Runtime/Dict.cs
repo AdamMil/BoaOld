@@ -6,7 +6,7 @@ namespace Boa.Runtime
 {
 
 [BoaType("dict")]
-public class Dict : HybridDictionary, IComparable, IMapping
+public class Dict : HybridDictionary, IComparable, IMapping, ICloneable
 { public Dict() { }
   public Dict(IDictionary dict) { foreach(DictionaryEntry e in dict) Add(e.Key, e.Value); }
   internal Dict(int size) : base(size) { }
@@ -78,6 +78,10 @@ public class Dict : HybridDictionary, IComparable, IMapping
   public void __setitem__(object key, object value) { this[key]=value; }
   public int __len__() { return Count; }
   public bool __contains__(object key) { return Contains(key); }
+  #endregion
+
+  #region ICloneable Members
+  public object Clone() { return new Dict(this); }
   #endregion
 }
 
