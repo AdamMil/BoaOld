@@ -26,7 +26,11 @@ public class Frame
     else Locals[name] = value;
   }
 
-  public object GetGlobal(string name) { return Module.__getattr__(name); }
+  public object GetGlobal(string name)
+  { object obj = Module.__getattr__(name);
+    if(obj==Ops.Missing) throw Ops.NameError("name '{0}' does not exist", name);
+    return obj;
+  }
 
   public void MarkGlobal(string name)
   { if(globalNames==null) globalNames = new HybridDictionary();

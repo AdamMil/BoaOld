@@ -91,8 +91,17 @@ public class LocalNamespace : Namespace
   }
 
   protected override Slot MakeSlot(Name name)
-  { return name.Scope==Scope.Closed ? (Slot)new ClosedSlot(codeGen, name.String)
-                                    : (Slot)new LocalSlot(codeGen.ILG.DeclareLocal(typeof(object)), name.String);
+  { switch(name.Scope)
+    { case Scope.Closed: return new ClosedSlot(codeGen, name.String);
+      case Scope.Free: case Scope.Global:
+      { Namespace par = Parent;
+        while(par!=null && !(par is FrameNamespace)) par = par.Parent;
+        if(par==null) throw new InvalidOperationException("There is no FrameNamespace in the hierachy");
+        return par.GetGlobalSlot(name);
+      }
+      case Scope.Local: return new LocalSlot(codeGen.ILG.DeclareLocal(typeof(object)), name.String);
+      default: throw new Exception("unhandled scope type");
+    }
   }
 
   CodeGenerator codeGen;

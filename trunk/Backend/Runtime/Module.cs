@@ -19,9 +19,7 @@ public class Module : Boa.AST.Snippet, IHasAttributes
   public void __delattr__(string key) { __dict__.Remove(key); }
   public object __getattr__(string name)
   { if(__dict__.Contains(name)) return __dict__[name]; // TODO: eliminate double lookup
-    object ret = builtins.__getattr__(name);
-    if(ret==Ops.Missing) throw Ops.AttributeError("no such name '{0}'", name);
-    return ret;
+    return builtins.__getattr__(name);
   }
   public void __setattr__(string key, object value) { __dict__[key] = value; }
   #endregion

@@ -113,6 +113,7 @@ public sealed class Ops
   public static object Add(object a, object b)
   { if(a is int && b is int) return (int)a+(int)b;
     if(a is double && b is double) return (double)a+(double)b;
+    if(a is string && b is string) return (string)a+(string)b;
     throw TypeError("unsupported operand type(s) for +: '{0}' and '{1}'",
                     GetDynamicType(a).__name__, GetDynamicType(b).__name__);
   }
@@ -336,7 +337,7 @@ public sealed class Ops
   public static void Import(Module module, string[] names, string[] asNames)
   { for(int i=0; i<names.Length; i++)
     { string dname = asNames[i]!=null ? asNames[i] : names[i].IndexOf('.')==-1 ? names[i] : names[i].Split('.')[0];
-      module.__setattr__(dname, Importer.ImportTop(names[i]));
+      module.__setattr__(dname, asNames[i]==null ? Importer.ImportTop(names[i]) : Importer.Import(names[i]));
     }
   }
 
@@ -349,14 +350,24 @@ public sealed class Ops
     if(names[0]=="*") ImportStar(module, moduleName);
     else
     { IHasAttributes mod = (IHasAttributes)Importer.Import(moduleName);
+      ISequence exports = mod.__getattr__("__all__") as ISequence;
+      if(exports==null && mod is Module) return;
       for(int i=0; i<names.Length; i++)
-        module.__setattr__(asNames[i]==null ? names[i] : asNames[i], mod.__getattr__(names[i]));
+        if(exports==null || exports.__contains__(names[i]))
+          module.__setattr__(asNames[i]==null ? names[i] : asNames[i], mod.__getattr__(names[i]));
     }
   }
 
   public static void ImportStar(Module module, string moduleName)
   { IHasAttributes mod = (IHasAttributes)Importer.Import(moduleName);
-    foreach(string name in mod.__attrs__()) module.__setattr__(name, mod.__getattr__(name));
+    ISequence exports = mod.__getattr__("__all__") as ISequence;
+    if(exports==null && mod is Module) return;
+    if(exports==null) foreach(string name in mod.__attrs__()) module.__setattr__(name, mod.__getattr__(name));
+    else
+      for(int i=0,len=exports.__len__(); i<len; i++)
+      { string name = (string)exports.__getitem__(i);
+        module.__setattr__(name, mod.__getattr__(name));
+      }
   }
 
   public static IndexErrorException IndexError(string format, params object[] args)

@@ -13,7 +13,7 @@ public class ReflectedPackage : IHasAttributes
   public List __attrs__() { return __dict__.keys(); }
   public object __getattr__(string key)
   { if(__dict__.Contains(key)) return __dict__[key]; // TODO: eliminate double lookup
-    throw Ops.AttributeError("namespace '{0}' does not contain '{1}'", __name__, key);
+    return Ops.Missing;
   }
   public void __setattr__(string key, object value) { __dict__[key]=value; }
   public void __delattr__(string key) { __dict__.Remove(key); }
@@ -79,9 +79,9 @@ public class ReflectedPackage : IHasAttributes
 
   static void Initialize()
   { if(!initialized)
-    { LoadAssemblyByName("mscorlib", false);
+    { initialized=true;
+      LoadAssemblyByName("mscorlib", false);
       LoadAssemblyByName("System", false);
-      initialized=true;
     }
   }
 
