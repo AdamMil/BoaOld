@@ -50,8 +50,7 @@ public sealed class ModuleGenerator
     try
     { TypeGenerator tg = ag.DefineType(TypeAttributes.Public|TypeAttributes.Sealed, name, typeof(Runtime.Module));
 
-      CodeGenerator icg = tg.DefineMethod(MethodAttributes.Virtual|MethodAttributes.Public|MethodAttributes.HideBySig,
-                                          "Run", typeof(void), new Type[] { typeof(Frame) });
+      CodeGenerator icg = tg.DefineMethodOverride(typeof(Runtime.Module).GetMethod("Run"), true);
       FrameNamespace ns = new FrameNamespace(tg, icg);
       icg.Namespace = ns;
       icg.ILG.Emit(OpCodes.Ldarg_0);

@@ -77,8 +77,16 @@ public class TypeGenerator
     return new CodeGenerator(this, mb, mb.GetILGenerator());
   }
 
-  public CodeGenerator DefineMethodOverride(MethodInfo baseMethod)
-  { MethodAttributes attrs = baseMethod.Attributes & ~MethodAttributes.Abstract;
+  public CodeGenerator DefineMethodOverride(Type type, string name) { return DefineMethodOverride(type, name, false); }
+  public CodeGenerator DefineMethodOverride(Type type, string name, bool final)
+  { return DefineMethodOverride(type.GetMethod(name, BindingFlags.Instance|BindingFlags.NonPublic|BindingFlags.Public),
+                                final);
+  }
+  public CodeGenerator DefineMethodOverride(MethodInfo baseMethod) { return DefineMethodOverride(baseMethod, false); }
+  public CodeGenerator DefineMethodOverride(MethodInfo baseMethod, bool final)
+  { MethodAttributes attrs = baseMethod.Attributes & ~(MethodAttributes.Abstract|MethodAttributes.NewSlot) |
+                             MethodAttributes.HideBySig;
+    if(final) attrs |= MethodAttributes.Final;
     MethodBuilder mb = TypeBuilder.DefineMethod(baseMethod.Name, attrs, baseMethod.ReturnType,
                                                 GetParamTypes(baseMethod.GetParameters()));
     // TODO: figure out how to use this properly

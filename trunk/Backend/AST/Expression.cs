@@ -537,8 +537,7 @@ public class GeneratorExpression : ListGenExpression
   public override void Emit(CodeGenerator cg)
   { TypeGenerator tg = cg.TypeGenerator.DefineNestedType(TypeAttributes.Sealed, "ge$f"+Misc.NextIndex,
                                                          typeof(Generator));
-    CodeGenerator nc = tg.DefineMethod(MethodAttributes.Virtual|MethodAttributes.Family,
-                                       "InnerNext", typeof(bool), new Type[] { Misc.TypeOfObjectRef });
+    CodeGenerator nc = tg.DefineMethodOverride(typeof(Generator), "InnerNext", true);
     Label yield = nc.ILG.DefineLabel();
     Name[] args = new Name[1] { new Name("genarg$", Scope.Local) };
     Slot argslot;

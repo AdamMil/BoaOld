@@ -71,7 +71,7 @@ public class CodeGenerator
 
   public void EmitCall(ConstructorInfo ci) { ILG.Emit(OpCodes.Call, ci); }
   public void EmitCall(MethodInfo mi)
-  { if(mi.IsVirtual) ILG.Emit(OpCodes.Callvirt, mi);
+  { if(mi.IsVirtual && !mi.DeclaringType.IsSealed && !mi.IsFinal) ILG.Emit(OpCodes.Callvirt, mi);
     else ILG.Emit(OpCodes.Call, mi);
   }
   public void EmitCall(Type type, string method) { EmitCall(type.GetMethod(method)); }
