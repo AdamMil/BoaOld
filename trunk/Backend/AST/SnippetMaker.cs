@@ -36,7 +36,8 @@ public class SnippetMaker
 
   public static void DumpAssembly()
   { Assembly.Save();
-    Assembly = new AssemblyGenerator("snippets"+assCount, "snippets"+Misc.NextIndex+".dll");
+    string bn = "snippets"+Misc.NextIndex;
+    Assembly = new AssemblyGenerator(bn, bn+".dll");
   }
 
   public static Snippet Generate(Statement body) { return Generate(body, "code_"+Misc.NextIndex); }

@@ -33,8 +33,8 @@ public class AssemblyGenerator
   public AssemblyGenerator(string moduleName, string outFileName, bool debug)
   { AssemblyName an = new AssemblyName();
     an.Name = moduleName;
-    Assembly = AppDomain.CurrentDomain.DefineDynamicAssembly(an, AssemblyBuilderAccess.RunAndSave, null, null, null,
-                                                             true);
+    Assembly = AppDomain.CurrentDomain
+                 .DefineDynamicAssembly(an, AssemblyBuilderAccess.RunAndSave, null, null, null, null, null, true);
     Module   = Assembly.DefineDynamicModule(outFileName, outFileName, debug);
     Symbols  = debug ? Module.DefineDocument(outFileName, Guid.Empty, Guid.Empty, SymDocumentType.Text) : null;
     OutFileName = outFileName;
