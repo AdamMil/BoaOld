@@ -1007,7 +1007,7 @@ public class RaiseStatement : Statement
       cg.ILG.MarkLabel(bad);
       cg.ILG.Emit(OpCodes.Pop);
       cg.EmitString("exceptions must be derived from System.Exception");
-      cg.EmitNew(typeof(TypeErrorException));
+      cg.EmitNew(typeof(TypeErrorException), new Type[] { typeof(string) });
       cg.ILG.Emit(OpCodes.Throw);
     }
   }

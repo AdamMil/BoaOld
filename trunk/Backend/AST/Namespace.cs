@@ -48,19 +48,41 @@ public abstract class Namespace
 
 #region FieldNamespace
 public class FieldNamespace : Namespace
-{ public FieldNamespace(Namespace parent, string prefix, TypeGenerator tg) : base(parent)
-  { this.tg=tg; Prefix=prefix;
+{ public FieldNamespace(Namespace parent, string prefix, CodeGenerator cg) : base(parent)
+  { this.cg=cg; Prefix=prefix;
   }
-  public FieldNamespace(Namespace parent, string prefix, TypeGenerator tg, Slot instance)
-    : base(parent) { this.tg=tg; this.instance=instance; Prefix=prefix; }
+  public FieldNamespace(Namespace parent, string prefix, CodeGenerator cg, Slot instance)
+    : base(parent) { this.cg=cg; this.instance=instance; Prefix=prefix; }
   
   public override Slot AllocTemp(Type type)
-  { return new FieldSlot(instance, tg.TypeBuilder.DefineField("temp$"+count++, type, FieldAttributes.Public));
+  { return new FieldSlot(instance, cg.TypeGenerator.TypeBuilder.DefineField("temp$"+count++, type,
+                                                                            FieldAttributes.Public));
+  }
+
+  public override void DeleteSlot(Name name)
+  { if(name.Scope==Scope.Global) // TODO: handle Free variables here?
+    { Namespace par = Parent;
+      while(par!=null && !(par is FrameNamespace)) par = par.Parent;
+      if(par==null) throw new InvalidOperationException("There is no FrameNamespace in the hierachy");
+      par.DeleteSlot(name);
+    }
+    else
+    { cg.ILG.Emit(OpCodes.Ldnull);
+      GetSlotForSet(name).EmitSet(cg);
+    }
   }
 
   protected override Slot MakeSlot(Name name)
-  { FieldInfo info = tg.TypeBuilder.DefineField(Prefix+name.String, typeof(object), FieldAttributes.Public);
-    return new FieldSlot(instance, info);
+  { if(name.Scope==Scope.Global)
+    { Namespace par = Parent;
+      while(par!=null && !(par is FrameNamespace)) par = par.Parent;
+      if(par==null) throw new InvalidOperationException("There is no FrameNamespace in the hierachy");
+      return par.GetGlobalSlot(name);
+    }
+    else
+    { return new FieldSlot(instance, cg.TypeGenerator.TypeBuilder.DefineField(Prefix+name.String, typeof(object),
+                                                                              FieldAttributes.Public));
+    }
   }
 
   public override void SetArgs(Name[] names, int offset, MethodBuilder mb)
@@ -69,7 +91,7 @@ public class FieldNamespace : Namespace
 
   public string Prefix;
 
-  TypeGenerator tg;
+  CodeGenerator cg;
   Slot instance;
   
   static int count;
