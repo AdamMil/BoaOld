@@ -86,7 +86,7 @@
                 />
                 <Reference
                     Name = "System.XML"
-                    AssemblyName = "System.XML"
+                    AssemblyName = "System.Xml"
                     HintPath = "..\..\..\WINDOWS\Microsoft.NET\Framework\v1.1.4322\System.XML.dll"
                 />
             </References>
@@ -169,11 +169,23 @@
                     BuildAction = "Compile"
                 />
                 <File
+                    RelPath = "lib\base64.boa"
+                    BuildAction = "None"
+                />
+                <File
                     RelPath = "lib\ftplib.boa"
                     BuildAction = "None"
                 />
                 <File
+                    RelPath = "lib\hmac.boa"
+                    BuildAction = "None"
+                />
+                <File
                     RelPath = "lib\os.boa"
+                    BuildAction = "None"
+                />
+                <File
+                    RelPath = "lib\poplib.boa"
                     BuildAction = "None"
                 />
                 <File
@@ -182,7 +194,15 @@
                     BuildAction = "None"
                 />
                 <File
+                    RelPath = "lib\rfc822.boa"
+                    BuildAction = "None"
+                />
+                <File
                     RelPath = "lib\socket.boa"
+                    BuildAction = "None"
+                />
+                <File
+                    RelPath = "lib\string.boa"
                     BuildAction = "None"
                 />
                 <File
@@ -197,6 +217,11 @@
                 />
                 <File
                     RelPath = "Modules\_socket.cs"
+                    SubType = "Code"
+                    BuildAction = "Compile"
+                />
+                <File
+                    RelPath = "Modules\_string.cs"
                     SubType = "Code"
                     BuildAction = "Compile"
                 />
@@ -217,11 +242,6 @@
                 />
                 <File
                     RelPath = "Modules\operator.cs"
-                    SubType = "Code"
-                    BuildAction = "Compile"
-                />
-                <File
-                    RelPath = "Modules\string.cs"
                     SubType = "Code"
                     BuildAction = "Compile"
                 />

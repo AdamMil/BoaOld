@@ -41,7 +41,8 @@ sys.path[1] = "c:/code/Boa/Backend/lib";
 
     top.__setattr__("__builtins__", Importer.Import("__builtin__"));
     top.__setattr__("__name__", "__main__");
-    
+    Importer.Import("string");
+
     while(true)
     { try
       { Statement stmt=null;

@@ -333,7 +333,13 @@ public class AssignStatement : Statement
   public AssignStatement(Expression[] lhs, Expression rhs) { LHS=lhs; RHS=rhs; }
 
   public override void Emit(CodeGenerator cg)
-  { bool leftAllTups = RHS is TupleExpression;
+  { if(Op!=null)
+    { new BinaryOpExpression(Op, LHS[0], RHS).Emit(cg);
+      LHS[0].EmitSet(cg);
+      return;
+    }
+
+    bool leftAllTups = RHS is TupleExpression;
     if(leftAllTups) foreach(Expression e in LHS) if(!(e is TupleExpression)) { leftAllTups=false; break; }
     if(leftAllTups) // RHS is TupleExpression
     { TupleExpression rhs = (TupleExpression)RHS;
@@ -543,6 +549,7 @@ public class AssignStatement : Statement
 
   public Expression[] LHS;
   public Expression   RHS;
+  public BinaryOperator Op;
 }
 #endregion
 

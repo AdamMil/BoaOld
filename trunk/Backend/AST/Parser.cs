@@ -31,7 +31,8 @@ using Boa.Runtime;
 // TODO: implement sets
 // TODO: try to make precedence match python's where it makes sense
 // TODO: support unicode string parsing
-// FIXME: make this parse:   func(lambda: print)
+// FIXME: make this parse:   (lambda: print)
+// TODO: disallow assignment to constants
 
 namespace Boa.AST
 {
@@ -383,8 +384,15 @@ public class Parser
     if(token==Token.Assign)
     { ArrayList list = new ArrayList();
       AssignStatement ass = (AssignStatement)AP(new AssignStatement());
+      ass.Op = (BinaryOperator)value;
+
       while(TryEat(Token.Assign))
-      { if(!(lhs is NameExpression || lhs is AttrExpression || lhs is TupleExpression || lhs is IndexExpression))
+      { if(ass.Op!=null)
+        { if(list.Count>0) SyntaxError("can't chain in-place assignment");
+          if(!(lhs is NameExpression || lhs is AttrExpression || lhs is IndexExpression))
+            SyntaxError("can't do in-place assignment with {0}", lhs.GetType());
+        }
+        else if(!(lhs is NameExpression || lhs is AttrExpression || lhs is TupleExpression || lhs is IndexExpression))
           SyntaxError("can't assign to {0}", lhs.GetType());
         list.Add(lhs);
         lhs = ParseExpression();
@@ -950,10 +958,13 @@ public class Parser
     while(true)
     { if(token==Token.EOL)
       { indent=0; c=ReadChar();
-        while(c!=0 && char.IsWhiteSpace(c))
-        { if(c=='\n') indent=0; else indent++;
-          c=ReadChar();
-        }
+        if(wantEOL)
+          while(c!=0 && char.IsWhiteSpace(c))
+          { if(c=='\n') indent=0;
+            else indent++;
+            c=ReadChar();
+          }
+        else while(c!=0 && char.IsWhiteSpace(c)) c=ReadChar();
       }
       else do c=ReadChar(); while(c!='\n' && c!=0 && char.IsWhiteSpace(c));
 
@@ -1098,28 +1109,60 @@ public class Parser
           else { lastChar = c; return Token.LogNot; }
         case '&':
           c = ReadChar();
-          if(c=='&') return Token.LogAnd;
+          if(c=='&')
+          { c = ReadChar();
+            if(c=='=') { value=BinaryOperator.LogicalAnd; return Token.Assign; }
+            lastChar = c; return Token.LogAnd;
+          }
+          if(c=='=') { value=BinaryOperator.BitwiseAnd; return Token.Assign; }
           lastChar = c; return Token.BitAnd;
         case '|':
           c = ReadChar();
-          if(c=='|') return Token.LogOr;
+          if(c=='|')
+          { c = ReadChar();
+            if(c=='=') { value=BinaryOperator.LogicalOr; return Token.Assign; }
+            lastChar = c; return Token.LogOr;
+          }
+          if(c=='=') { value=BinaryOperator.BitwiseOr; return Token.Assign; }
           lastChar = c; return Token.BitOr;
-        case '^': return Token.BitXor;
-        case '+': return Token.Plus;
-        case '-': return Token.Minus;
+        case '^':
+          c = ReadChar();
+          if(c=='=') { value=BinaryOperator.BitwiseAnd; return Token.Assign; }
+          lastChar = c; return Token.BitXor;
+        case '+':
+          c = ReadChar();
+          if(c=='=') { value=BinaryOperator.Add; return Token.Assign; }
+          lastChar = c; return Token.Plus;
+        case '-':
+          c = ReadChar();
+          if(c=='=') { value=BinaryOperator.Subtract; return Token.Assign; }
+          lastChar = c; return Token.Minus;
         case '*':
           c = ReadChar();
-          if(c=='*') return Token.Power;
+          if(c=='=') { value=BinaryOperator.Multiply; return Token.Assign; }
+          if(c=='*')
+          { c = ReadChar();
+            if(c=='=') { value=BinaryOperator.Power; return Token.Assign; }
+            lastChar = c; return Token.Power;
+          }
           lastChar = c; return Token.Asterisk;
         case '/':
           c = ReadChar();
+          if(c=='/')
+          { c = ReadChar();
+            if(c=='=') { value=BinaryOperator.FloorDivide; return Token.Assign; }
+            lastChar = c; return Token.FloorDivide;
+          }
+          if(c=='=') { value=BinaryOperator.Divide; return Token.Assign; }
           if(c=='*')
           { do c = ReadChar(); while(c!=0 && (c!='*' || (c=ReadChar())!='/'));
             break;
           }
-          if(c=='/') return Token.FloorDivide;
           lastChar = c; return Token.Slash;
-        case '%': return Token.Percent;
+        case '%':
+          c = ReadChar();
+          if(c=='=') { value=BinaryOperator.Modulus; return Token.Assign; }
+          lastChar = c; return Token.Percent;
         case '~': return Token.BitNot;
         case ':': return Token.Colon;
         case '`': return Token.BackQuote;
