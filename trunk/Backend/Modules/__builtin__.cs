@@ -601,31 +601,24 @@ of object, a help page on the object is generated.")]
     else if(o is ReflectedEvent)
     { ReflectedEvent re = (ReflectedEvent)o;
       Console.WriteLine("'{0}' is an event that takes a '{1}' object",
-                        re.info.Name, typeName(re.info.EventHandlerType));
+                        re.info.Name, TypeName(re.info.EventHandlerType));
     }
     else if(o is ReflectedField)
     { ReflectedField rf = (ReflectedField)o;
-      Console.WriteLine("'{0}' is a field of type '{1}'", rf.info.Name, typeName(rf.info.FieldType));
+      Console.WriteLine("'{0}' is a field of type '{1}'", rf.info.Name, TypeName(rf.info.FieldType));
     }
     else if(o is ReflectedMethodBase)
     { ReflectedMethodBase rm = (ReflectedMethodBase)o;
       foreach(System.Reflection.MethodBase mb in rm.sigs)
       { Console.Write(rm.__name__);
         Console.Write('(');
-        bool first=true;
-        foreach(System.Reflection.ParameterInfo pi in mb.GetParameters())
-        { if(!first) Console.Write(", ");
-          Console.Write("{0} {1}{2}", typeName(pi.ParameterType),
-                        pi.IsDefined(typeof(ParamArrayAttribute), false) ? "*" : "", pi.Name);
-          if(pi.IsOptional) Console.Write("="+Ops.Repr(pi.DefaultValue));
-          first=false;
-        }
+        WriteParameters(mb.GetParameters());
         Console.Write(mb.IsStatic ? ")" : ") (method)");
         if(!mb.IsConstructor)
         { Type ret = ((System.Reflection.MethodInfo)mb).ReturnType;
-          if(ret!=typeof(void)) Console.WriteLine(" -> "+typeName(ret));
+          if(ret!=typeof(void)) Console.Write(" -> "+TypeName(ret));
         }
-        else Console.WriteLine();
+        Console.WriteLine();
       }
     }
     else if(o is ReflectedProperty)
@@ -650,6 +643,15 @@ of object, a help page on the object is generated.")]
         { Console.Write(names[i].PadRight(nameLen));
           Console.WriteLine(Ops.ToInt(values.GetValue(i)));
         }
+      }
+      else if(type.IsSubclassOf(typeof(Delegate)))
+      { System.Reflection.MethodInfo mi = type.GetMethod("Invoke");
+        Console.Write(type.Name);
+        Console.Write('(');
+        WriteParameters(mi.GetParameters());
+        Console.Write(") (delegate)");
+        if(mi.ReturnType!=typeof(void)) Console.Write(" -> "+TypeName(mi.ReturnType));
+        Console.WriteLine();
       }
       else goto noHelp;
     }
@@ -1150,13 +1152,24 @@ runtime.")]
   public static readonly ReflectedType ZeroDivisionError = ReflectedType.FromType(typeof(DivideByZeroException));
   #endregion
   
-  static string typeName(Type type)
-  { if(type.IsArray) return typeName(type.GetElementType())+"[]";
+  static string TypeName(Type type)
+  { if(type.IsArray) return TypeName(type.GetElementType())+"[]";
     if(type==typeof(object)) return "object";
     if(type==typeof(int)) return "int";
     if(type==typeof(string)) return "str";
     if(type==typeof(char)) return "char";
     return type.FullName;
+  }
+
+  static void WriteParameters(System.Reflection.ParameterInfo[] parms)
+  { bool sep=false;
+    foreach(System.Reflection.ParameterInfo pi in parms)
+    { if(sep) Console.Write(", ");
+      else sep=true;
+      Console.Write("{0} {1}{2}", TypeName(pi.ParameterType),
+                    pi.IsDefined(typeof(ParamArrayAttribute), false) ? "*" : "", pi.Name);
+      if(pi.IsOptional) Console.Write("="+Ops.Repr(pi.DefaultValue));
+    }
   }
 }
   

@@ -54,7 +54,8 @@ public sealed class sys
 
   public static readonly List argv    = new List();
   public static readonly Tuple builtin_module_names =
-    new Tuple("__builtin__", "codecs", "operator", "os", "re", "string", "struct", "sys");
+    new Tuple("__builtin__", "binascii", "bisect", "codecs", "dotnet", "dotnetpath", "math", "md5",
+              "operator", "os", "random", "re", "socket", "string", "struct", "sys", "time", "types");
 
   #if BIGENDIAN
   public static string byteorder = "big";

@@ -68,6 +68,9 @@ public sealed class _socket
 
     public socket(Socket socket) { Socket=socket; }
 
+    public bool connected { get { return Socket.Connected; } }
+    public int waiting { get { return Socket.Available; } }
+
     public Tuple accept()
     { try
       { socket s = new socket(Socket.Accept());
