@@ -18,8 +18,6 @@ public class SnippetMaker
   public static FrameCode Generate(Statement body) { return Generate(body, "code_"+typeCount++); }
   public static FrameCode Generate(Statement body, string typeName)
   { TypeGenerator tg = Assembly.DefineType(typeName, typeof(FrameCode));
-
-    tg.AddModuleSlot(typeof(Boa.Runtime.Module));
     tg.TypeBuilder.DefineDefaultConstructor(MethodAttributes.Public);
 
     CodeGenerator cg = tg.DefineMethod(MethodAttributes.Public|MethodAttributes.Virtual, "Run",

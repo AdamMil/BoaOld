@@ -59,9 +59,11 @@ public class CodeGenerator
 
   public void EmitFieldGet(Type type, string name) { EmitFieldGet(type.GetField(name)); }
   public void EmitFieldGet(FieldInfo field) { ILG.Emit(field.IsStatic ? OpCodes.Ldsfld : OpCodes.Ldfld, field); }
+  public void EmitFieldGetAddr(Type type, string name) { EmitFieldGetAddr(type.GetField(name)); }
   public void EmitFieldGetAddr(FieldInfo field)
   { ILG.Emit(field.IsStatic ? OpCodes.Ldsflda : OpCodes.Ldflda, field);
   }
+  public void EmitFieldSet(Type type, string name) { EmitFieldSet(type.GetField(name)); }
   public void EmitFieldSet(FieldInfo field) { ILG.Emit(field.IsStatic ? OpCodes.Stsfld : OpCodes.Stfld, field); }
 
   public void EmitGet(Name name) { Namespace.GetSlotForGet(name).EmitGet(this); }
@@ -95,8 +97,6 @@ public class CodeGenerator
 
   // TODO: reenable this
   //public void EmitLine(int line) { ILG.MarkSequencePoint(TypeGenerator.Document, line, 0, line+1, 0); }
-
-  public void EmitModuleInstance() { TypeGenerator.ModuleSlot.EmitGet(this); }
 
   public void EmitNew(Type type) { ILG.Emit(OpCodes.Newobj, type.GetConstructor(Type.EmptyTypes)); }
   public void EmitNew(Type type, Type[] paramTypes) { ILG.Emit(OpCodes.Newobj, type.GetConstructor(paramTypes)); }
@@ -150,7 +150,8 @@ public class CodeGenerator
 
   public void FreeLocalTemp(Slot slot) { localTemps.Add(slot); }
 
-  public void SetArgs(Name[] names) { Namespace.SetArgs(names, MethodBuilder); }
+  public void SetArgs(Name[] names) { Namespace.SetArgs(names, 0, MethodBuilder); }
+  public void SetArgs(Name[] names, int offset) { Namespace.SetArgs(names, offset, MethodBuilder); }
 
   public Namespace Namespace;
 

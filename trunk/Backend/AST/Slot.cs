@@ -45,20 +45,44 @@ public class ArgSlot : Slot
 
 #region ClosedSlot
 public class ClosedSlot : Slot
-{ public ClosedSlot(Name name, CodeGenerator cg) { throw Ops.NotImplemented("ClosedSlot"); }
-  public ClosedSlot(Name name, CodeGenerator cg, Slot source) { throw Ops.NotImplemented("ClosedSlot"); }
-  
-  public override Type Type { get { throw Ops.NotImplemented("ClosedSlot"); } }
+{ public ClosedSlot(Slot slot) { Storage=slot; }
+  public ClosedSlot(CodeGenerator cg, string name)
+  { Storage = new LocalSlot(cg.ILG.DeclareLocal(typeof(ClosedVar)), name);
+    cg.EmitString(name);
+    cg.EmitNew(typeof(ClosedVar), new Type[] { typeof(string) });
+    Storage.EmitSet(cg);
+  }
 
-  public override void EmitGet(CodeGenerator cg) { throw Ops.NotImplemented("ClosedSlot"); }
-  public override void EmitGetAddr(CodeGenerator cg) { throw Ops.NotImplemented("ClosedSlot"); }
-  public override void EmitSet(CodeGenerator cg) { throw Ops.NotImplemented("ClosedSlot"); }
+  public override Type Type { get { return typeof(ClosedVar); } }
+
+  public override void EmitGet(CodeGenerator cg)
+  { Storage.EmitGet(cg);
+    cg.EmitFieldGet(typeof(ClosedVar), "Value");
+  }
+  public override void EmitGetAddr(CodeGenerator cg)
+  { Storage.EmitGet(cg);
+    cg.EmitFieldGetAddr(typeof(ClosedVar), "Value");
+  }
+  public override void EmitSet(CodeGenerator cg)
+  { Slot temp = cg.AllocLocalTemp(typeof(object));
+    temp.EmitSet(cg);
+    EmitSet(cg, temp);
+    cg.FreeLocalTemp(temp);
+  }
+  public override void EmitSet(CodeGenerator cg, Slot val)
+  { Storage.EmitGet(cg);
+    val.EmitGet(cg);
+    cg.EmitFieldSet(typeof(ClosedVar), "Value");
+  }
+
+  public Slot Storage;
 }
 #endregion
 
 #region LocalSlot
 public class LocalSlot : Slot
-{ public LocalSlot(LocalBuilder lb) { builder = lb; }
+{ public LocalSlot(LocalBuilder lb) { builder = lb; } // TODO: reenable this ---v
+  public LocalSlot(LocalBuilder lb, string name) { builder = lb; /*lb.SetLocalSymInfo(name);*/ }
   
   public override Type Type { get { return builder.LocalType; } }
 

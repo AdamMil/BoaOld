@@ -1,4 +1,4 @@
-#define COMPILED
+//#define COMPILED
 
 using System;
 using Boa.AST;
@@ -12,27 +12,29 @@ public class Text
   { Module top = new Module();
     Frame topFrame = new Frame(top);
 
-    System.IO.Stream stdin = Console.OpenStandardInput();
-    while(true)
-    { try
-      { Console.Write(">>> ");
+System.IO.Stream stdin = Console.OpenStandardInput();
 string source = 
-/*@"
+@"
 def makeAdder(base):
     def add(n): return base+n
     return add
-a = makeAdder(4)
-b = makeAdder(6)
-print a(3), b(3)
-";*/
-@"
-def outer():
-  a = 5
-  def middle():
-    def inner(): print a
 ";
+Statement glob = Parser.FromString(source).Parse();
+#if COMPILED
+glob.PostProcessForCompile();
+SnippetMaker.Generate(glob).Run(topFrame);
+#else
+glob.PostProcessForInterpret();
+glob.Execute(topFrame);
+#endif
+
+    while(true)
+    { try
+      { Console.Write(">>> ");
 //        Statement stmt = Parser.FromStream(stdin).ParseStatement();
-        Statement stmt = Parser.FromString(source).Parse();
+        string line = Console.ReadLine();
+        if(line=="quit" || line=="exit") break;
+        Statement stmt = Parser.FromString(line).Parse();
         #if COMPILED
         stmt.PostProcessForCompile();
         FrameCode code = SnippetMaker.Generate(stmt);

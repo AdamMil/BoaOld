@@ -11,25 +11,42 @@ using Boa.AST;
 namespace Boa.Runtime
 {
 
-public delegate object CallTarget(params object[] args);
-
 public abstract class Function : ICallable
 { public Function(string name, Parameter[] parms) { Name=name; Parameters=parms; }
 
   public abstract object Call(params object[] parms);
-  
+
+  public override string ToString() { return string.Format("<function '{0}'>", Name); }
+
   public string Name;
   public Parameter[] Parameters;
 }
 
-public class CompiledFunction : Function
-{ public CompiledFunction(string name, Parameter[] parms, CallTarget target)
-    : base(name, parms) { Target=target; }
+#region Compiled functions
+public delegate object CallTargetN(params object[] args);
+public delegate object CallTargetFN(CompiledFunction func, params object[] args);
+
+public abstract class CompiledFunction : Function
+{ public CompiledFunction(string name, Parameter[] parms, ClosedVar[] closed) : base(name, parms) { Closed=closed; }
+  public ClosedVar[] Closed;
+}
+
+public class CompiledFunctionN : CompiledFunction
+{ public CompiledFunctionN(string name, Parameter[] parms, ClosedVar[] closed, CallTargetN target)
+    : base(name, parms, closed) { Target=target; }
 
   public override object Call(params object[] args) { return Target(args); }
-
-  public CallTarget Target;
+  CallTargetN Target;
 }
+
+public class CompiledFunctionFN : CompiledFunction
+{ public CompiledFunctionFN(string name, Parameter[] parms, ClosedVar[] closed, CallTargetFN target)
+    : base(name, parms, closed) { Target=target; }
+
+  public override object Call(params object[] args) { return Target(this, args); }
+  CallTargetFN Target;
+}
+#endregion
 
 public class InterpretedFunction : Function
 { public InterpretedFunction(Frame frame, string name, Parameter[] parms, Statement body)
