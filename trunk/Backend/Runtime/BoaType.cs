@@ -1,18 +1,33 @@
 using System;
 using System.Collections;
+using System.Collections.Specialized;
 
 namespace Boa.Runtime
 {
 
+[AttributeUsage(AttributeTargets.Class|AttributeTargets.Interface|AttributeTargets.Struct, Inherited=false)]
+public class BoaTypeAttribute : Attribute
+{ public BoaTypeAttribute(string name) { Name=name; }
+  public string Name;
+}
+
 public abstract class BoaType : DynamicType, IDynamicObject, ICallable, IHasAttributes
-{ public BoaType(Type type) { this.type = type; }
+{ public BoaType(Type type)
+  { this.type=type; dict=new Dict();
+
+    if(type==typeof(object)) __name__ = "object";
+    else
+    { BoaTypeAttribute attr = (BoaTypeAttribute)Attribute.GetCustomAttribute(type, typeof(BoaTypeAttribute), false);
+      __name__ = attr==null ? type.FullName : attr.Name;
+    }
+  }
 
   #region ICallable
-  public virtual object Call(params object[] args) { throw new NotImplementedException(); }
+  public abstract object Call(params object[] args);
   #endregion
 
   #region IDynamicObject
-  public virtual DynamicType GetDynamicType() { throw new NotImplementedException(); }
+  public abstract DynamicType GetDynamicType();
   #endregion
 
   #region IHasAttributes
@@ -60,8 +75,7 @@ public abstract class BoaType : DynamicType, IDynamicObject, ICallable, IHasAttr
   protected void RawSetSlot(string name, object value) { dict[name] = value; }
 
   protected Dict dict;
-
-  Type type;
+  protected Type type;
 }
 
 } // namespace Boa.Runtime

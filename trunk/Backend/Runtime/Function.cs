@@ -8,7 +8,7 @@ namespace Boa.Runtime
 public abstract class Function : ICallable
 { public Function(string name, Parameter[] parms) { Name=name; Parameters=parms; }
 
-  public abstract object Call(params object[] parms);
+  public abstract object Call(params object[] args);
 
   public override string ToString() { return string.Format("<function '{0}'>", Name); }
 
@@ -46,9 +46,9 @@ public class InterpretedFunction : Function
 { public InterpretedFunction(Frame frame, string name, Parameter[] parms, Name[] globals, Statement body)
     : base(name, parms) { Frame=frame; Body=body; }
 
-  public override object Call(params object[] parms)
+  public override object Call(params object[] args)
   { Frame localFrame = new Frame(Frame);
-    for(int i=0; i<Parameters.Length; i++) localFrame.Set(Parameters[i].Name.String, parms[i]);
+    for(int i=0; i<Parameters.Length; i++) localFrame.Set(Parameters[i].Name.String, args[i]);
     if(Globals!=null) for(int i=0; i<Globals.Length; i++) localFrame.MarkGlobal(Globals[i].String);
     try { Body.Execute(localFrame); }
     catch(ReturnException e) { return e.Value; }

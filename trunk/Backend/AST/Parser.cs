@@ -216,8 +216,8 @@ public class Parser
   Statement ParseExprStmt()
   { Expression lhs = ParseExpression();
     if(TryEat(Token.Assign))
-    { if(!(lhs is NameExpression)) throw Ops.SyntaxError("can't assign to {0}", lhs.GetType());
-      return new AssignStatement(lhs, ParseExpression());
+    { if(lhs is NameExpression || lhs is AttrExpression) return new AssignStatement(lhs, ParseExpression());
+      throw Ops.SyntaxError("can't assign to {0}", lhs.GetType());
     }
     else return new ExpressionStatement(lhs);
   }
