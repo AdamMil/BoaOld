@@ -33,6 +33,7 @@ using Boa.Runtime;
 // TODO: support unicode string parsing
 // FIXME: make this parse:   (lambda: print)
 // TODO: disallow assignment to constants
+// TODO: make string parsing more close to python's if possible
 
 namespace Boa.AST
 {
