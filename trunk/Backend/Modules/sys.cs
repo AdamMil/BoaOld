@@ -24,7 +24,7 @@ public sealed class sys
   public static void loadAssemblyFromFile(string filename) { ReflectedPackage.LoadAssemblyFromFile(filename); }
 
   public static readonly object __displayhook__ =
-    new CompiledFunctionN("displayhook", new Parameter[] { new Parameter("value") }, null, new CallTargetN(display));
+    Ops.GenerateFunction("displayhook", new Parameter[] { new Parameter("value") }, new CallTargetN(display));
   public static readonly object __excepthook__; // TODO: implement this
   public static readonly object __stdin__; // TODO: implement this
   public static readonly object __stdout__; // TODO: implement this

@@ -5,6 +5,13 @@ using Boa.AST;
 namespace Boa.Runtime
 {
 
+public struct CallArg
+{ public CallArg(object value, object type) { Value=value; Type=type; }
+  public object Value, Type;
+  
+  public static readonly object DictType="<dict>", ListType="<list>";
+}
+
 public abstract class Function : IFancyCallable
 { public Function(string name, string[] names, object[] defaults, bool list, bool dict, int required)
   { Name=name; ParamNames=names; Defaults=defaults; HasList=list; HasDict=dict; NumRequired=required;
@@ -22,13 +29,44 @@ public abstract class Function : IFancyCallable
   public object[] Defaults;
   public int NumRequired;
   public bool HasList, HasDict;
-  
+
+  protected object[] FixArgs(object[] args)
+  { if(args.Length<NumRequired) throw Ops.TooFewArgs(FuncName, NumRequired, args.Length);
+    if(HasList)
+    { if(!HasDict && ParamNames.Length==1) return new object[] { new Tuple(args) };
+    }
+    else if(args.Length==ParamNames.Length) return args;
+    else if(args.Length>ParamNames.Length) throw Ops.TooManyArgs(FuncName, ParamNames.Length, args.Length);
+
+    object[] newargs = new object[ParamNames.Length];
+    int plen=ParamNames.Length, offset=HasList ? 1 : 0;
+    if(HasDict) newargs[--plen] = new Dict();
+    int pos=plen-offset, ai=Math.Min(pos, args.Length);
+
+    Array.Copy(args, 0, newargs, 0, ai);
+    for(; ai<pos; ai++) newargs[ai] = Defaults[ai-NumRequired];
+
+    if(HasList)
+    { Tuple tup;
+      if(ai>=args.Length) tup = new Tuple();
+      else
+      { object[] items = new object[args.Length-ai];
+        for(int i=0; i<items.Length; i++) items[i] = args[ai+i];
+        tup = new Tuple(items);
+      }
+      newargs[plen-1] = tup;
+    }
+
+    return newargs;
+  }
+
   protected unsafe object[] MakeArgs(object[] positional, string[] names, object[] values)
   { object[] newargs = new object[ParamNames.Length];
     bool* done = stackalloc bool[newargs.Length];
-    List  list = HasList ? new List() : null;
     Dict  dict = HasDict ? new Dict() : null;
     int pi=0, js=0, plen=newargs.Length;
+
+    for(int i=0; i<newargs.Length; i++) done[i] = false;
 
     // do the positional arguments first
     if(positional!=null)
@@ -56,10 +94,16 @@ public abstract class Function : IFancyCallable
       next:;
     }
 
-    if(HasDict) plen--;
+    if(HasDict) newargs[--plen] = dict;
     if(HasList)
-    { for(; pi<positional.Length; pi++) list.append(positional[pi]);
-      plen--;
+    { Tuple tup;
+      if(pi==0) tup = new Tuple(positional==null ? Misc.EmptyArray : positional);
+      else
+      { object[] items = new object[positional.Length-pi];
+        Array.Copy(positional, pi, items, 0, items.Length);
+        tup = new Tuple(items);
+      }
+      newargs[--plen] = tup;
     }
 
     for(pi=0; pi<NumRequired; pi++)
@@ -82,15 +126,12 @@ public abstract class CompiledFunction : Function
   public ClosedVar[] Closed;
 }
 
-public class CompiledFunctionN : CompiledFunction
+public sealed class CompiledFunctionN : CompiledFunction
 { public CompiledFunctionN(string name, string[] names, object[] defaults, bool list, bool dict, int required,
                            ClosedVar[] closed, CallTargetN target)
     : base(name, names, defaults, list, dict, required, closed) { Target=target; }
 
-  public override object Call(params object[] args)
-  { if(args.Length<NumRequired) Ops.TooFewArgs(FuncName, NumRequired, args.Length);
-    return Target(args);
-  }
+  public override object Call(params object[] args) { return Target(FixArgs(args)); }
 
   public override object Call(object[] positional, string[] names, object[] values)
   { return Target(MakeArgs(positional, names, values));
@@ -99,15 +140,12 @@ public class CompiledFunctionN : CompiledFunction
   CallTargetN Target;
 }
 
-public class CompiledFunctionFN : CompiledFunction
+public sealed class CompiledFunctionFN : CompiledFunction
 { public CompiledFunctionFN(string name, string[] names, object[] defaults, bool list, bool dict, int required,
                             ClosedVar[] closed, CallTargetFN target)
     : base(name, names, defaults, list, dict, required, closed) { Target=target; }
 
-  public override object Call(params object[] args)
-  { if(args.Length<NumRequired) Ops.TooFewArgs(FuncName, NumRequired, args.Length);
-    return Target(this, args);
-  }
+  public override object Call(params object[] args) { return Target(this, FixArgs(args)); }
 
   public override object Call(object[] positional, string[] names, object[] values)
   { return Target(this, MakeArgs(positional, names, values));
@@ -117,28 +155,28 @@ public class CompiledFunctionFN : CompiledFunction
 }
 #endregion
 
-public class InterpretedFunction : Function
+public sealed class InterpretedFunction : Function
 { public InterpretedFunction(string name, string[] names, object[] defaults, bool list, bool dict, int required,
                              Name[] globals, Frame frame, Statement body)
     : base(name, names, defaults, list, dict, required) { Globals=globals; Frame=frame; Body=body; }
 
-  public override object Call(params object[] args)
-  { if(args.Length<NumRequired) Ops.TooFewArgs(FuncName, NumRequired, args.Length);
-    Frame localFrame = new Frame(Frame);
-    for(int i=0; i<Parameters.Length; i++) localFrame.Set(names[i], args[i]);
-    if(Globals!=null) for(int i=0; i<Globals.Length; i++) localFrame.MarkGlobal(Globals[i].String);
-    try { Body.Execute(localFrame); }
-    catch(ReturnException e) { return e.Value; }
-    return null;
-  }
-
+  public override object Call(params object[] args) { return DoCall(FixArgs(args)); }
   public override object Call(object[] positional, string[] names, object[] values)
-  { return Call(MakeArgs(positional, names, values));
+  { return DoCall(MakeArgs(positional, names, values));
   }
 
   public Name[] Globals;
   public Frame Frame;
   public Statement Body;
+
+  object DoCall(object[] args)
+  { Frame localFrame = new Frame(Frame);
+    for(int i=0; i<args.Length; i++) localFrame.Set(ParamNames[i], args[i]);
+    if(Globals!=null) for(int i=0; i<Globals.Length; i++) localFrame.MarkGlobal(Globals[i].String);
+    try { Body.Execute(localFrame); }
+    catch(ReturnException e) { return e.Value; }
+    return null;
+  }
 }
 
 } // namespace Boa.Runtime

@@ -10,10 +10,22 @@ public interface IWalker
   bool Walk(Node node);
 }
 
+public enum ArgType { Normal, List, Dict };
 public struct Argument
-{ public Argument(Expression expr) { Expression=expr; }
-  public void ToCode(System.Text.StringBuilder sb) { Expression.ToCode(sb, 0); }
+{ public Argument(Expression expr) { Name=null; Expression=expr; Type=ArgType.Normal; }
+  public Argument(string name, Expression expr) { Name=name; Expression=expr; Type=ArgType.Normal; }
+  public Argument(Expression expr, ArgType type) { Name=null; Expression=expr; Type=type; }
+
+  public void ToCode(System.Text.StringBuilder sb)
+  { if(Name!=null) sb.Append(Name);
+    else if(Type==ArgType.List) sb.Append('*');
+    else if(Type==ArgType.Dict) sb.Append("**");
+    Expression.ToCode(sb, 0);
+  }
+
+  public string Name;
   public Expression Expression;
+  public ArgType Type;
 }
 
 public class ExceptClause : Node
