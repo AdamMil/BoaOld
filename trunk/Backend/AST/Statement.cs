@@ -27,9 +27,6 @@ public abstract class Statement : Node
     { if(node==current)
       { inDef=false;
 
-        Names = new Name[localNames.Count];
-        localNames.Values.CopyTo(Names, 0);
-
         foreach(DefStatement def in innerFuncs)
         { NameDecorator dec = new NameDecorator();
           def.Walk(dec);
@@ -39,7 +36,7 @@ public abstract class Statement : Node
               if(name!=null)
               { if(name.Type==Name.Scope.Local) name.Type=Name.Scope.Closed;
               }
-              else localNames[dname.String] = name;
+              else localNames[dname.String] = dname;
             }
         }
       }
@@ -85,8 +82,6 @@ public abstract class Statement : Node
       }
       return false;
     }
-    
-    public Name[] Names;
     
     Name AddLocal(Name name)
     { Name lname = (Name)localNames[name.String];
