@@ -14,8 +14,11 @@ public abstract class Generator : IEnumerator
   }
 
   public bool MoveNext()
-  { if(state==State.Done || !InnerNext(out current)) { state=State.Done; return false; }
-    state=State.In; return true;
+  { try
+    { if(state==State.Done || !InnerNext(out current)) { state=State.Done; return false; }
+      state=State.In; return true;
+    }
+    catch(Exception) { state=State.Done; throw; }
   }
 
   public void Reset() { throw new NotSupportedException(); }
