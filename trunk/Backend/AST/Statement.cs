@@ -77,7 +77,7 @@ class JumpFinder : IWalker
 { public JumpFinder(string name, Label start, Label end) { this.name=name; this.start=start; this.end=end; }
 
   public void PostWalk(Node node)
-  { if(node is TryStatement) inTry--;
+  { if(node is ExceptionStatement) inTry--;
   }
 
   public bool Walk(Node node)
@@ -96,7 +96,7 @@ class JumpFinder : IWalker
       }
     }
     else if(name==null && (node is WhileStatement || node is ForStatement) || node is DefStatement) return false;
-    else if(node is TryStatement) inTry++;
+    else if(node is ExceptionStatement) inTry++;
     return true;
   }
 
@@ -255,8 +255,9 @@ public abstract class Statement : Node
         else if(node is ForStatement) HandleAssignment(((ForStatement)node).Names);
         else if(node is ListCompExpression)
           foreach(ListCompFor f in ((ListCompExpression)node).Fors) HandleAssignment(f.Names);
-        else if(node is TryStatement)
-        { foreach(ExceptClause ec in ((TryStatement)node).Except) if(ec.Target!=null) HandleAssignment(ec.Target);
+        else if(node is ExceptionStatement)
+        { foreach(ExceptClause ec in ((ExceptionStatement)node).Except)
+            if(ec.Target!=null) HandleAssignment(ec.Target);
         }
         else if(node is ImportStatement)
         { ImportStatement imp = (ImportStatement)node;
@@ -324,7 +325,7 @@ public abstract class Statement : Node
   #endregion
   
   #region TryChecker
-  sealed class TryChecker : IWalker
+  sealed class TryChecker : IWalker // checks for exceptionless 'raise' outside of a try statement
   { public void PostWalk(Node node) { }
 
     public bool Walk(Node node)
@@ -702,8 +703,8 @@ public class DefStatement : Statement
       else if(node is ForStatement) HandleAssignment(((ForStatement)node).Names);
       else if(node is ListCompExpression)
         foreach(ListCompFor f in ((ListCompExpression)node).Fors) HandleAssignment(f.Names);
-      else if(node is TryStatement)
-        foreach(ExceptClause ec in ((TryStatement)node).Except) if(ec.Target!=null) HandleAssignment(ec.Target);
+      else if(node is ExceptionStatement)
+        foreach(ExceptClause ec in ((ExceptionStatement)node).Except) if(ec.Target!=null) HandleAssignment(ec.Target);
       return true;
     }
 
@@ -747,62 +748,184 @@ public class DelStatement : Statement
 }
 #endregion
 
-#region ExecStatement
-public class ExecStatement : Statement
-{ public ExecStatement(Expression code, Expression globals, Expression locals)
-  { Code=code; Globals=globals; Locals=locals;
+#region ExceptionStatement
+public abstract class ExceptionStatement : Statement
+{ public ExceptionStatement(Statement body, ExceptClause[] except) { Body=body; Except=except; }
+
+  public override void Emit(CodeGenerator cg)
+  { bool haveExcept = Except!=null && Except.Length!=0;
+    Slot fromElse = NeedElse && haveExcept ? cg.AllocLocalTemp(typeof(bool)) : null;
+
+    if(fromElse!=null)
+    { cg.EmitInt(0);
+      fromElse.EmitSet(cg);
+    }
+
+    Slot choice=null;
+    if(Yields!=null)
+    { choice = cg.AllocLocalTemp(typeof(int));
+      Label label = cg.ILG.DefineLabel();
+      cg.EmitInt(int.MaxValue);
+      choice.EmitSet(cg);
+      cg.ILG.Emit(OpCodes.Br, label);
+      for(int i=0; i<Yields.Length; i++)
+      { YieldStatement ys = Yields[i];
+        for(int j=0; j<ys.Targets.Length; j++)
+          if(ys.Targets[j].Statement==this) { cg.ILG.MarkLabel(ys.Targets[j].Label); break; }
+        cg.EmitInt(i);
+        choice.EmitSet(cg);
+        if(i!=Yields.Length-1) cg.ILG.Emit(OpCodes.Br, label);
+      }
+      cg.ILG.MarkLabel(label);
+    }
+
+    EmitPreTry(cg);
+    Label done = cg.ILG.BeginExceptionBlock();      // try {
+    if(Yields!=null)
+    { Label[] jumps = new Label[Yields.Length];
+      for(int i=0; i<Yields.Length; i++)
+      { YieldStatement ys = (YieldStatement)Yields[i];
+        for(int j=0; j<ys.Targets.Length; j++)
+          if(ys.Targets[j].Statement==this) { jumps[i] = ys.Targets[j+1].Label; break; }
+      }
+      choice.EmitGet(cg);
+      cg.ILG.Emit(OpCodes.Switch, jumps);
+      cg.FreeLocalTemp(choice);
+    }
+    Body.Emit(cg);                                  //   body
+    if(NeedElse)                                    //   else
+    { if(fromElse!=null)
+      { cg.EmitInt(1);
+        fromElse.EmitSet(cg);
+      }
+      EmitElse(cg);
+    }
+
+    if(haveExcept)
+    { cg.ILG.BeginCatchBlock(typeof(Exception));      // } catch(Exception e) {
+      Slot dt = cg.AllocLocalTemp(typeof(DynamicType)), type = cg.AllocLocalTemp(typeof(object)),
+          et = cg.AllocLocalTemp(typeof(DynamicType)), e = cg.AllocLocalTemp(typeof(Exception));
+
+      if(fromElse!=null)                              // if(fromElse) throw;
+      { Label prop = cg.ILG.DefineLabel();
+        fromElse.EmitGet(cg);
+        cg.ILG.Emit(OpCodes.Brfalse_S, prop);
+        cg.ILG.Emit(OpCodes.Rethrow);
+        cg.ILG.MarkLabel(prop);
+      }
+
+      if(Except[0].Type!=null)
+      { cg.ILG.Emit(OpCodes.Dup);
+        e.EmitSet(cg);
+        cg.EmitCall(typeof(Ops), "GetDynamicType");     // dt = GetDynamicType(e)
+        dt.EmitSet(cg);
+
+        foreach(ExceptClause ec in Except)              // foreach(ExceptClause ec in Except) {
+        { if(ec.Type==null) break;
+          Label isDT=cg.ILG.DefineLabel(), next=cg.ILG.DefineLabel();
+          ec.Type.Emit(cg);                             // type = ec.Type
+          cg.ILG.Emit(OpCodes.Dup);
+          type.EmitSet(cg);
+          cg.ILG.Emit(OpCodes.Isinst, typeof(DynamicType)); // DynamicType et = type as DynamicType
+          cg.ILG.Emit(OpCodes.Dup);
+          et.EmitSet(cg);
+          cg.ILG.Emit(OpCodes.Brtrue, isDT);                // if(et==null) et = Ops.GetDynamicType(type)
+          type.EmitGet(cg);
+          cg.EmitCall(typeof(Ops), "GetDynamicType");
+          et.EmitSet(cg);
+          cg.ILG.MarkLabel(isDT);
+          et.EmitGet(cg);                                   // if(et.IsSubclassOf(dt)) {
+          dt.EmitGet(cg);
+          cg.EmitCall(typeof(DynamicType), "IsTryMatch");
+          cg.ILG.Emit(OpCodes.Brfalse, next);
+          if(ec.Target!=null)                               // ec.Target = e
+          { e.EmitGet(cg);
+            new AssignStatement(ec.Target).Emit(cg);
+          }
+          ec.Body.Emit(cg);                                 // ec.Body()
+          cg.ILG.Emit(OpCodes.Leave, done);                 // }
+          cg.ILG.MarkLabel(next);
+        }
+      }
+
+      if(Except[Except.Length-1].Type!=null) cg.ILG.Emit(OpCodes.Rethrow);
+      else
+      { ExceptClause ec = Except[Except.Length-1];
+        if(ec.Target!=null)
+        { e.EmitGet(cg);
+          new AssignStatement(ec.Target).Emit(cg);
+        }
+        ec.Body.Emit(cg);
+      }
+      cg.FreeLocalTemp(dt);
+      cg.FreeLocalTemp(type);
+      cg.FreeLocalTemp(et);
+      cg.FreeLocalTemp(e);
+    }
+
+    if(NeedFinally)
+    { cg.ILG.BeginFinallyBlock();
+      EmitFinally(cg);
+    }
+    cg.ILG.EndExceptionBlock();
+
+    if(fromElse!=null) cg.FreeLocalTemp(fromElse);
   }
   
   public override void Execute(Frame frame)
-  { object code = Code.Evaluate(frame);
-    if(Locals!=null)
-      Boa.Modules.__builtin__.exec(code, (IDictionary)Ops.ConvertTo(Globals.Evaluate(frame), typeof(IDictionary)),
-                                   (IDictionary)Ops.ConvertTo(Locals.Evaluate(frame), typeof(IDictionary)));
-    else if(Globals!=null)
-      Boa.Modules.__builtin__.exec(code, (IDictionary)Ops.ConvertTo(Globals.Evaluate(frame), typeof(IDictionary)));
-    else Boa.Modules.__builtin__.exec(code);
-  }
-  
-  public override void Emit(CodeGenerator cg)
-  { Code.Emit(cg);
-    if(Globals!=null)
-    { Globals.Emit(cg);
-      cg.EmitTypeOf(typeof(IDictionary));
-      cg.EmitCall(typeof(Ops), "ConvertTo", new Type[] { typeof(object), typeof(Type) });
-    }
-    if(Locals!=null)
-    { Locals.Emit(cg);
-      cg.EmitTypeOf(typeof(IDictionary));
-      cg.EmitCall(typeof(Ops), "ConvertTo", new Type[] { typeof(object), typeof(Type) });
-    }
-    cg.EmitCall(typeof(Boa.Modules.__builtin__), "exec",
-      Locals!=null  ? new Type[] { typeof(object), typeof(IDictionary), typeof(IDictionary) } :
-      Globals!=null ? new Type[] { typeof(object), typeof(IDictionary) } : new Type[] { typeof(object) });
-  }
+  { ExecutePreTry(frame);
 
-  public override void ToCode(System.Text.StringBuilder sb, int indent)
-  { sb.Append("exec ");
-    Code.ToCode(sb, 0);
-    if(Globals!=null)
-    { sb.Append(" in ");
-      Globals.ToCode(sb, 0);
-      if(Locals!=null)
-      { sb.Append(", ");
-        Locals.ToCode(sb, 0);
+    bool fromElse=false, occurred=false;
+    try
+    { Body.Execute(frame);
+      if(NeedElse) { fromElse=true; ExecuteElse(frame); }
+    }
+    catch(BreakException) { throw; }
+    catch(ContinueException) { throw; }
+    catch(Exception e)
+    { if(fromElse) throw;
+      occurred = true;
+      Boa.Modules.sys.Exceptions.Push(e);
+
+      DynamicType dt = Ops.GetDynamicType(e);
+      foreach(ExceptClause ec in Except)
+      { DynamicType et;
+        if(ec.Type!=null)
+        { object type = ec.Type.Evaluate(frame);
+          et = type as DynamicType;
+          if(et==null) et = Ops.GetDynamicType(type);
+        }
+        else et=null;
+        if(et==null || et.IsSubclassOf(dt))
+        { if(ec.Target!=null) ec.Target.Assign(e, frame);
+          ec.Body.Execute(frame);
+          goto done;
+        }
       }
+      done:;
     }
-  }
-  
-  public override void Walk(IWalker w)
-  { if(w.Walk(this))
-    { Code.Walk(w);
-      if(Globals!=null) Globals.Walk(w);
-      if(Locals!=null) Locals.Walk(w);
+    finally
+    { if(NeedFinally) ExecuteFinally(frame);
+      if(occurred) Boa.Modules.sys.Exceptions.Pop();
     }
-    w.PostWalk(this);
   }
 
-  public Expression Code, Globals, Locals;
+  public Statement Body;
+  public ExceptClause[] Except;
+  public YieldStatement[] Yields;
+  
+  protected virtual void EmitPreTry(CodeGenerator cg) { }
+  protected virtual void EmitBody(CodeGenerator cg) { Body.Emit(cg); }
+  protected virtual void EmitElse(CodeGenerator cg) { }
+  protected virtual void EmitExcept(CodeGenerator cg) { }
+  protected virtual void EmitFinally(CodeGenerator cg) { }
+  protected virtual void PostEmit(CodeGenerator cg) { }
+
+  protected virtual void ExecutePreTry(Frame frame) { }
+  protected virtual void ExecuteElse(Frame frame) { }
+  protected virtual void ExecuteFinally(Frame frame) { }
+
+  protected bool NeedElse, NeedFinally;
 }
 #endregion
 
@@ -1105,6 +1228,86 @@ public abstract class JumpStatement : Statement
 }
 #endregion
 
+#region LockStatement
+public class LockStatement : ExceptionStatement
+{ public LockStatement(Expression expr, Statement body) : base(body, null) { Expression=expr; NeedFinally=true; }
+
+  public override void Execute(Frame frame)
+  { if(Expression is TupleExpression)
+    { TupleExpression tup = (TupleExpression)Expression;
+      object[] arr = new object[tup.Expressions.Length];
+      for(int i=0; i<arr.Length; i++)
+      { arr[i] = tup.Expressions[i].Evaluate(frame);
+        if(arr[i]==null) throw Ops.ValueError(this, "cannot lock a null value");
+      }
+      for(int i=0; i<arr.Length; i++) System.Threading.Monitor.Enter(arr[i]);
+      try { Body.Execute(frame); }
+      finally { foreach(object o in arr) if(o!=null) System.Threading.Monitor.Exit(o); }
+    }
+    else
+    { object o = Expression.Evaluate(frame);
+      if(o==null) throw Ops.ValueError(this, "cannot lock a null value");
+      lock(o) Body.Execute(frame);
+    }
+  }
+
+  public override void ToCode(System.Text.StringBuilder sb, int indent)
+  { sb.Append("lock ");
+    Expression.ToCode(sb, 0);
+    sb.Append(":\n");
+    StatementToCode(sb, Body, indent+Options.IndentSize);
+  }
+
+  public override void Walk(IWalker w)
+  { if(w.Walk(this))
+    { Expression.Walk(w);
+      Body.Walk(w);
+    }
+    w.PostWalk(this);
+  }
+
+  public Expression Expression;
+
+  protected override void EmitPreTry(CodeGenerator cg)
+  { Expression[] exprs = Expression is TupleExpression ? ((TupleExpression)Expression).Expressions
+                                                       : new Expression[] { Expression };
+    Label good=cg.ILG.DefineLabel(), evil=exprs.Length==1 ? new Label() : cg.ILG.DefineLabel();
+
+    slots = new Slot[exprs.Length];
+    for(int i=0; i<exprs.Length; i++)
+    { slots[i] = cg.AllocLocalTemp(typeof(object), true);
+      exprs[i].Emit(cg);
+      cg.ILG.Emit(OpCodes.Dup);
+      slots[i].EmitSet(cg);
+      if(i==exprs.Length-1) cg.ILG.Emit(OpCodes.Brtrue_S, good);
+      else cg.ILG.Emit(OpCodes.Brfalse, evil);
+    }
+
+    if(exprs.Length!=1) cg.ILG.MarkLabel(evil);
+    cg.EmitString("cannot lock a null value");
+    cg.EmitNew(typeof(ValueErrorException), new Type[] { typeof(string) });
+    cg.ILG.Emit(OpCodes.Throw);
+
+    cg.ILG.MarkLabel(good);
+    foreach(Slot s in slots)
+    { s.EmitGet(cg);
+      cg.EmitCall(typeof(System.Threading.Monitor), "Enter");
+    }
+  }
+
+  protected override void EmitFinally(CodeGenerator cg)
+  { foreach(Slot s in slots)
+    { s.EmitGet(cg);
+      cg.EmitCall(typeof(System.Threading.Monitor), "Exit");
+    }
+  }
+
+  protected override void PostEmit(CodeGenerator cg) { foreach(Slot s in slots) cg.FreeLocalTemp(s); }
+
+  Slot[] slots;
+}
+#endregion
+
 #region PassStatement
 public class PassStatement : Statement
 { public override void Emit(CodeGenerator cg) { }
@@ -1314,164 +1517,9 @@ public class Suite : Statement
 #endregion
 
 #region TryStatement
-public class TryStatement : Statement
+public class TryStatement : ExceptionStatement
 { public TryStatement(Statement body, ExceptClause[] except, Statement elze, Statement final)
-  { Body=body; Except=except; Else=elze; Finally=final;
-  }
-
-  public override void Emit(CodeGenerator cg)
-  { Slot fromElse = Else!=null && Except.Length!=0 ? cg.AllocLocalTemp(typeof(bool)) : null;
-
-    if(fromElse!=null)
-    { cg.EmitInt(0);
-      fromElse.EmitSet(cg);
-    }
-
-    Slot choice=null;
-    if(Yields!=null)
-    { choice = cg.AllocLocalTemp(typeof(int));
-      Label label = cg.ILG.DefineLabel();
-      cg.EmitInt(int.MaxValue);
-      choice.EmitSet(cg);
-      cg.ILG.Emit(OpCodes.Br, label);
-      for(int i=0; i<Yields.Length; i++)
-      { YieldStatement ys = Yields[i];
-        for(int j=0; j<ys.Targets.Length; j++)
-          if(ys.Targets[j].Statement==this) { cg.ILG.MarkLabel(ys.Targets[j].Label); break; }
-        cg.EmitInt(i);
-        choice.EmitSet(cg);
-        if(i!=Yields.Length-1) cg.ILG.Emit(OpCodes.Br, label);
-      }
-      cg.ILG.MarkLabel(label);
-    }
-
-    Label done = cg.ILG.BeginExceptionBlock();      // try {
-    if(Yields!=null)
-    { Label[] jumps = new Label[Yields.Length];
-      for(int i=0; i<Yields.Length; i++)
-      { YieldStatement ys = (YieldStatement)Yields[i];
-        for(int j=0; j<ys.Targets.Length; j++)
-          if(ys.Targets[j].Statement==this) { jumps[i] = ys.Targets[j+1].Label; break; }
-      }
-      choice.EmitGet(cg);
-      cg.ILG.Emit(OpCodes.Switch, jumps);
-      cg.FreeLocalTemp(choice);
-    }
-    Body.Emit(cg);                                  //   body
-    if(Else!=null)                                  //   else
-    { if(fromElse!=null)
-      { cg.EmitInt(1);
-        fromElse.EmitSet(cg);
-      }
-      Else.Emit(cg);
-    }
-
-    if(Except.Length!=0)
-    { cg.ILG.BeginCatchBlock(typeof(Exception));      // } catch(Exception e) {
-      Slot dt = cg.AllocLocalTemp(typeof(DynamicType)), type = cg.AllocLocalTemp(typeof(object)),
-          et = cg.AllocLocalTemp(typeof(DynamicType)), e = cg.AllocLocalTemp(typeof(Exception));
-
-      if(fromElse!=null)                              // if(fromElse) throw;
-      { Label prop = cg.ILG.DefineLabel();
-        fromElse.EmitGet(cg);
-        cg.ILG.Emit(OpCodes.Brfalse_S, prop);
-        cg.ILG.Emit(OpCodes.Rethrow);
-        cg.ILG.MarkLabel(prop);
-      }
-
-      if(Except[0].Type!=null)
-      { cg.ILG.Emit(OpCodes.Dup);
-        e.EmitSet(cg);
-        cg.EmitCall(typeof(Ops), "GetDynamicType");     // dt = GetDynamicType(e)
-        dt.EmitSet(cg);
-
-        foreach(ExceptClause ec in Except)              // foreach(ExceptClause ec in Except) {
-        { if(ec.Type==null) break;
-          Label isDT=cg.ILG.DefineLabel(), next=cg.ILG.DefineLabel();
-          ec.Type.Emit(cg);                             // type = ec.Type
-          cg.ILG.Emit(OpCodes.Dup);
-          type.EmitSet(cg);
-          cg.ILG.Emit(OpCodes.Isinst, typeof(DynamicType)); // DynamicType et = type as DynamicType
-          cg.ILG.Emit(OpCodes.Dup);
-          et.EmitSet(cg);
-          cg.ILG.Emit(OpCodes.Brtrue, isDT);                // if(et==null) et = Ops.GetDynamicType(type)
-          type.EmitGet(cg);
-          cg.EmitCall(typeof(Ops), "GetDynamicType");
-          et.EmitSet(cg);
-          cg.ILG.MarkLabel(isDT);
-          et.EmitGet(cg);                                   // if(et.IsSubclassOf(dt)) {
-          dt.EmitGet(cg);
-          cg.EmitCall(typeof(DynamicType), "IsTryMatch");
-          cg.ILG.Emit(OpCodes.Brfalse, next);
-          if(ec.Target!=null)                               // ec.Target = e
-          { e.EmitGet(cg);
-            new AssignStatement(ec.Target).Emit(cg);
-          }
-          ec.Body.Emit(cg);                                 // ec.Body()
-          cg.ILG.Emit(OpCodes.Leave, done);                 // }
-          cg.ILG.MarkLabel(next);
-        }
-      }
-
-      if(Except[Except.Length-1].Type!=null) cg.ILG.Emit(OpCodes.Rethrow);
-      else
-      { ExceptClause ec = Except[Except.Length-1];
-        if(ec.Target!=null)
-        { e.EmitGet(cg);
-          new AssignStatement(ec.Target).Emit(cg);
-        }
-        ec.Body.Emit(cg);
-      }
-      cg.FreeLocalTemp(dt);
-      cg.FreeLocalTemp(type);
-      cg.FreeLocalTemp(et);
-      cg.FreeLocalTemp(e);
-    }
-
-    if(Finally!=null)
-    { cg.ILG.BeginFinallyBlock();
-      Finally.Emit(cg);
-    }
-    cg.ILG.EndExceptionBlock();
-
-    if(fromElse!=null) cg.FreeLocalTemp(fromElse);
-  }
-  
-  public override void Execute(Frame frame)
-  { bool fromElse=false, occurred=false;
-    try
-    { Body.Execute(frame);
-      if(Else!=null) { fromElse=true; Else.Execute(frame); }
-    }
-    catch(BreakException) { throw; }
-    catch(ContinueException) { throw; }
-    catch(Exception e)
-    { if(fromElse) throw;
-      occurred = true;
-      Boa.Modules.sys.Exceptions.Push(e);
-
-      DynamicType dt = Ops.GetDynamicType(e);
-      foreach(ExceptClause ec in Except)
-      { DynamicType et;
-        if(ec.Type!=null)
-        { object type = ec.Type.Evaluate(frame);
-          et = type as DynamicType;
-          if(et==null) et = Ops.GetDynamicType(type);
-        }
-        else et=null;
-        if(et==null || et.IsSubclassOf(dt))
-        { if(ec.Target!=null) ec.Target.Assign(e, frame);
-          ec.Body.Execute(frame);
-          goto done;
-        }
-      }
-      done:;
-    }
-    finally
-    { if(Finally!=null) Finally.Execute(frame);
-      if(occurred) Boa.Modules.sys.Exceptions.Pop();
-    }
-  }
+    : base(body, except) { NeedElse=(elze!=null); NeedFinally=(final!=null); Else=elze; Finally=final; }
 
   public override void ToCode(System.Text.StringBuilder sb, int indent)
   { sb.Append("try:\n");
@@ -1503,9 +1551,73 @@ public class TryStatement : Statement
     w.PostWalk(this);
   }
 
-  public Statement Body, Else, Finally;
-  public ExceptClause[] Except;
-  public YieldStatement[] Yields;
+  public Statement Else, Finally;
+
+  protected override void EmitElse(CodeGenerator cg) { Else.Emit(cg); }
+  protected override void EmitFinally(CodeGenerator cg) { Finally.Emit(cg); }
+  protected override void ExecuteElse(Frame frame) { Else.Execute(frame); }
+  protected override void ExecuteFinally(Frame frame) { Finally.Execute(frame); }
+}
+#endregion
+
+#region UsingStatement
+public class UsingStatement : ExceptionStatement
+{ public UsingStatement(Expression expr, Statement body) : base(body, null) { Expression=expr; NeedFinally=true; }
+
+  public override void Execute(Frame frame)
+  { if(Expression is TupleExpression)
+    { TupleExpression tup = (TupleExpression)Expression;
+      IDisposable[] arr = new IDisposable[tup.Expressions.Length];
+      for(int i=0; i<arr.Length; i++) arr[i] = (IDisposable)tup.Expressions[i].Evaluate(frame);
+      try { Body.Execute(frame); }
+      finally { foreach(IDisposable o in arr) if(o!=null) o.Dispose(); }
+    }
+    else using((IDisposable)Expression.Evaluate(frame)) Body.Execute(frame);
+  }
+
+  public override void ToCode(System.Text.StringBuilder sb, int indent)
+  { sb.Append("using ");
+    Expression.ToCode(sb, 0);
+    sb.Append(":\n");
+    StatementToCode(sb, Body, indent+Options.IndentSize);
+  }
+
+  public override void Walk(IWalker w)
+  { if(w.Walk(this))
+    { Expression.Walk(w);
+      Body.Walk(w);
+    }
+    w.PostWalk(this);
+  }
+
+  public Expression Expression;
+
+  protected override void EmitPreTry(CodeGenerator cg)
+  { Expression[] exprs = Expression is TupleExpression ? ((TupleExpression)Expression).Expressions
+                                                       : new Expression[] { Expression };
+    slots = new Slot[exprs.Length];
+    for(int i=0; i<exprs.Length; i++)
+    { slots[i] = cg.AllocLocalTemp(typeof(IDisposable), true);
+      exprs[i].Emit(cg);
+      cg.ILG.Emit(OpCodes.Castclass, typeof(IDisposable));
+      slots[i].EmitSet(cg);
+    }
+  }
+
+  protected override void EmitFinally(CodeGenerator cg)
+  { foreach(Slot s in slots)
+    { Label skip = cg.ILG.DefineLabel();
+      s.EmitGet(cg);
+      cg.ILG.Emit(OpCodes.Brfalse_S, skip);
+      s.EmitGet(cg);
+      cg.EmitCall(typeof(IDisposable), "Dispose");
+      cg.ILG.MarkLabel(skip);
+    }
+  }
+
+  protected override void PostEmit(CodeGenerator cg) { foreach(Slot s in slots) cg.FreeLocalTemp(s); }
+
+  Slot[] slots;
 }
 #endregion
 

@@ -80,8 +80,9 @@
 				<Key word="del" />
 				<Key word="yield" />
 				<Key word="assert" />
-				<Key word="exec" />
 				<Key word="pass" />
+				<Key word="lock" />
+				<Key word="using" />
 			</KeyWords>
 
 			<KeyWords name="SelectionStatements" bold="false" italic="false" color="Blue">
