@@ -65,20 +65,20 @@ public abstract class BoaType : DynamicType, IDynamicObject, ICallable, IHasAttr
 
   public void __delattr__(string name)
   { object slot = RawGetSlot(name);
-    if(slot!=null && Ops.DelDescriptor(slot, null)) return;
+    if(slot!=Ops.Missing && Ops.DelDescriptor(slot, null)) return;
     RawRemoveSlot(name);
   }
 
   public object __getattr__(string name)
   { object slot = LookupSlot(name);
-    if(slot!=null) return Ops.GetDescriptor(slot, null);
+    if(slot!=Ops.Missing) return Ops.GetDescriptor(slot, null);
     if(name=="__name__") return __name__;
     return Ops.Missing;
   }
 
   public void __setattr__(string name, object value)
   { object slot = RawGetSlot(name);
-    if(slot!=null && Ops.SetDescriptor(slot, null, value)) return;
+    if(slot!=Ops.Missing && Ops.SetDescriptor(slot, null, value)) return;
     RawSetSlot(name, value);
   }
   #endregion
@@ -99,17 +99,17 @@ public abstract class BoaType : DynamicType, IDynamicObject, ICallable, IHasAttr
   internal object LookupSlot(string name)
   { foreach(BoaType type in mro)
     { object slot = type.RawGetSlot(name);
-      if(slot!=null) return slot;
+      if(slot!=Ops.Missing) return slot;
     }
-    return null;
+    return Ops.Missing;
   }
   
   protected object LookupSlot(Tuple mro, int index, string name)
   { for(; index<mro.Count; index++)
     { object slot = ((BoaType)mro.items[index]).RawGetSlot(name);
-      if(slot!=null) return slot;
+      if(slot!=Ops.Missing) return slot;
     }
-    return null;
+    return Ops.Missing;
   }
 
   internal Tuple mro;
@@ -125,7 +125,7 @@ public abstract class BoaType : DynamicType, IDynamicObject, ICallable, IHasAttr
   { Initialize();
     if(name=="__dict__") return dict;
     if(name=="mro") return mro;
-    return dict[name];
+    return dict.Contains(name) ? dict[name] : Ops.Missing;
   }
 
   protected void RawRemoveSlot(string name) { dict.Remove(name); }

@@ -26,6 +26,8 @@ using System.IO;
 namespace Boa.Runtime
 {
 
+// FIXME: standardize line endings and make readline(), etc match python's
+
 #region FileEnumerator
 public class FileEnumerator : IEnumerator
 { public FileEnumerator(IFile file) { this.file=file; state=State.BOF; }

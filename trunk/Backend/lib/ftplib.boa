@@ -170,8 +170,7 @@ class FTP:
         if self.debugging > 1:
             print '*get* ', self.sanitize(line)
         if not line: raise EOFError()
-        if line[-2:] == CRLF: line = line[:-2]
-        elif line[-1:] in CRLF: line = line[:-1]
+        line = line[:-1]
         return line
 
     # Internal: get a response from the server, which may possibly
@@ -388,12 +387,8 @@ class FTP:
         while 1:
             line = fp.readline()
             if self.debugging > 2: print '*retr*', repr(line)
-            if not line:
-                break
-            if line[-2:] == CRLF:
-                line = line[:-2]
-            elif line[-1:] == '\n':
-                line = line[:-1]
+            if not line: break
+            line = line[:-1]
             callback(line)
         fp.close()
         conn.close()

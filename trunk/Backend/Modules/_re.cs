@@ -27,32 +27,75 @@ using Boa.Runtime;
 namespace Boa.Modules
 {
 
-namespace re_internal
+public sealed class re_internal
 { 
-  internal class match
+  #region match
+  public sealed class match
   { public static string expand(Match m, string template) { throw new NotImplementedException(); }
-    public static string group(Match m, params object[] groups) { throw new NotImplementedException(); }
-    public static Tuple groups(Match m) { throw new NotImplementedException(); }
-    public static Tuple groups(Match m, object defaultValue) { throw new NotImplementedException(); }
-    public static Dict groupdict(Match m) { throw new NotImplementedException(); }
+
+    public static object group(Match m, params object[] groups)
+    { if(groups.Length==0) return m.Value;
+      if(groups.Length==1)
+      { Group g = GetGroup(m, groups[0]);
+        return g.Success ? g.Value : null;
+      }
+
+      object[] ret = new object[groups.Length];
+      for(int i=0; i<groups.Length; i++)
+      { Group g = GetGroup(m, groups[i]);
+        ret[i] = g.Success ? g.Value : null;
+      }
+      return new Tuple(ret);
+    }
+
+    public static Tuple groups(Match m) { return groups(m, null); }
+    public static Tuple groups(Match m, object defaultValue)
+    { object[] ret = new object[m.Groups.Count-1];
+      for(int i=0; i<ret.Length; i++) ret[i] = m.Groups[i+1].Success ? m.Groups[i+1].Value : null;
+      return new Tuple(ret);
+    }
+
+    public static Dict groupdict(Match m) { return groupdict(m, null); }
     public static Dict groupdict(Match m, object defaultValue) { throw new NotImplementedException(); }
-    public static int start(Match m) { throw new NotImplementedException(); }
-    public static int start(Match m, object group) { throw new NotImplementedException(); }
-    public static int end(Match m) { throw new NotImplementedException(); }
-    public static int end(Match m, object group) { throw new NotImplementedException(); }
-    public static Tuple span(Match m) { throw new NotImplementedException(); }
-    public static Tuple span(Match m, object group) { throw new NotImplementedException(); }
-    
-    public static int lastindex { get; } // these aren't accepting a Match... :-/
-    public static string lastgroup { get; }
+
+    public static int start(Match m) { return m.Index; }
+    public static int start(Match m, object group)
+    { if(group==null) return m.Index;
+      Group g = GetGroup(m, group);
+      return g.Success ? g.Index : -1;
+    }
+
+    public static int end(Match m) { return m.Index+m.Length; }
+    public static int end(Match m, object group)
+    { if(group==null) return m.Index+m.Length;
+      Group g = GetGroup(m, group);
+      return g.Success ? g.Index+g.Length : -1;
+    }
+
+    public static Tuple span(Match m) { return new Tuple(m.Index, m.Index+m.Length); }
+    public static Tuple span(Match m, object group)
+    { if(group==null) return new Tuple(m.Index, m.Index+m.Length);
+      Group g = GetGroup(m, group);
+      return g.Success ? new Tuple(g.Index, g.Index+g.Length) : new Tuple(-1, -1);
+    }
+
+    public static object get_lastindex(Match m)
+    { for(int i=m.Groups.Count-1; i>0; i--) if(m.Groups[i].Success) return i;
+      return null;
+    }
+
+    public static string get_lastgroup(Match m) { throw new NotImplementedException(); }
+
+    static Group GetGroup(Match m, object g) { return g is int ? m.Groups[(int)g] : m.Groups[Ops.ToString(g)]; }
   }
+  #endregion
 }
 
 // TODO: optimize by using Match.NextMatch()
 
 [BoaType("module")]
-public sealed class re
-{ re() { }
+public sealed class _re
+{ _re() { }
 
   #region FindEnumerator
   public class FindEnumerator : IEnumerator
@@ -107,9 +150,9 @@ public sealed class re
     }
 
     [DocString(@"findall(string) -> list\n\nSee documentation for re.findall()")]
-    public List findall(string str) { return Boa.Modules.re.findall(this, str); }
+    public List findall(string str) { return Boa.Modules._re.findall(this, str); }
     [DocString(@"finditer(string) -> iter\n\nSee documentation for re.finditer()")]
-    public IEnumerator finditer(string str) { return Boa.Modules.re.finditer(this, str); }
+    public IEnumerator finditer(string str) { return Boa.Modules._re.finditer(this, str); }
 
     [DocString(@"match(string[, start[, end]]) -> Match
 
@@ -149,19 +192,19 @@ public sealed class re
     }
     
     [DocString(@"split(string[, maxsplit=0]) -> list\n\nSee documentation for re.split()")]
-    public List split(string str) { return Boa.Modules.re.split(this, str, 0); }
-    public List split(string str, int maxsplit) { return Boa.Modules.re.split(this, str, maxsplit); }
+    public List split(string str) { return Boa.Modules._re.split(this, str, 0); }
+    public List split(string str, int maxsplit) { return Boa.Modules._re.split(this, str, maxsplit); }
 
     [DocString(@"sub(repl, string [, maxreplace=0]) -> str\n\nSee documentation for re.sub()")]
-    public string sub(object repl, string str) { return Boa.Modules.re.sub(this, repl, str, 0); }
+    public string sub(object repl, string str) { return Boa.Modules._re.sub(this, repl, str, 0); }
     public string sub(object repl, string str, int maxreplace)
-    { return Boa.Modules.re.sub(this, repl, str, maxreplace);
+    { return Boa.Modules._re.sub(this, repl, str, maxreplace);
     }
 
     [DocString(@"subn(repl, string [, maxreplace=0]) -> tuple\n\nSee documentation for re.subn()")]
-    public Tuple subn(object repl, string str) { return Boa.Modules.re.subn(this, repl, str, 0); }
+    public Tuple subn(object repl, string str) { return Boa.Modules._re.subn(this, repl, str, 0); }
     public Tuple subn(object repl, string str, int maxreplace)
-    { return Boa.Modules.re.subn(this, repl, str, maxreplace);
+    { return Boa.Modules._re.subn(this, repl, str, maxreplace);
     }
 
     public string __repr__() { return string.Format("re.compile({0})", Ops.Repr(base.pattern)); }
@@ -180,6 +223,8 @@ It is never an error if a string contains no match for a pattern.")]
   }
   #endregion
   
+  public static readonly ReflectedType MatchObject = ReflectedType.FromType(typeof(Match));
+
   public static string __repr__() { return "<module 're' (built-in)>"; }
   public static string __str__() { return __repr__(); }
 
@@ -309,7 +354,7 @@ creation time and performance.")]
 
   [DocString(@"Specifies that the regular expression should perform case-insensitive
 matching.")]
-  public const int I=(int)RegexOptions.IgnoreCase, IGNORE=I;
+  public const int I=(int)RegexOptions.IgnoreCase, IGNORECASE=I;
 
   [DocString(@"When specified, the pattern character '^' matches at the beginning of the
 string and at the beginning of each line (immediately following each

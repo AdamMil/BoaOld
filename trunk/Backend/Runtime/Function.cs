@@ -43,6 +43,8 @@ public abstract class Function : IFancyCallable
 
   public string FuncName { get { return Name==null ? "<lambda>" : Name; } }
 
+  public object __call__(params object[] args) { return Call(args); }
+
   public abstract object Call(params object[] args);
   public abstract object Call(object[] args, string[] names, object[] values);
 

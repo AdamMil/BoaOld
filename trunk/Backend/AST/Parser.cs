@@ -31,6 +31,7 @@ using Boa.Runtime;
 // TODO: implement sets
 // TODO: try to make precedence match python's where it makes sense
 // TODO: support unicode string parsing
+// FIXME: make this parse:   func(lambda: print)
 
 namespace Boa.AST
 {

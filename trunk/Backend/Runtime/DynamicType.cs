@@ -19,6 +19,8 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 
+// FIXME: look into how obj.attr can throw "no such attribute" when obj.attr is actually just null
+
 using System;
 using System.Collections;
 

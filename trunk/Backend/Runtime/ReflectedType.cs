@@ -318,6 +318,8 @@ public abstract class ReflectedMethodBase : ReflectedMember, IFancyCallable
 
   public string __name__ { get { return sigs[0].Name; } }
 
+  public object __call__(params object[] args) { return Call(args); }
+
   public object Call(params object[] args)
   { Type[] types  = new Type[args.Length];
     Match[] res   = new Match[sigs.Length];
@@ -609,13 +611,13 @@ public class ReflectedType : BoaType
 
   public override void DelAttr(object self, string name)
   { object slot = RawGetSlot(name);
-    if(slot==null) throw Ops.AttributeError("no such slot '{0}'", name);
+    if(slot==Ops.Missing) throw Ops.AttributeError("no such slot '{0}'", name);
     if(!Ops.DelDescriptor(slot, self)) dict.Remove(name);
   }
 
   public override bool GetAttr(object self, string name, out object value)
   { object slot = RawGetSlot(name);
-    if(slot!=null)
+    if(slot!=Ops.Missing)
     { value = Ops.GetDescriptor(slot, self);
       return true;
     }
@@ -642,8 +644,10 @@ public class ReflectedType : BoaType
 
   public override void SetAttr(object self, string name, object value)
   { object slot = RawGetSlot(name);
-    if(slot==null) throw Ops.AttributeError("no such slot '{0}'", name);
-    Ops.SetDescriptor(slot, self, value);
+    if(slot==Ops.Missing || !Ops.SetDescriptor(slot, self, value))
+    { if(self==null) dict[name] = value;
+      else throw Ops.AttributeError("no such slot '{0}'", name);
+    }
   }
 
   public override string ToString() { return __repr__(); }
@@ -709,6 +713,8 @@ public class ReflectedType : BoaType
         if(prop.state.get!=null && !dict.Contains("__getitem__")) dict["__getitem__"] = prop.state.get;
         if(prop.state.set!=null && !dict.Contains("__setitem__")) dict["__setitem__"] = prop.state.set;
       }
+
+    foreach(Type t in type.GetNestedTypes()) AddNestedType(t);
   }
 
   void AddConstructor(ConstructorInfo ci)
@@ -726,6 +732,8 @@ public class ReflectedType : BoaType
     if(rm==null) dict[mi.Name] = new ReflectedMethod(mi);
     else rm.Add(mi);
   }
+
+  void AddNestedType(Type type) { dict[type.Name] = ReflectedType.FromType(type); }
 
   void AddProperty(PropertyInfo pi)
   { ReflectedProperty rp = (ReflectedProperty)dict[pi.Name];

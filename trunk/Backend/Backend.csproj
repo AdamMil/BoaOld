@@ -69,6 +69,26 @@
                     AssemblyName = "System"
                     HintPath = "..\..\..\WINDOWS\Microsoft.NET\Framework\v1.1.4322\System.dll"
                 />
+                <Reference
+                    Name = "System.Data"
+                    AssemblyName = "System.Data"
+                    HintPath = "..\..\..\WINDOWS\Microsoft.NET\Framework\v1.1.4322\System.Data.dll"
+                />
+                <Reference
+                    Name = "System.Drawing"
+                    AssemblyName = "System.Drawing"
+                    HintPath = "..\..\..\WINDOWS\Microsoft.NET\Framework\v1.1.4322\System.Drawing.dll"
+                />
+                <Reference
+                    Name = "System.Windows.Forms"
+                    AssemblyName = "System.Windows.Forms"
+                    HintPath = "..\..\..\WINDOWS\Microsoft.NET\Framework\v1.1.4322\System.Windows.Forms.dll"
+                />
+                <Reference
+                    Name = "System.XML"
+                    AssemblyName = "System.XML"
+                    HintPath = "..\..\..\WINDOWS\Microsoft.NET\Framework\v1.1.4322\System.XML.dll"
+                />
             </References>
         </Build>
         <Files>
@@ -157,11 +177,21 @@
                     BuildAction = "None"
                 />
                 <File
+                    RelPath = "lib\re.boa"
+                    SubType = "Form"
+                    BuildAction = "None"
+                />
+                <File
                     RelPath = "lib\socket.boa"
                     BuildAction = "None"
                 />
                 <File
                     RelPath = "Modules\__builtin__.cs"
+                    SubType = "Code"
+                    BuildAction = "Compile"
+                />
+                <File
+                    RelPath = "Modules\_re.cs"
                     SubType = "Code"
                     BuildAction = "Compile"
                 />
@@ -187,11 +217,6 @@
                 />
                 <File
                     RelPath = "Modules\operator.cs"
-                    SubType = "Code"
-                    BuildAction = "Compile"
-                />
-                <File
-                    RelPath = "Modules\re.cs"
                     SubType = "Code"
                     BuildAction = "Compile"
                 />
