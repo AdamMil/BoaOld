@@ -193,6 +193,10 @@
                     BuildAction = "None"
                 />
                 <File
+                    RelPath = "lib\quopri.boa"
+                    BuildAction = "Content"
+                />
+                <File
                     RelPath = "lib\re.boa"
                     SubType = "Form"
                     BuildAction = "None"
@@ -216,6 +220,10 @@
                 <File
                     RelPath = "lib\time.boa"
                     BuildAction = "None"
+                />
+                <File
+                    RelPath = "lib\uu.boa"
+                    BuildAction = "Content"
                 />
                 <File
                     RelPath = "Modules\__builtin__.cs"
