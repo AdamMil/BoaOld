@@ -80,7 +80,11 @@ public sealed class Importer
   }
 
   static object LoadFromSource(string name, string filename, List __path__)
-  { Module mod = ModuleGenerator.Generate(name, filename, Parser.FromFile(filename).Parse());
+  { string outfile = Path.GetDirectoryName(filename);
+    if(outfile!="") outfile += Path.DirectorySeparatorChar;
+    outfile += Path.GetFileNameWithoutExtension(filename)+".dll";
+
+    Module mod = ModuleGenerator.Generate(name, outfile, Parser.FromFile(filename).Parse());
     if(__path__!=null) mod.__setattr__("__path__", __path__);
     lock(sys.modules) sys.modules[name] = mod;
     mod.Run(new Frame(mod));

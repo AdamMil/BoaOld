@@ -31,10 +31,14 @@ namespace Boa.AST
 public class AssemblyGenerator
 { public AssemblyGenerator(string moduleName, string outFileName) : this(moduleName, outFileName, Options.Debug) { }
   public AssemblyGenerator(string moduleName, string outFileName, bool debug)
-  { AssemblyName an = new AssemblyName();
+  { string dir = System.IO.Path.GetDirectoryName(outFileName);
+    if(dir=="") dir=null;
+    outFileName = System.IO.Path.GetFileName(outFileName);
+
+    AssemblyName an = new AssemblyName();
     an.Name  = moduleName;
     Assembly = AppDomain.CurrentDomain
-                 .DefineDynamicAssembly(an, AssemblyBuilderAccess.RunAndSave, null, null, null, null, null, true);
+                 .DefineDynamicAssembly(an, AssemblyBuilderAccess.RunAndSave, dir, null, null, null, null, true);
     Module   = Assembly.DefineDynamicModule(outFileName, outFileName, debug);
     Symbols  = debug ? Module.DefineDocument(outFileName, Guid.Empty, Guid.Empty, SymDocumentType.Text) : null;
     OutFileName = outFileName;
@@ -46,7 +50,6 @@ public class AssemblyGenerator
   }
 
   public void Save() { Assembly.Save(OutFileName); }
-  public void Save(string fileName) { Assembly.Save(fileName); }
 
   public AssemblyBuilder Assembly;
   public ModuleBuilder   Module;

@@ -567,7 +567,7 @@ public class GeneratorExpression : ListGenExpression
     nc.ILG.BeginCatchBlock(typeof(StopIterationException));
     nc.ILG.EndExceptionBlock();
     nc.ILG.Emit(OpCodes.Ldc_I4_0);
-    nc.ILG.Emit(OpCodes.Ret);
+    nc.EmitReturn();
     nc.Finish();
 
     cg.EmitNew(tg.TypeBuilder.DefineDefaultConstructor(MethodAttributes.Public));
@@ -926,7 +926,7 @@ public abstract class ListGenExpression : Expression
         Item.Emit(cg);
         cg.ILG.Emit(OpCodes.Stind_Ref);
         cg.ILG.Emit(OpCodes.Ldc_I4_1);
-        cg.ILG.Emit(OpCodes.Ret);
+        cg.EmitReturn();
         cg.ILG.MarkLabel(YieldLabel);
       }
       else

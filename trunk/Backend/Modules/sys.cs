@@ -33,7 +33,15 @@ public sealed class sys
 { sys() { }
   static sys()
   { modules["__builtin__"] = Importer.Import("__builtin__");
+
     if(Options.Interactive) path.append("");
+    else path.append(System.IO.Path.GetDirectoryName(Assembly.GetEntryAssembly().Location));
+
+    string lib = Environment.GetEnvironmentVariable("BOA_LIB_PATH");
+    if(lib!=null && lib!="") path.append(lib);
+
+    path.append(System.IO.Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) +
+                System.IO.Path.DirectorySeparatorChar + "lib");
   }
 
   public static string __repr__() { return "<module 'sys' (built-in)>"; }
@@ -52,7 +60,8 @@ public sealed class sys
   public static readonly object __stdout__ = new BoaFile(Console.OpenStandardOutput());
   public static readonly object __stderr__ = new BoaFile(Console.OpenStandardError());
 
-  public static readonly List argv    = new List();
+  public static readonly List argv = new List();
+
   public static readonly Tuple builtin_module_names =
     new Tuple("__builtin__", "binascii", "bisect", "codecs", "dotnet", "dotnetpath", "math", "md5",
               "operator", "os", "random", "re", "socket", "string", "struct", "sys", "time", "types");

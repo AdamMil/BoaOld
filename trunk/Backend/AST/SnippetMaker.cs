@@ -56,7 +56,8 @@ public class SnippetMaker
     tg.ModuleField.EmitSet(cg);
 
     body.Emit(cg);
-    cg.ILG.Emit(OpCodes.Ret);
+    cg.EmitReturn();
+    cg.Finish();
     return (Snippet)tg.FinishType().GetConstructor(Type.EmptyTypes).Invoke(null);
   }
 

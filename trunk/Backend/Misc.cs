@@ -72,7 +72,7 @@ public sealed class Options
 { private Options() { }
 
   public static int  IndentSize=2;
-  public static bool Debug=true, Interactive;
+  public static bool Debug, Optimize, Interactive, NoStdLib;
 }
 
 }

@@ -23,6 +23,7 @@ using System;
 using System.IO;
 using System.Reflection;
 using System.Reflection.Emit;
+using Boa.Runtime;
 
 namespace Boa.AST
 {
@@ -30,16 +31,25 @@ namespace Boa.AST
 public sealed class ModuleGenerator
 { ModuleGenerator() { }
 
-  public static Boa.Runtime.Module Generate(string name, string filename, Statement body)
+  public static Runtime.Module Generate(string name, string filename, Statement body)
+  { return Generate(new AssemblyGenerator(name, filename), name, filename, body,
+                    false, false, PEFileKinds.ConsoleApplication);
+  }
+
+  public static Runtime.Module Generate(string name, string filename, Statement body, PEFileKinds type)
+  { return Generate(new AssemblyGenerator(name, filename), name, filename, body, true, true, type);
+  }
+
+  public static Runtime.Module Generate(AssemblyGenerator ag, string name, string filename, Statement body,
+                                        bool staticCompile, bool entryPoint, PEFileKinds type)
   { body.PostProcessForCompile();
     bool interactive = Options.Interactive;
     Options.Interactive = false;
     try
-    { AssemblyGenerator ag = new AssemblyGenerator(name, Path.GetFileNameWithoutExtension(filename)+".dll");
-      TypeGenerator tg = ag.DefineType(name, typeof(Boa.Runtime.Module));
+    { TypeGenerator tg = ag.DefineType(name, typeof(Runtime.Module));
 
       CodeGenerator icg = tg.DefineMethod(MethodAttributes.Virtual|MethodAttributes.Public|MethodAttributes.HideBySig,
-                                          "Run", typeof(void), new Type[] { typeof(Boa.Runtime.Frame) });
+                                          "Run", typeof(void), new Type[] { typeof(Frame) });
       FrameNamespace ns = new FrameNamespace(tg, icg);
       icg.Namespace = ns;
       icg.ILG.Emit(OpCodes.Ldarg_0);
@@ -50,20 +60,96 @@ public sealed class ModuleGenerator
       icg.ILG.Emit(OpCodes.Ldarg_1);
       icg.EmitString("__name__");
       icg.EmitString(name);
-      icg.EmitCall(typeof(Boa.Runtime.Frame), "SetGlobal");
+      icg.EmitCall(typeof(Frame), "SetGlobal");
 
       string docstring = Misc.BodyToDocString(body);
       if(docstring!=null)
       { icg.ILG.Emit(OpCodes.Ldarg_1);
         icg.EmitString("__doc__");
         icg.EmitString(docstring);
-        icg.EmitCall(typeof(Boa.Runtime.Frame), "SetGlobal");
+        icg.EmitCall(typeof(Frame), "SetGlobal");
       }
 
       body.Emit(icg);
-      icg.ILG.Emit(OpCodes.Ret);
+      icg.EmitReturn();
+      icg.Finish();
 
-      return (Boa.Runtime.Module)tg.FinishType().GetConstructor(Type.EmptyTypes).Invoke(null);
+      if(entryPoint && type!=PEFileKinds.Dll)
+      { CodeGenerator ecg = tg.DefineMethod(MethodAttributes.Static|MethodAttributes.HideBySig,
+                                            "Main", typeof(void), new Type[] { typeof(string[]) });
+        Slot mod=ecg.AllocLocalTemp(typeof(Runtime.Module)), frame=ecg.AllocLocalTemp(typeof(Frame)),
+            argi=ecg.AllocLocalTemp(typeof(int));
+        Label nextarg=ecg.ILG.DefineLabel(), lastarg=ecg.ILG.DefineLabel();
+
+        ecg.EmitFieldGet(typeof(Modules.sys), "argv");
+        ecg.EmitCall(typeof(Assembly), "GetExecutingAssembly");
+        ecg.EmitPropGet(typeof(Assembly), "Location");
+        ecg.EmitCall(typeof(List), "append");
+
+        ecg.EmitInt(0);
+        argi.EmitSet(ecg);
+        ecg.ILG.MarkLabel(nextarg);
+        argi.EmitGet(ecg);
+        ecg.EmitArgGet(0);
+        ecg.EmitPropGet(typeof(string[]), "Length");
+        ecg.ILG.Emit(OpCodes.Clt);
+        ecg.ILG.Emit(OpCodes.Brfalse_S, lastarg);
+        ecg.EmitFieldGet(typeof(Modules.sys), "argv");
+        ecg.EmitArgGet(0);
+        argi.EmitGet(ecg);
+        ecg.ILG.Emit(OpCodes.Ldelem_Ref);
+        ecg.EmitCall(typeof(List), "append");
+        argi.EmitGet(ecg);
+        ecg.EmitInt(1);
+        ecg.ILG.Emit(OpCodes.Add);
+        argi.EmitSet(ecg);
+        ecg.ILG.Emit(OpCodes.Br_S, nextarg);
+        ecg.ILG.MarkLabel(lastarg);
+
+        ecg.EmitNew(tg.TypeBuilder.DefineDefaultConstructor(MethodAttributes.Public));
+        ecg.ILG.Emit(OpCodes.Dup);
+        mod.EmitSet(ecg);
+        ecg.EmitNew(typeof(Frame), new Type[] { typeof(Runtime.Module) });
+        frame.EmitSet(ecg);
+
+        ecg.EmitFieldGet(typeof(Ops), "Frames");
+        frame.EmitGet(ecg);
+        ecg.EmitCall(typeof(System.Collections.Stack), "Push");
+
+        if(!Options.NoStdLib)
+        { mod.EmitGet(ecg);
+          ecg.EmitString("__builtins__");
+          ecg.EmitString("__builtin__");
+          ecg.EmitCall(typeof(Importer), "Import", new Type[] { typeof(string) });
+          ecg.EmitCall(typeof(Runtime.Module), "__setattr__");
+        }
+
+        mod.EmitGet(ecg);
+        ecg.EmitString("__name__");
+        ecg.EmitString("__main__");
+        ecg.EmitCall(typeof(Runtime.Module), "__setattr__");
+
+        ecg.EmitString("string");
+        ecg.EmitCall(typeof(Importer), "Import", new Type[] { typeof(string) });
+        ecg.ILG.Emit(OpCodes.Pop);
+
+        mod.EmitGet(ecg);
+        frame.EmitGet(ecg);
+        ecg.EmitCall((MethodInfo)icg.MethodBase);
+
+        ecg.FreeLocalTemp(mod);
+        ecg.FreeLocalTemp(frame);
+        ecg.FreeLocalTemp(argi);
+
+        ecg.EmitReturn();
+        ecg.Finish();
+
+        ag.Assembly.SetEntryPoint((MethodInfo)ecg.MethodBase, type);
+        if(Options.Debug) ag.Module.SetUserEntryPoint((MethodInfo)icg.MethodBase);
+      }
+
+      Type mtype = tg.FinishType();
+      return staticCompile ? null : (Runtime.Module)mtype.GetConstructor(Type.EmptyTypes).Invoke(null);
     }
     finally { Options.Interactive = interactive; }
   }
