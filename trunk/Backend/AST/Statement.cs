@@ -9,7 +9,7 @@ namespace Boa.AST
 {
 
 // TODO: possibly rework compiled closures
-// TODO: using exceptions is extremely slow
+// TODO: using exceptions is very slow
 #region Exceptions (used to aid implementation)
 public class BreakException : Exception
 { public static BreakException Value = new BreakException();
@@ -68,7 +68,10 @@ public abstract class Statement : Node
   }
   public void PostProcessForInterpret() { PostProcess(); }
 
-  void PostProcess() { }
+  void PostProcess()
+  { Walk(new TryChecker());
+    if(!Options.Debug) Walk(new Optimizer());
+  }
 
   #region NameDecorator
   class NameDecorator : IWalker
@@ -101,7 +104,9 @@ public abstract class Statement : Node
     }
 
     public bool Walk(Node node)
-    { if(inDef)
+    { while(node is ParenExpression) node = ((ParenExpression)node).Expression;
+
+      if(inDef)
       { if(node is DefStatement)
         { DefStatement de = (DefStatement)node;
           innerFuncs.Add(de.Function);
@@ -134,7 +139,7 @@ public abstract class Statement : Node
         { if(func.Globals!=null)
             for(int i=0; i<func.Globals.Length; i++)
               if(func.Globals[i].String==p.Name.String)
-                throw Ops.SyntaxError("'{0}' is both local and global", p.Name.String);
+                throw Ops.SyntaxError(node, "'{0}' is both local and global", p.Name.String);
           names[p.Name.String] = p.Name;
         }
         current=func; inDef=true;
@@ -157,7 +162,8 @@ public abstract class Statement : Node
     }
     
     void HandleAssignment(Expression assignedTo)
-    { if(assignedTo is NameExpression)
+    { while(assignedTo is ParenExpression) assignedTo = ((ParenExpression)assignedTo).Expression;
+      if(assignedTo is NameExpression)
       { NameExpression ne = (NameExpression)assignedTo;
         ne.Name = AddName(ne.Name);
         if(ne.Name.Scope!=Scope.Global) ne.Name.Scope = Scope.Local;
@@ -172,28 +178,139 @@ public abstract class Statement : Node
     bool inDef;
   }
   #endregion
+  
+  #region Optimizer
+  public class Optimizer : IWalker
+  { public void PostWalk(Node n)
+    { if(n is UnaryExpression)
+      { UnaryExpression ue = (UnaryExpression)n;
+        if(ue.Expression.IsConstant) ue.IsConstant = true;
+      }
+      else if(n is BinaryExpression)
+      { BinaryExpression oe = (BinaryExpression)n;
+        if(oe.LHS.IsConstant && oe.RHS.IsConstant) oe.IsConstant = true;
+      }
+      else if(n is HashExpression)
+      { HashExpression he = (HashExpression)n;
+        foreach(DictionaryEntry de in he.Entries)
+          if(!((Expression)de.Key).IsConstant || !((Expression)de.Value).IsConstant) goto nope;
+        he.IsConstant = true;
+        nope:;
+      }
+      else if(n is ListExpression)
+      { ListExpression le = (ListExpression)n;
+        foreach(Expression e in le.Expressions) if(!e.IsConstant) goto nope;
+        le.IsConstant = true;
+        nope:;
+      }
+      else if(n is TupleExpression)
+      { TupleExpression te = (TupleExpression)n;
+        foreach(Expression e in te.Expressions) if(!e.IsConstant) goto nope;
+        te.IsConstant = true;
+        nope:;
+      }
+      else if(n is ListCompExpression) // TODO: optimize this
+      {
+      }
+      else if(n is TernaryExpression)
+      { TernaryExpression te = (TernaryExpression)n;
+        if(te.Test.IsConstant)
+        { bool isTrue = Ops.IsTrue(te.Test.GetValue());
+          if(isTrue && te.IfTrue.IsConstant || !isTrue && te.IfFalse.IsConstant) te.IsConstant = true;
+        }
+      }
+      else if(n is ParenExpression) n.IsConstant = ((ParenExpression)n).Expression.IsConstant;
+    }
+
+    public bool Walk(Node n) { return true; }
+  }
+  #endregion
+  
+  #region TryChecker
+  public class TryChecker : IWalker
+  { public void PostWalk(Node node) { }
+
+    public bool Walk(Node node)
+    { if(inTry)
+      { if(node is TryStatement)
+        { if(nested==null) nested = new ArrayList();
+          nested.Add(node);
+        }
+        return true;
+      }
+      else if(node is TryStatement)
+      { TryStatement ts = (TryStatement)node;
+        ts.Body.Walk(this);
+        if(ts.Else!=null) ts.Else.Walk(this);
+        if(ts.Finally!=null) ts.Finally.Walk(this);
+
+        inTry = true;
+        foreach(ExceptClause ec in ts.Except) ec.Body.Walk(this);
+        inTry = false;
+
+        if(nested!=null && nested.Count>0)
+        { TryStatement[] nest = (TryStatement[])nested.ToArray(typeof(TryStatement));
+          nested.Clear();
+          foreach(TryStatement nts in nest) nts.Walk(this);
+        }
+        return false;
+      }
+      else if(node is RaiseStatement)
+      { if(((RaiseStatement)node).Expression==null)
+          throw Ops.SyntaxError(node, "expression-less 'raise' can only occur inside 'except' block");
+      }
+      else return true;
+      return false;
+    }
+
+    ArrayList nested;
+    bool inTry;
+  }
+  #endregion
 }
 #endregion
 
-#region Suite
-public class Suite : Statement
-{ public Suite(Statement[] stmts) { Statements=stmts; SetLocation(stmts[0].Source, stmts[0].Line, stmts[0].Column); }
-
+#region AssertStatement
+public class AssertStatement : Statement
+{ public AssertStatement(Expression e) { Expression=e; }
+  
   public override void Emit(CodeGenerator cg)
-  { foreach(Statement stmt in Statements)
-    { cg.EmitPosition(stmt);
-      stmt.Emit(cg);
+  { if(Options.Debug)
+    { Label good = cg.ILG.DefineLabel();
+      Expression.Emit(cg);
+      cg.EmitCall(typeof(Ops), "IsTrue");
+      cg.ILG.Emit(OpCodes.Brtrue, good);
+      cg.EmitString("assertion failed: ");
+      cg.EmitString(Expression.ToCode());
+      cg.EmitCall(typeof(string), "Concat", new Type[] { typeof(string), typeof(string) });
+      cg.EmitNew(typeof(AssertionErrorException));
+      cg.ILG.Emit(OpCodes.Dup);
+      cg.EmitString(Source);
+      cg.EmitInt(Line);
+      cg.EmitInt(Column);
+      cg.EmitCall(typeof(AssertionErrorException), "SetPosition");
+      cg.ILG.Emit(OpCodes.Throw);
+      cg.ILG.MarkLabel(good);
     }
   }
+  
+  public override void Execute(Frame frame)
+  { if(Options.Debug && !Ops.IsTrue(Expression.Evaluate(frame)))
+      throw Ops.AssertionError(this, "assertion failed: "+Expression.ToCode());
+  }
 
-  public override void Execute(Frame frame) { foreach(Statement stmt in Statements) stmt.Execute(frame); }
+  public override void ToCode(System.Text.StringBuilder sb, int indent)
+  { sb.Append("assert ");
+    Expression.ToCode(sb, indent);
+    sb.Append('\n');
+  }
 
   public override void Walk(IWalker w)
-  { if(w.Walk(this)) foreach(Statement stmt in Statements) stmt.Walk(w);
+  { if(w.Walk(this)) Expression.Walk(w);
     w.PostWalk(this);
   }
 
-  public Statement[] Statements;
+  public Expression Expression;
 }
 #endregion
 
@@ -205,8 +322,8 @@ public class AssignStatement : Statement
   public override void Emit(CodeGenerator cg)
   { if(LHS is TupleExpression)
     { TupleExpression lhs = (TupleExpression)LHS;
-      if(false/*RHS.IsConstant*/) // TODO: implement this optimization
-      { 
+      if(RHS.IsConstant) // TODO: implement this optimization
+      { throw new NotImplementedException();
       }
       else
       { 
@@ -333,6 +450,12 @@ public class AssignStatement : Statement
 
   public override void Execute(Frame frame) { LHS.Assign(RHS.Evaluate(frame), frame); }
 
+  public override void ToCode(System.Text.StringBuilder sb, int indent)
+  { LHS.ToCode(sb, indent);
+    sb.Append(" = ");
+    RHS.ToCode(sb, indent);
+  }
+
   public override void Walk(IWalker w)
   { if(w.Walk(this))
     { LHS.Walk(w);
@@ -348,19 +471,63 @@ public class AssignStatement : Statement
 #region BreakStatement
 public class BreakStatement : JumpStatement
 { public override void Execute(Frame frame) { throw BreakException.Value; }
+  public override void ToCode(System.Text.StringBuilder sb, int indent) { sb.Append("break"); }
+}
+#endregion
+
+#region ClassStatement
+public class ClassStatement : Statement
+{ public ClassStatement(string name, Expression[] bases, Statement body)
+  { Name  = new Name(name);
+    Bases = bases;
+    Body  = body;
+  }
+  
+  public override void Emit(CodeGenerator cg)
+  { throw new NotImplementedException();
+  }
+
+  public override void Execute(Frame frame)
+  { 
+  }
+
+  public override void ToCode(System.Text.StringBuilder sb, int indent)
+  { sb.Append("class ");
+    sb.Append(Name.String);
+    sb.Append(" (");
+    for(int i=0; i<Bases.Length; i++)
+    { if(i!=0) sb.Append(", ");
+      Bases[i].ToCode(sb, indent);
+    }
+    sb.Append("):");
+    StatementToCode(sb, Body, indent+Options.IndentSize);
+  }
+
+  public override void Walk(IWalker w)
+  { if(w.Walk(this))
+    { foreach(Expression e in Bases) e.Walk(w);
+      Body.Walk(w);
+    }
+    w.PostWalk(this);
+  }
+
+  public Name Name;
+  public Expression[] Bases;
+  public Statement Body;
 }
 #endregion
 
 #region ContinueStatement
 public class ContinueStatement : JumpStatement
 { public override void Execute(Frame frame) { throw ContinueException.Value; }
+  public override void ToCode(System.Text.StringBuilder sb, int indent) { sb.Append("continue"); }
 }
 #endregion
 
 #region DefStatement
 public class DefStatement : Statement
 { public DefStatement(string name, Parameter[] parms, Statement body)
-  { Function = new BoaFunction(name, parms, body);
+  { Function = new BoaFunction(this, name, parms, body);
     GlobalFinder gf = new GlobalFinder();
     Function.Body.Walk(gf);
     Function.Globals = gf.Globals==null || gf.Globals.Count==0 ? null : (Name[])gf.Globals.ToArray(typeof(Name));
@@ -387,6 +554,18 @@ public class DefStatement : Statement
 
   public override void Execute(Frame frame) { frame.Set(Function.FuncName, Function.MakeFunction(frame)); }
 
+  public override void ToCode(System.Text.StringBuilder sb, int indent)
+  { sb.Append("def ");
+    sb.Append(Function.Name.String);
+    sb.Append("(");
+    for(int i=0; i<Function.Parameters.Length; i++)
+    { if(i!=0) sb.Append(", ");
+      Function.Parameters[i].ToCode(sb);
+    }
+    sb.Append("):");
+    StatementToCode(sb, Function.Body, indent+Options.IndentSize);
+  }
+
   public override void Walk(IWalker w) { Function.Walk(w); }
 
   public BoaFunction Function;
@@ -396,12 +575,13 @@ public class DefStatement : Statement
   { public void PostWalk(Node node) { }
 
     public bool Walk(Node node)
-    { if(node is DefStatement || node is LambdaExpression) return false; // TODO: what if 'def' and 'global' collide?
+    { while(node is ParenExpression) node = ((ParenExpression)node).Expression;
+      if(node is DefStatement || node is LambdaExpression) return false; // TODO: what if 'def' and 'global' collide?
       else if(node is GlobalStatement)
       { if(Globals==null) Globals = new ArrayList();
         foreach(Name n in ((GlobalStatement)node).Names)
           if(assigned!=null && assigned.Contains(n.String))
-            throw Ops.SyntaxError("'{0}' assigned to before associated 'global' statement", n.String);
+            throw Ops.SyntaxError(node, "'{0}' assigned to before associated 'global' statement", n.String);
           else Globals.Add(n);
         return false;
       }
@@ -417,7 +597,8 @@ public class DefStatement : Statement
     }
 
     void HandleAssignment(Expression e)
-    { if(e is NameExpression)
+    { while(e is ParenExpression) e = ((ParenExpression)e).Expression;
+      if(e is NameExpression)
       { if(assigned==null) assigned=new HybridDictionary();
         assigned[((NameExpression)e).Name.String] = null;
       }
@@ -447,10 +628,13 @@ public class ExpressionStatement : Statement
     }
     cg.ILG.Emit(OpCodes.Pop);
   }
+
   public override void Execute(Frame frame)
   { object ret = Expression.Evaluate(frame);
     if(Options.Interactive) Ops.Call(Boa.Modules.sys.displayhook, ret);
   }
+
+  public override void ToCode(System.Text.StringBuilder sb, int indent) { Expression.ToCode(sb, indent); }
 
   public override void Walk(IWalker w)
   { if(w.Walk(this)) Expression.Walk(w);
@@ -466,22 +650,30 @@ public class IfStatement : Statement
 { public IfStatement(Expression test, Statement body, Statement elze) { Test=test; Body=body; Else=elze; }
 
   public override void Emit(CodeGenerator cg)
-  { Label endLab = cg.ILG.DefineLabel(), elseLab = Else==null ? new Label() : cg.ILG.DefineLabel();
-    cg.EmitIsTrue(Test);
-    cg.ILG.Emit(OpCodes.Brfalse, Else==null ? endLab : elseLab);
-    Body.Emit(cg);
-    if(Else!=null)
-    { cg.ILG.Emit(OpCodes.Br, endLab);
-      cg.ILG.MarkLabel(elseLab);
-      Else.Emit(cg);
+  { if(!Options.Debug && Test.IsConstant)
+    { if(Ops.IsTrue(Test.GetValue())) Body.Emit(cg);
+      else if(Else!=null) Else.Emit(cg);
     }
-    cg.ILG.MarkLabel(endLab);
+    else
+    { Label endLab = cg.ILG.DefineLabel(), elseLab = Else==null ? new Label() : cg.ILG.DefineLabel();
+      cg.EmitIsTrue(Test);
+      cg.ILG.Emit(OpCodes.Brfalse, Else==null ? endLab : elseLab);
+      Body.Emit(cg);
+      if(Else!=null)
+      { cg.ILG.Emit(OpCodes.Br, endLab);
+        cg.ILG.MarkLabel(elseLab);
+        Else.Emit(cg);
+      }
+      cg.ILG.MarkLabel(endLab);
+    }
   }
 
   public override void Execute(Frame frame)
   { if(Ops.IsTrue(Test.Evaluate(frame))) Body.Execute(frame);
     else if(Else!=null) Else.Execute(frame);
   }
+
+  public override void ToCode(System.Text.StringBuilder sb, int indent) { ToCode(sb, indent, false); }
 
   public override void Walk(IWalker w)
   { if(w.Walk(this))
@@ -494,6 +686,21 @@ public class IfStatement : Statement
 
   public Expression Test;
   public Statement Body, Else;
+
+  void ToCode(System.Text.StringBuilder sb, int indent, bool elif)
+  { sb.Append(elif ? "elif " : "if ");
+    Test.ToCode(sb, indent);
+    sb.Append(':');
+    StatementToCode(sb, Body, indent+Options.IndentSize);
+    if(Else!=null)
+    { sb.Append(' ', indent);
+      if(Else is IfStatement) ((IfStatement)Else).ToCode(sb, indent, true);
+      else
+      { sb.Append("else:");
+        StatementToCode(sb, Else, indent+Options.IndentSize);
+      }
+    }
+  }
 }
 #endregion
 
@@ -523,6 +730,16 @@ public class ImportFromStatement : Statement
     }
   }
 
+  public override void ToCode(System.Text.StringBuilder sb, int indent)
+  { sb.Append("from ");
+    sb.Append(Module);
+    sb.Append(" import ");
+    for(int i=0; i<Names.Length; i++)
+    { if(i!=0) sb.Append(", ");
+      Names[i].ToCode(sb);
+    }
+  }
+
   public ImportName[] Names;
   public string Module;
 }
@@ -545,6 +762,14 @@ public class ImportStatement : Statement
   { string[] names=new string[Names.Length], asNames=new string[Names.Length];
     for(int i=0; i<Names.Length; i++) { names[i]=Names[i].Name; asNames[i]=Names[i].AsName; }
     Ops.Import(frame.Module, names, asNames);
+  }
+
+  public override void ToCode(System.Text.StringBuilder sb, int indent)
+  { sb.Append("import ");
+    for(int i=0; i<Names.Length; i++)
+    { if(i!=0) sb.Append(", ");
+      Names[i].ToCode(sb);
+    }
   }
 
   public ImportName[] Names;
@@ -597,6 +822,22 @@ public class ForStatement : Statement
     }
   }
   
+  public override void ToCode(System.Text.StringBuilder sb, int indent)
+  { sb.Append("for ");
+    if(Names is TupleExpression)
+    { TupleExpression te = (TupleExpression)Names;
+      for(int i=0; i<te.Expressions.Length; i++)
+      { if(i!=0) sb.Append(',');
+        te.Expressions[i].ToCode(sb, indent);
+      }
+    }
+    else Names.ToCode(sb, indent);
+    sb.Append(" in ");
+    Expression.ToCode(sb, indent);
+    sb.Append(':');
+    StatementToCode(sb, Body, indent+Options.IndentSize);
+  }
+
   public override void Walk(IWalker w)
   { if(w.Walk(this))
     { Names.Walk(w);
@@ -622,6 +863,14 @@ public class GlobalStatement : Statement
   public override void Emit(CodeGenerator cg) { }
   public override void Execute(Frame frame) { foreach(Name name in Names) frame.MarkGlobal(name.String); }
 
+  public override void ToCode(System.Text.StringBuilder sb, int indent)
+  { sb.Append("global ");
+    for(int i=0; i<Names.Length; i++)
+    { if(i!=0) sb.Append(", ");
+      sb.Append(Names[i].String);
+    }
+  }
+
   public Name[] Names;
 }
 #endregion
@@ -638,6 +887,7 @@ public abstract class JumpStatement : Statement
 public class PassStatement : Statement
 { public override void Emit(CodeGenerator cg) { }
   public override void Execute(Frame frame) { }
+  public override void ToCode(System.Text.StringBuilder sb, int indent) { sb.Append("pass"); }
 }
 #endregion
 
@@ -662,6 +912,15 @@ public class PrintStatement : Statement
     if(TrailingNewline || Expressions.Length==0) Ops.PrintNewline();
   }
 
+  public override void ToCode(System.Text.StringBuilder sb, int indent)
+  { sb.Append("print ");
+    for(int i=0; i<Expressions.Length; i++)
+    { if(i!=0) sb.Append(", ");
+      Expressions[i].ToCode(sb, indent);
+    }
+    if(!TrailingNewline) sb.Append(',');
+  }
+
   public override void Walk(IWalker w)
   { if(w.Walk(this) && Expressions!=null) foreach(Expression e in Expressions) e.Walk(w);
     w.PostWalk(this);
@@ -672,7 +931,7 @@ public class PrintStatement : Statement
 }
 #endregion
 
-// TODO: enforce that the expressionless 'raise' only occurs within an 'except' block
+// TODO: add source, line, and column to exceptions
 #region RaiseStatement
 public class RaiseStatement : Statement
 { public RaiseStatement() { }
@@ -704,6 +963,14 @@ public class RaiseStatement : Statement
     }
   }
 
+  public override void ToCode(System.Text.StringBuilder sb, int indent)
+  { if(Expression==null) sb.Append("raise");
+    else
+    { sb.Append("raise ");
+      Expression.ToCode(sb, indent);
+    }
+  }
+
   public override void Walk(IWalker w)
   { if(w.Walk(this) && Expression!=null) Expression.Walk(w);
     w.PostWalk(this);
@@ -723,12 +990,51 @@ public class ReturnStatement : Statement
   { throw new ReturnException(Expression==null ? null : Expression.Evaluate(frame));
   }
 
+  public override void ToCode(System.Text.StringBuilder sb, int indent)
+  { if(Expression==null) sb.Append("return");
+    else
+    { sb.Append("return ");
+      Expression.ToCode(sb, indent);
+    }
+  }
+
   public override void Walk(IWalker w)
   { if(w.Walk(this) && Expression!=null) Expression.Walk(w);
     w.PostWalk(this);
   }
 
   public Expression Expression;
+}
+#endregion
+
+#region Suite
+public class Suite : Statement
+{ public Suite(Statement[] stmts) { Statements=stmts; SetLocation(stmts[0].Source, stmts[0].Line, stmts[0].Column); }
+
+  public override void Emit(CodeGenerator cg)
+  { foreach(Statement stmt in Statements)
+    { cg.EmitPosition(stmt);
+      stmt.Emit(cg);
+    }
+  }
+
+  public override void Execute(Frame frame) { foreach(Statement stmt in Statements) stmt.Execute(frame); }
+
+  public override void ToCode(System.Text.StringBuilder sb, int indent)
+  { sb.Append('\n');
+    foreach(Statement s in Statements)
+    { if(indent>0) sb.Append(' ', indent);
+      s.ToCode(sb, indent);
+      if(!(s is IfStatement)) sb.Append('\n');
+    }
+  }
+
+  public override void Walk(IWalker w)
+  { if(w.Walk(this)) foreach(Statement stmt in Statements) stmt.Walk(w);
+    w.PostWalk(this);
+  }
+
+  public Statement[] Statements;
 }
 #endregion
 
@@ -854,6 +1160,26 @@ public class TryStatement : Statement
     }
   }
 
+  public override void ToCode(System.Text.StringBuilder sb, int indent)
+  { sb.Append("try:\n");
+    StatementToCode(sb, Body, indent+Options.IndentSize);
+
+    foreach(ExceptClause ec in Except)
+    { sb.Append(' ', indent);
+      ec.ToCode(sb, indent);
+    }
+    if(Else!=null)
+    { sb.Append(' ', indent);
+      sb.Append("else:");
+      StatementToCode(sb, Else, indent+Options.IndentSize);
+    }
+    if(Finally!=null)
+    { sb.Append(' ', indent);
+      sb.Append("finally:");
+      StatementToCode(sb, Finally, indent+Options.IndentSize);
+    }
+  }
+
   public override void Walk(IWalker w)
   { if(w.Walk(this))
     { Body.Walk(w);
@@ -873,12 +1199,16 @@ public class WhileStatement : Statement
 { public WhileStatement(Expression test, Statement body) { Test=test; Body=body; }
 
   public override void Emit(CodeGenerator cg)
-  { Label start=cg.ILG.DefineLabel(), end=cg.ILG.DefineLabel();
+  { if(!Options.Debug && Test.IsConstant && !Ops.IsTrue(Test.GetValue())) return;
+
+    Label start=cg.ILG.DefineLabel(), end=cg.ILG.DefineLabel();
     Body.Walk(new JumpFinder(start, end));
     cg.ILG.MarkLabel(start);
-    Test.Emit(cg);
-    cg.EmitCall(typeof(Ops), "IsTrue");
-    cg.ILG.Emit(OpCodes.Brfalse, end);
+    if(Options.Debug || !Test.IsConstant)
+    { Test.Emit(cg);
+      cg.EmitCall(typeof(Ops), "IsTrue");
+      cg.ILG.Emit(OpCodes.Brfalse, end);
+    }
     Body.Emit(cg);
     cg.ILG.Emit(OpCodes.Br, start);
     cg.ILG.MarkLabel(end);
@@ -889,6 +1219,13 @@ public class WhileStatement : Statement
       try { Body.Execute(frame); }
       catch(BreakException) { break; }
       catch(ContinueException) { }
+  }
+
+  public override void ToCode(System.Text.StringBuilder sb, int indent)
+  { sb.Append("while ");
+    Test.ToCode(sb, indent);
+    sb.Append(':');
+    StatementToCode(sb, Body, indent+Options.IndentSize);
   }
 
   public override void Walk(IWalker w)

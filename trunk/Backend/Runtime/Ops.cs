@@ -106,6 +106,12 @@ public sealed class Ops
   { public int Compare(object x, object y) { return Ops.Compare(x, y); }
   }
 
+  public static AssertionErrorException AssertionError(Boa.AST.Node node, string format, params object[] args)
+  { AssertionErrorException e = new AssertionErrorException(string.Format(format, args));
+    e.SetPosition(node);
+    return e;
+  }
+
   public static AttributeErrorException AttributeError(string format, params object[] args)
   { return new AttributeErrorException(string.Format(format, args));
   }
@@ -500,6 +506,12 @@ public sealed class Ops
 
   public static SyntaxErrorException SyntaxError(string format, params object[] args)
   { return new SyntaxErrorException(string.Format(format, args));
+  }
+
+  public static SyntaxErrorException SyntaxError(Boa.AST.Node node, string format, params object[] args)
+  { SyntaxErrorException e = new SyntaxErrorException(string.Format(format, args));
+    e.SetPosition(node);
+    return e;
   }
 
   public static object ToBoa(object o) { return o is char ? new string((char)o, 1) : o; }

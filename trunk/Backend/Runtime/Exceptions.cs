@@ -6,6 +6,20 @@ namespace Boa.Runtime
 public abstract class BoaException : Exception
 { public BoaException() { }
   public BoaException(string message) : base(message) { }
+
+  public void SetPosition(Boa.AST.Node node) { SourceFile=node.Source; Line=node.Line; Column=node.Column; }
+  public void SetPosition(string source, int line, int column) { SourceFile=source; Line=line; Column=column; }
+
+  public override string Message
+  { get { return string.Format("{0}({1},{2}: {3}", SourceFile, Line, Column, base.Message); }
+  }
+
+  public string SourceFile;
+  public int Line, Column;
+}
+
+public class AssertionErrorException : RuntimeException
+{ public AssertionErrorException(string message) : base(message) { }
 }
 
 public class AttributeErrorException : RuntimeException

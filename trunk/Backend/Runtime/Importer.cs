@@ -53,7 +53,7 @@ public sealed class Importer
     }
     return null;
   }
-  
+
   static object LoadFromSource(string name, string filename, List __path__)
   { Module mod = ModuleGenerator.Generate(name, filename, Parser.FromFile(filename).Parse());
     if(__path__!=null) mod.__setattr__("__path__", __path__);

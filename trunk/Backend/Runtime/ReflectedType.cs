@@ -270,7 +270,7 @@ public class ReflectedProperty : IDataDescriptor
   }
 
   public void __set__(object instance, object value)
-  { if(!info.CanWrite) throw Ops.TypeError("non-writeable attribute");
+  { if(!info.CanWrite) throw Ops.TypeError("{0} is a non-writeable attribute", info.Name);
     MethodInfo mi = info.GetSetMethod();
     if(instance==null && !mi.IsStatic) throw Ops.TypeError("{0} is an instance property", info.Name);
     mi.Invoke(instance, new object[] { Ops.ConvertTo(value, info.PropertyType) });
