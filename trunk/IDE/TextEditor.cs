@@ -21,7 +21,10 @@ public class TextEditor : Control
     hbar.Dock = DockStyle.Bottom;
 
     ptab.LineCountChanged += new EventHandler(ptab_LineCountChanged);
+    ExamineFont();
+    RecalcScrollbars();
   }
+  ~TextEditor() { if(caretControl==this) caretControl=null; }
 
   public bool AcceptsTab
   { get { return acceptsTab; }
@@ -29,6 +32,16 @@ public class TextEditor : Control
     { if(value!=acceptsTab)
       { acceptsTab=value;
         OnAcceptsTabChanged(EventArgs.Empty);
+      }
+    }
+  }
+
+  public bool AntiAliased
+  { get { return antiAliased; }
+    set
+    { if(antiAliased!=value)
+      { antiAliased = value;
+        Invalidate(false);
       }
     }
   }
@@ -107,7 +120,12 @@ public class TextEditor : Control
 
   public TextEditorScrollBars ScrollBars
   { get { return scrollBars; }
-    set { throw new NotImplementedException(); }
+    set
+    { if(scrollBars!=value)
+      { scrollBars = value;
+        RecalcScrollbars();
+      }
+    }
   }
 
   public string SelectedText
@@ -132,12 +150,12 @@ public class TextEditor : Control
   }
 
   public int SelectionLength
-  { get { return selLength; }
+  { get { return Math.Abs(selLength); }
     set { Select(selStart, value); }
   }
   public int SelectionStart
-  { get { return selStart; }
-    set { Select(value, selLength); }
+  { get { return selLength<0 ? selStart-selLength : selStart; }
+    set { Select(value, SelectionLength); }
   }
 
   public bool SelectionProtected
@@ -156,27 +174,6 @@ public class TextEditor : Control
   }
 
   public int TextLength { get { return ptab.TextLength; } }
-
-  public TextRenderingHint TextRenderingHint
-  { get { return textRender; }
-    set
-    { if(textRender!=value)
-      { textRender=value;
-        Invalidate(false);
-      }
-    }
-  }
-
-  public bool WordWrap
-  { get { return wordWrap; }
-    set
-    { if(wordWrap!=value)
-      { wordWrap=value;
-        // TODO: recalculate scroll bars
-        Invalidate(false);
-      }
-    }
-  }
 
   public void AppendText(string text) { ptab.Append(text); }
   public void Clear() { ptab.Clear(); }
@@ -250,18 +247,83 @@ public class TextEditor : Control
 
   #region Event handlers
   void ptab_LineCountChanged(object sender, EventArgs e)
-  { vbar.Maximum = ptab.LineCount;
-    RecalcScrollbars();
+  { RecalcScrollbars();
   }
   #endregion
 
   #region Event overrides
+  protected override void Dispose(bool disposing)
+  { if(caretControl==this) caretControl=null;
+    if(!disposing) GC.SuppressFinalize(this);
+    base.Dispose(disposing);
+  }
+
+  protected override void OnGotFocus(EventArgs e)
+  { base.OnGotFocus(e);
+    caretControl = this;
+  }
+
+  protected override void OnFontChanged(EventArgs e)
+  { base.OnFontChanged(e);
+    ExamineFont();
+    RecalcScrollbars();
+    Invalidate(false);
+  }
+
+  protected override void OnKeyPress(KeyPressEventArgs e)
+  { if(!e.Handled)
+    { if(e.KeyChar==(char)27) { selLength=0; } // escape
+      else if(readOnly || e.KeyChar<32 && (e.KeyChar!='\t' || !acceptsTab)) goto done;
+      else if(e.KeyChar=='\r' || e.KeyChar=='\n')
+      { if(selLength==0) ptab.Insert(selStart++, '\n');
+        else SelectedText = "\n";
+      }
+      else if(e.KeyChar=='\b')
+      { if(selLength==0)
+        { if(selStart!=0) ptab.Delete(--selStart);
+        }
+        else SelectedText = "";
+      }
+      else if(selLength==0) ptab.Insert(selStart++, e.KeyChar);
+      else SelectedText = e.KeyChar.ToString();
+
+      Invalidate(false); // FIXME: this definitely needs to be more intelligent
+      e.Handled = true;
+    }
+    done: base.OnKeyPress(e);
+  }
+
   protected override void OnPaint(PaintEventArgs e)
   { base.OnPaint(e);
+
+    Font font = Font;
+    Brush brush = new SolidBrush(ForeColor);
+
+    int y=padding, fhei=font.Height, topLine=vbar.Value, nlines=(e.ClipRectangle.Height+fhei-1)/fhei, tlines=LineCount;
+    while(y+fhei<e.ClipRectangle.Top) { y += fhei; topLine++; }
+
+    RectangleF rect = e.ClipRectangle;
+    rect.Inflate(-padding, 0);
+    rect.Y = y;
+    rect.Height = fhei;
+
+    e.Graphics.TextRenderingHint =
+      antiAliased ? TextRenderingHint.AntiAliasGridFit : TextRenderingHint.SingleBitPerPixelGridFit;
+
+    string[] lines = GetLines(topLine, nlines);
+    for(nlines=Math.Min(nlines+topLine, tlines); topLine<nlines; rect.Y+=rect.Height, topLine++)
+      e.Graphics.DrawString(lines[topLine], font, brush, rect, StringFormat.GenericTypographic);
+
+    if(Focused && caretControl==this)
+    { Rectangle caret = Rectangle.Intersect(CaretRect, e.ClipRectangle);
+      caret.Location = PointToScreen(caret.Location);
+      if(caret.Width!=0) ControlPaint.FillReversibleRectangle(caret, BackColor);
+    }
   }
 
   protected override void OnPaintBackground(PaintEventArgs e)
   { base.OnPaintBackground(e);
+
     if(borderStyle==BorderStyle.FixedSingle)
       ControlPaint.DrawBorder(e.Graphics, ClientRectangle,
                               Enabled ? SystemColors.ActiveBorder : SystemColors.InactiveBorder,
@@ -270,6 +332,15 @@ public class TextEditor : Control
       ControlPaint.DrawBorder3D(e.Graphics, ClientRectangle, Border3DStyle.Sunken);
   }
 
+  protected override void OnParentChanged(EventArgs e)
+  { if(Parent==null && caretControl==this) caretControl=null;
+    base.OnParentChanged(e);
+  }
+
+  protected override void OnResize(EventArgs e)
+  { base.OnResize(e);
+    RecalcScrollbars();
+  }
   #endregion
 
   #region Event raisers
@@ -296,23 +367,83 @@ public class TextEditor : Control
   }
   #endregion
 
+  const int padding=2;
+
+  Rectangle CaretRect
+  { get
+    { //Point pt = GetPositionFromCharIndex(selStart);
+      return new Rectangle(padding+(int)Math.Round(selStart*charWidth), padding, 2, Font.Height);
+    }
+  }
+
+  int LineCount { get { return ptab.LineCount; } }
   int MaxVisibleLines { get { return ClientSize.Height/Font.Height; } }
 
-  void RecalcScrollbars()
-  { if((scrollBars&TextEditorScrollBars.Vertical)!=0)
-      vbar.Visible = (scrollBars&TextEditorScrollBars.Forced)==0 ? vbar.Maximum>MaxVisibleLines : true;
-    if((scrollBars&TextEditorScrollBars.Horizontal)!=0)
-      hbar.Visible = (scrollBars&TextEditorScrollBars.Forced)==0 ? false : true;
+  void ExamineFont()
+  { StringFormat sf = StringFormat.GenericTypographic;
+
+    Graphics g = Graphics.FromHwnd(Handle);
+    g.TextRenderingHint =
+      antiAliased ? TextRenderingHint.AntiAliasGridFit : TextRenderingHint.SingleBitPerPixelGridFit;
+
+    float w1 = g.MeasureString("WWWWWWWWWWWWWWW", Font, 2000, sf).Width;
+    float w2 = g.MeasureString("iiiiiiiiiiiiiii", Font, 2000, sf).Width;
+    float w3 = g.MeasureString("lllllllllllllll", Font, 2000, sf).Width;
+    float w4 = g.MeasureString("...............", Font, 2000, sf).Width;
+
+    const float epsilon = 0.001f;
+    monoSpaced = Math.Abs(w1-w2)<epsilon && Math.Abs(w1-w3)<epsilon && Math.Abs(w1-w4)<epsilon;
+    if(monoSpaced) charWidth = (w1+w2+w3+w4)/60f;
+
+    g.Dispose();
   }
+
+  string[] GetLines(int start, int count) { return Lines; }
+
+  void RecalcScrollbars()
+  { vbar.LargeChange = MaxVisibleLines;
+    int vmax = Math.Max(0, LineCount-vbar.LargeChange+1);
+    vbar.Maximum = LineCount;
+    if(vbar.Value>vmax) vbar.Value=vmax;
+
+    if((scrollBars&TextEditorScrollBars.Vertical)!=0)
+    { bool visible = (scrollBars&TextEditorScrollBars.Forced)==0 ? vbar.Maximum>MaxVisibleLines : true;
+      if(visible && vbar.Parent==null) vbar.Parent=this;
+      else if(!visible && vbar.Parent!=null) vbar.Parent=null;
+    }
+
+    if((scrollBars&TextEditorScrollBars.Horizontal)!=0)
+    { bool visible = (scrollBars&TextEditorScrollBars.Forced)==0 ? false : true;
+      if(visible && hbar.Parent==null) hbar.Parent=this;
+      else if(!visible && hbar.Parent!=null) hbar.Parent=null;
+    }
+  }
+
+  void ShowCaret() { Invalidate(CaretRect, false); }
 
   PieceTable ptab=new PieceTable();
   ScrollBar hbar=new HScrollBar(), vbar=new VScrollBar();
   int selStart, selLength, maxLength;
+  float charWidth;
   CharacterCasing casing=CharacterCasing.Normal;
   BorderStyle borderStyle=BorderStyle.Fixed3D;
   TextEditorScrollBars scrollBars=TextEditorScrollBars.Both;
-  TextRenderingHint textRender;
-  bool acceptsTab, createUndos=true, hideSelection=true, modified, readOnly, wordWrap=true;
+  bool acceptsTab=true, antiAliased, createUndos=true, hideSelection=true, modified, monoSpaced, readOnly;
+
+  delegate void CaretDelegate();
+
+  static void CaretTick(object dummy)
+  { TextEditor ctl = caretControl;
+    if(ctl!=null && ctl.Focused)
+      try { ctl.Invoke(new CaretDelegate(ctl.ShowCaret)); }
+      catch { }
+    caretVisible=!caretVisible;
+  }
+
+  static System.Threading.Timer caretTimer =
+    new System.Threading.Timer(new System.Threading.TimerCallback(CaretTick), null, 400, 400);
+  static TextEditor caretControl;
+  static bool caretVisible;
 }
 
 } // namespace Boa.IDE
