@@ -192,7 +192,7 @@ public abstract class Statement : Node
         }
         else if(node is ImportFromStatement)
         { ImportFromStatement imp = (ImportFromStatement)node;
-          if(imp.Names[0].Name=="*") ; // TODO: handle this case
+          if(imp.Names[0].Name=="*") ; // FIXME: handle this case
           foreach(ImportName n in imp.Names) AddName(new Name(n.AsName==null ? n.Name : n.AsName, Scope.Local));
         }
         else if(node is NameExpression)
