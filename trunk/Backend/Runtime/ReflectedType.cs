@@ -224,7 +224,7 @@ public class ReflectedMember
 }
 #endregion
 
-// TODO: allow extra keyword parameters to set properties?
+// TODO: allow extra keyword parameters to set properties
 #region ReflectedConstructor
 public class ReflectedConstructor : ReflectedMethodBase
 { public ReflectedConstructor(ConstructorInfo ci) : base(ci) { }
@@ -237,6 +237,7 @@ public class ReflectedConstructor : ReflectedMethodBase
 #region ReflectedEvent
 public class ReflectedEvent : ReflectedMember, IDescriptor
 { public ReflectedEvent(EventInfo ei) : base(ei) { info=ei; }
+  public ReflectedEvent(EventInfo ei, object instance) : base(ei) { info=ei; this.instance=instance; }
 
 	// TODO: automatically create new delegate types for different event signatures
 	public class BoaEventHandler
@@ -248,27 +249,27 @@ public class ReflectedEvent : ReflectedMember, IDescriptor
 		object func;
 	}
 
-  public object __iadd__(object instance, object func)
+  // TODO: use __iadd__ and __isub__ when we support that
+  public void add(object func)
   { Delegate handler = func as Delegate;
     if(handler==null) handler = Delegate.CreateDelegate(info.EventHandlerType, new BoaEventHandler(func), "Handle");
     info.AddEventHandler(instance, handler);
-    return null;
   }
 
-  public object __isub__(object instance, object func)
+  public void sub(object func)
   { Delegate handler = func as Delegate;
     if(handler==null) throw new NotImplementedException("removing non-delegate event handlers");
     info.RemoveEventHandler(instance, handler);
-    return null;
   }
 
-  public object __get__(object instance) { return this; }
+  public object __get__(object instance) { return instance==null ? this : new ReflectedEvent(info, instance); }
 
   public override string ToString()
   { return string.Format("<event '{0}' on '{1}'>", info.Name, info.DeclaringType.FullName);
   }
 
   internal EventInfo info;
+  object instance;
 }
 #endregion
 
