@@ -1,0 +1,21 @@
+OPERATOR PRECEDENCE:
+nonassoc  (expr) (expr,) [] {} `` (parenthesized expression, tuple, lists and hashes, string conversion)
+right     typeof new def lambda
+left      . func(parms) [] type(expr) (member access, function calls, indexing, cast)
+nonassoc  ++ --
+right     ! ~ unary- unary+ ref
+right     **
+left      * / // %
+nonassoc  =~ !~
+left      + -
+left      shifting
+left      & | ^
+left      comparison
+left      &&
+left      ||
+right     ?: (ternary operator)
+left      is as in
+right     assignment
+right     not
+left      and
+left      or
