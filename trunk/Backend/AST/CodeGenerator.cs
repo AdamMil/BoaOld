@@ -28,7 +28,7 @@ using Boa.Runtime;
 namespace Boa.AST
 {
 
-public class CodeGenerator
+public sealed class CodeGenerator
 { public CodeGenerator(TypeGenerator tg, MethodBase mb, ILGenerator ilg)
   { TypeGenerator = tg; MethodBase = mb; ILG = ilg;
   }

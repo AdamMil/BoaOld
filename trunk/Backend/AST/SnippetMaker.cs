@@ -31,7 +31,7 @@ public abstract class Snippet
 { public abstract void Run(Frame frame);
 }
 
-public class SnippetMaker
+public sealed class SnippetMaker
 { private SnippetMaker() { }
 
   public static void DumpAssembly()

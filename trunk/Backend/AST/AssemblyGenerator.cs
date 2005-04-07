@@ -28,7 +28,7 @@ using Boa.Runtime;
 namespace Boa.AST
 {
 
-public class AssemblyGenerator
+public sealed class AssemblyGenerator
 { public AssemblyGenerator(string moduleName, string outFileName) : this(moduleName, outFileName, Options.Debug) { }
   public AssemblyGenerator(string moduleName, string outFileName, bool debug)
   { string dir = System.IO.Path.GetDirectoryName(outFileName);

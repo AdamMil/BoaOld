@@ -143,7 +143,7 @@ public struct Complex : IRepresentable
   { Complex r = new Complex(1, 0);
 	  int mask = 1;
 	  while(mask>0 && power>=mask)
-	  { if((power&mask)!=0) r = r*this;
+	  { if((power&mask)!=0) r *= this;
 		  mask <<= 1;
 		  this *= this;
 	  }

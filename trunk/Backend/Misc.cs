@@ -19,7 +19,6 @@ along with this program; if not, write to the Free Software
 Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 */
 
-// TODO: make use of 'readonly' attribute
 // TODO: make use of 'sealed' attribute
 // TODO: make parameter names more consistent
 
@@ -73,7 +72,7 @@ public sealed class Misc
   public static readonly object[] EmptyArray = new object[0];
   public static readonly Type TypeOfObjectRef = Type.GetType("System.Object&");
   static long index;
-  static object indexLock = "<Misc_INDEX_LOCK>";
+  static readonly object indexLock = "<Misc_INDEX_LOCK>";
 }
 
 public sealed class Options

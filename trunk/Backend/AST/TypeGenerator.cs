@@ -29,7 +29,7 @@ using Boa.Runtime;
 namespace Boa.AST
 {
 
-public class TypeGenerator
+public sealed class TypeGenerator
 { public TypeGenerator(AssemblyGenerator assembly, TypeBuilder typeBuilder)
   { Assembly=assembly; TypeBuilder=typeBuilder;
   }

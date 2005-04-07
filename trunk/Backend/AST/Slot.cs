@@ -41,7 +41,7 @@ public abstract class Slot
 #endregion
 
 #region ArgSlot
-public class ArgSlot : Slot
+public sealed class ArgSlot : Slot
 { public ArgSlot(MethodBuilder mb, int index, string name) : this(mb, index, name, typeof(object)) { }
   public ArgSlot(MethodBuilder mb, int index, string name, Type type)
     : this(mb, mb.DefineParameter(index+1, ParameterAttributes.None, name), type) { }
@@ -64,7 +64,7 @@ public class ArgSlot : Slot
 #endregion
 
 #region FieldSlot
-public class FieldSlot : Slot
+public sealed class FieldSlot : Slot
 { public FieldSlot(FieldInfo fi) { Info=fi; }
   public FieldSlot(Slot instance, FieldInfo fi) { Instance=instance; Info=fi; }
 
@@ -99,7 +99,7 @@ public class FieldSlot : Slot
 #endregion
 
 #region FrameObjectSlot
-public class FrameObjectSlot : Slot
+public sealed class FrameObjectSlot : Slot
 { public FrameObjectSlot(CodeGenerator baseCg, ArgSlot argSlot, Slot fieldSlot)
   { BaseCodeGenerator=baseCg; ArgSlot=argSlot; FieldSlot=fieldSlot;
   }
@@ -126,7 +126,7 @@ public class FrameObjectSlot : Slot
 #endregion
 
 #region LocalSlot
-public class LocalSlot : Slot
+public sealed class LocalSlot : Slot
 { public LocalSlot(LocalBuilder lb) { builder = lb; }
   public LocalSlot(LocalBuilder lb, string name)
   { builder = lb; 
@@ -144,7 +144,7 @@ public class LocalSlot : Slot
 #endregion
 
 #region NamedFrameSlot
-public class NamedFrameSlot : Slot
+public sealed class NamedFrameSlot : Slot
 { public NamedFrameSlot(Slot frame, string name) { Frame=frame; Name=name; }
 
   public override Type Type { get { return typeof(object); } }
@@ -179,7 +179,7 @@ public class NamedFrameSlot : Slot
 #endregion
 
 #region StaticSlot
-public class StaticSlot : Slot
+public sealed class StaticSlot : Slot
 { public StaticSlot(FieldInfo field) { this.field=field; }
 
   public override Type Type { get { return field.FieldType; } }
@@ -193,7 +193,7 @@ public class StaticSlot : Slot
 #endregion
 
 #region ThisSlot
-public class ThisSlot : Slot
+public sealed class ThisSlot : Slot
 { public ThisSlot(Type type) { this.type=type; }
 
   public override Type Type { get { return type; } }

@@ -71,20 +71,16 @@ public sealed class sys
     new Tuple("__builtin__", "binascii", "bisect", "codecs", "dotnet", "dotnetpath", "math", "md5",
               "operator", "os", "random", "re", "socket", "string", "struct", "sys", "time", "types");
 
-  #if BIGENDIAN
-  public static string byteorder = "big";
-  #else
-  public static string byteorder = "little";
-  #endif
+  public static string byteorder = BitConverter.IsLittleEndian ? "little" : "big";
   
-  public static string copyright = "Boa, Copyright 2004 Adam Milazzo";
+  public static string copyright = "Boa, Copyright 2004-2005 Adam Milazzo\nPortions of the standard library are copyright their respective authors.";
 
   public static object displayhook = __displayhook__;
   public static object excepthook = __excepthook__;
   public static string executable; // TODO: implement this
   public static object exitfunc;
   
-  public static int hexversion = 0x00010000; // 0.1.0.0
+  public static int hexversion = 0x00020000; // 0.2.0.0 (remember to update 'version', below)
   public static int maxint = int.MaxValue;
   public static int maxunicode = (int)char.MaxValue;
 
@@ -99,11 +95,11 @@ public sealed class sys
   public static object stderr = __stderr__;
   
   public static List warnoptions = new List(); // TODO: populate this list on startup
-  
+
   public static int recursionlimit = 1000; // TODO: make this take effect
   public static int tracebacklimit = 1000; // TODO: make this take effect
 
-  public static string version = "0.2.0";
+  public static string version = "0.2.0"; // remember to update 'hexversion', above
   public static Tuple version_info = new Tuple(0, 2, 0, "devel");
 
   internal static Stack Exceptions = new Stack();

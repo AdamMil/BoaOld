@@ -112,7 +112,7 @@ public sealed class ReflectedPackage : IHasAttributes
     }
   }
 
-  static Dict dict = new Dict();
+  static readonly Dict dict=new Dict();
   static bool initialized;
 }
 
