@@ -41,11 +41,7 @@ public sealed class @struct
     byte[] ret = new byte[size];
 
     int ri=0, ai=0;
-#if BIGENDIAN
-    bool bigendian=true;
-#else
-    bool bigendian=false;
-#endif
+    bool bigendian=!BitConverter.IsLittleEndian;
 
     for(int i=0; i<format.Length; i++)
     { int count;
@@ -144,11 +140,7 @@ public sealed class @struct
 
         case '<': bigendian=false; break;
         case '>': case '!': bigendian=true; break;
-        #if BIGENDIAN
-        case '=': bigendian=true; break;
-        #else
-        case '=': bigendian=false; break;
-        #endif
+        case '=': bigendian=!BitConverter.IsLittleEndian; break;
       }
     }
     return ret;
@@ -161,11 +153,7 @@ public sealed class @struct
     object[] ret = new object[nargs];
 
     int ri=0, ai=0;
-#if BIGENDIAN
-    bool bigendian=true;
-#else
-    bool bigendian=false;
-#endif
+    bool bigendian=!BitConverter.IsLittleEndian;
 
     for(int i=0; i<format.Length; i++)
     { int count;
@@ -258,11 +246,7 @@ public sealed class @struct
 
         case '<': bigendian=false; break;
         case '>': case '!': bigendian=true; break;
-        #if BIGENDIAN
-        case '=': bigendian=true; break;
-        #else
-        case '=': bigendian=false; break;
-        #endif
+        case '=': bigendian=!BitConverter.IsLittleEndian; break;
       }
     }
     return new Tuple(ret);

@@ -319,41 +319,10 @@ public sealed class _socket
 
   public static Tuple resolve(string ipOrHost) { return HEntryToTuple(Resolve(ipOrHost)); }
   
-  public static int htonl(int i)
-  { 
-    #if BIG_ENDIAN
-    return i;
-    #else
-    return IPAddress.HostToNetworkOrder(i);
-    #endif
-  }
-
-  public static short htons(short i)
-  { 
-    #if BIG_ENDIAN
-    return i;
-    #else
-    return IPAddress.HostToNetworkOrder(i);
-    #endif
-  }
-
-  public static int ntohl(int i)
-  { 
-    #if BIG_ENDIAN
-    return i;
-    #else
-    return IPAddress.NetworkToHostOrder(i);
-    #endif
-  }
-
-  public static short ntohs(short i)
-  { 
-    #if BIG_ENDIAN
-    return i;
-    #else
-    return IPAddress.NetworkToHostOrder(i);
-    #endif
-  }
+  public static int htonl(int i) { return IPAddress.HostToNetworkOrder(i); }
+  public static short htons(short i) { IPAddress.HostToNetworkOrder(i); }
+  public static int ntohl(int i) { return IPAddress.NetworkToHostOrder(i); }
+  public static short ntohs(short i) { return IPAddress.NetworkToHostOrder(i); }
 
   static IPHostEntry GetHostByAddress(string address)
   { try { return Dns.GetHostByAddress(address); }

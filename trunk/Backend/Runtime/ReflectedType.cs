@@ -864,7 +864,7 @@ public sealed class ReflectedType : BoaType
 
   ReflectedConstructor cons;
 
-  static Hashtable types = new Hashtable(); // assumes these fields are initialized in order
+  static readonly Hashtable types=new Hashtable(); // assumes these fields are initialized in order
   static readonly DynamicType MyDynamicType = ReflectedType.FromType(typeof(ReflectedType));
 }
 #endregion

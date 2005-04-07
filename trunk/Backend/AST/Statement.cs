@@ -73,7 +73,7 @@ public class ReturnException : Exception
 
 #region Walkers
 #region JumpFinder
-class JumpFinder : IWalker
+sealed class JumpFinder : IWalker
 { public JumpFinder(string name, Label start, Label end) { this.name=name; this.start=start; this.end=end; }
 
   public void PostWalk(Node node)
@@ -109,7 +109,7 @@ class JumpFinder : IWalker
 #endregion
 
 #region NameFinder
-public class NameFinder : IWalker
+sealed class NameFinder : IWalker
 { public static Name[] Find(Node n)
   { NameFinder nf = new NameFinder();
     n.Walk(nf);
@@ -128,7 +128,7 @@ public class NameFinder : IWalker
 #endregion
 
 #region Optimizer
-public class Optimizer : IWalker
+sealed class Optimizer : IWalker
 { public void PostWalk(Node n) { n.Optimize(); }
   public bool Walk(Node n) { return true; }
 }
@@ -678,7 +678,7 @@ public class DefStatement : Statement
   public BoaFunction Function;
 
   #region GlobalFinder
-  class GlobalFinder : IWalker
+  sealed class GlobalFinder : IWalker
   { public static Name[] Find(Node node)
     { GlobalFinder gf = new GlobalFinder();
       node.Walk(gf);

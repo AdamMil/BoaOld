@@ -59,7 +59,7 @@ public class Module : Boa.AST.Snippet, IHasAttributes, IRepresentable
 
   public readonly IDictionary __dict__;
   
-  static ReflectedType builtins = ReflectedType.FromType(typeof(Boa.Modules.__builtin__));
+  static readonly ReflectedType builtins = ReflectedType.FromType(typeof(Boa.Modules.__builtin__));
 }
 
 } // namespace Boa.Runtime

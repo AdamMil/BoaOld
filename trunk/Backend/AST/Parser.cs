@@ -63,7 +63,7 @@ enum Token
 #endregion
 
 #region Parser
-public class Parser
+public sealed class Parser
 { public Parser(Stream data) : this("<unknown>", data) { }
   public Parser(string source, Stream data) : this(source, new StreamReader(data), false) { }
   public Parser(string source, TextReader data) : this(source, data, false) { }

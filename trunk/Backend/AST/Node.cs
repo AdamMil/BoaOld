@@ -49,7 +49,7 @@ public struct Argument
   public ArgType Type;
 }
 
-public class ExceptClause : Node
+public sealed class ExceptClause : Node
 { public ExceptClause(Expression type, NameExpression target, Statement body) { Type=type; Target=target; Body=body; }
 
   public override void ToCode(System.Text.StringBuilder sb, int indent)
@@ -127,7 +127,7 @@ public struct ListCompFor
   public Expression Names, List, Test;
 }
 
-public class Name
+public sealed class Name
 { public Name(string name) { String=name; Scope=Scope.Free; }
   public Name(string name, Scope scope) { String=name; Scope=scope; }
 

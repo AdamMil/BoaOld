@@ -109,7 +109,7 @@ public abstract class Namespace
 #endregion
 
 #region FieldNamespace
-public class FieldNamespace : Namespace
+public sealed class FieldNamespace : Namespace
 { public FieldNamespace(Namespace parent, string prefix, CodeGenerator cg) : base(parent, cg) { Prefix=prefix; }
   public FieldNamespace(Namespace parent, string prefix, CodeGenerator cg, Slot instance)
     : base(parent, cg) { this.instance=instance; Prefix=prefix; }
@@ -156,7 +156,7 @@ public class FieldNamespace : Namespace
 #endregion
 
 #region FrameNamespace
-public class FrameNamespace : Namespace
+public sealed class FrameNamespace : Namespace
 { public FrameNamespace(TypeGenerator tg, CodeGenerator cg) : base(null, cg)
   { Slot field = new StaticSlot(tg.TypeBuilder.DefineField("__frame", typeof(Frame),
                                                            FieldAttributes.Public|FieldAttributes.Static));
@@ -180,7 +180,7 @@ public class FrameNamespace : Namespace
 #endregion
 
 #region LocalNamespace
-public class LocalNamespace : Namespace
+public sealed class LocalNamespace : Namespace
 { public LocalNamespace(Namespace parent, CodeGenerator cg) : base(parent, cg) { }
 
   public void AddClosedVars(Name[] names, Slot[] slots)

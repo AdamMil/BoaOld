@@ -69,13 +69,13 @@ public abstract class BinaryOperator : Operator
 #endregion
 
 #region Unary operators
-public class BitwiseNotOperator : UnaryOperator
+public sealed class BitwiseNotOperator : UnaryOperator
 { public override void Emit(CodeGenerator cg) { cg.EmitCall(typeof(Ops), "BitwiseNegate"); }
   public override object Evaluate(object value) { return Ops.BitwiseNegate(value); }
   public override string ToString() { return "~"; }
 }
 
-public class LogicalNotOperator : UnaryOperator
+public sealed class LogicalNotOperator : UnaryOperator
 { public override void Emit(CodeGenerator cg)
   { cg.EmitIsFalse();
     cg.EmitCall(typeof(Ops), "FromBool");
@@ -92,19 +92,19 @@ public class UnaryMinusOperator : UnaryOperator
 #endregion
 
 #region Comparison operators
-public class EqualOperator : BinaryOperator
+public sealed class EqualOperator : BinaryOperator
 { public override void Emit(CodeGenerator cg) { cg.EmitCall(typeof(Ops), "Equal"); }
   public override object Evaluate(object lhs, object rhs) { return Ops.Equal(lhs, rhs); }
   public override string ToString() { return " == "; }
 }
 
-public class NotEqualOperator : BinaryOperator
+public sealed class NotEqualOperator : BinaryOperator
 { public override void Emit(CodeGenerator cg) { cg.EmitCall(typeof(Ops), "NotEqual"); }
   public override object Evaluate(object lhs, object rhs) { return Ops.NotEqual(lhs, rhs); }
   public override string ToString() { return " != "; }
 }
 
-public class IdenticalOperator : BinaryOperator
+public sealed class IdenticalOperator : BinaryOperator
 { public override void Emit(CodeGenerator cg)
   { cg.ILG.Emit(OpCodes.Ceq);
     cg.EmitCall(typeof(Ops), "FromBool");
@@ -113,7 +113,7 @@ public class IdenticalOperator : BinaryOperator
   public override string ToString() { return " is "; }
 }
 
-public class NotIdenticalOperator : BinaryOperator
+public sealed class NotIdenticalOperator : BinaryOperator
 { public override void Emit(CodeGenerator cg)
   { cg.ILG.Emit(OpCodes.Ceq); cg.EmitInt(0); cg.ILG.Emit(OpCodes.Ceq);
     cg.EmitCall(typeof(Ops), "FromBool");
@@ -122,25 +122,25 @@ public class NotIdenticalOperator : BinaryOperator
   public override string ToString() { return " is not "; }
 }
 
-public class LessOperator : BinaryOperator
+public sealed class LessOperator : BinaryOperator
 { public override void Emit(CodeGenerator cg) { cg.EmitCall(typeof(Ops), "Less"); }
   public override object Evaluate(object lhs, object rhs) { return Ops.Less(lhs, rhs); }
   public override string ToString() { return " < "; }
 }
 
-public class LessEqualOperator : BinaryOperator
+public sealed class LessEqualOperator : BinaryOperator
 { public override void Emit(CodeGenerator cg) { cg.EmitCall(typeof(Ops), "Add"); }
   public override object Evaluate(object lhs, object rhs) { return Ops.LessEqual(lhs, rhs); }
   public override string ToString() { return " <= "; }
 }
 
-public class MoreOperator : BinaryOperator
+public sealed class MoreOperator : BinaryOperator
 { public override void Emit(CodeGenerator cg) { cg.EmitCall(typeof(Ops), "More"); }
   public override object Evaluate(object lhs, object rhs) { return Ops.More(lhs, rhs); }
   public override string ToString() { return " > "; }
 }
 
-public class MoreEqualOperator : BinaryOperator
+public sealed class MoreEqualOperator : BinaryOperator
 { public override void Emit(CodeGenerator cg) { cg.EmitCall(typeof(Ops), "MoreEqual"); }
   public override object Evaluate(object lhs, object rhs) { return Ops.MoreEqual(lhs, rhs); }
   public override string ToString() { return " >= "; }
@@ -148,85 +148,85 @@ public class MoreEqualOperator : BinaryOperator
 #endregion
 
 #region Binary operators
-public class AddOperator : BinaryOperator
+public sealed class AddOperator : BinaryOperator
 { public override void Emit(CodeGenerator cg) { cg.EmitCall(typeof(Ops), "Add"); }
   public override object Evaluate(object lhs, object rhs) { return Ops.Add(lhs, rhs); }
   public override string ToString() { return " + "; }
 }
 
-public class SubtractOperator : BinaryOperator
+public sealed class SubtractOperator : BinaryOperator
 { public override void Emit(CodeGenerator cg) { cg.EmitCall(typeof(Ops), "Subtract"); }
   public override object Evaluate(object lhs, object rhs) { return Ops.Subtract(lhs, rhs); }
   public override string ToString() { return " - "; }
 }
 
-public class MultiplyOperator : BinaryOperator
+public sealed class MultiplyOperator : BinaryOperator
 { public override void Emit(CodeGenerator cg) { cg.EmitCall(typeof(Ops), "Multiply"); }
   public override object Evaluate(object lhs, object rhs) { return Ops.Multiply(lhs, rhs); }
   public override string ToString() { return " * "; }
 }
 
-public class DivideOperator : BinaryOperator
+public sealed class DivideOperator : BinaryOperator
 { public override void Emit(CodeGenerator cg) { cg.EmitCall(typeof(Ops), "Divide"); }
   public override object Evaluate(object lhs, object rhs) { return Ops.Divide(lhs, rhs); }
   public override string ToString() { return " / "; }
 }
 
-public class FloorDivideOperator : BinaryOperator
+public sealed class FloorDivideOperator : BinaryOperator
 { public override void Emit(CodeGenerator cg) { cg.EmitCall(typeof(Ops), "FloorDivide"); }
   public override object Evaluate(object lhs, object rhs) { return Ops.FloorDivide(lhs, rhs); }
   public override string ToString() { return " // "; }
 }
 
-public class ModulusOperator : BinaryOperator
+public sealed class ModulusOperator : BinaryOperator
 { public override void Emit(CodeGenerator cg) { cg.EmitCall(typeof(Ops), "Modulus"); }
   public override object Evaluate(object lhs, object rhs) { return Ops.Modulus(lhs, rhs); }
   public override string ToString() { return " % "; }
 }
 
-public class PowerOperator : BinaryOperator
+public sealed class PowerOperator : BinaryOperator
 { public override void Emit(CodeGenerator cg) { cg.EmitCall(typeof(Ops), "Power"); }
   public override object Evaluate(object lhs, object rhs) { return Ops.Power(lhs, rhs); }
   public override string ToString() { return " ** "; }
 }
 
-public class LeftShiftOperator : BinaryOperator
+public sealed class LeftShiftOperator : BinaryOperator
 { public override void Emit(CodeGenerator cg) { cg.EmitCall(typeof(Ops), "LeftShift"); }
   public override object Evaluate(object lhs, object rhs) { return Ops.LeftShift(lhs, rhs); }
   public override string ToString() { return " << "; }
 }
 
-public class RightShiftOperator : BinaryOperator
+public sealed class RightShiftOperator : BinaryOperator
 { public override void Emit(CodeGenerator cg) { cg.EmitCall(typeof(Ops), "RightShift"); }
   public override object Evaluate(object lhs, object rhs) { return Ops.RightShift(lhs, rhs); }
   public override string ToString() { return " >> "; }
 }
 
-public class BitwiseAndOperator : BinaryOperator
+public sealed class BitwiseAndOperator : BinaryOperator
 { public override void Emit(CodeGenerator cg) { cg.EmitCall(typeof(Ops), "BitwiseAnd"); }
   public override object Evaluate(object lhs, object rhs) { return Ops.BitwiseAnd(lhs, rhs); }
   public override string ToString() { return " & "; }
 }
 
-public class BitwiseOrOperator : BinaryOperator
+public sealed class BitwiseOrOperator : BinaryOperator
 { public override void Emit(CodeGenerator cg) { cg.EmitCall(typeof(Ops), "BitwiseOr"); }
   public override object Evaluate(object lhs, object rhs) { return Ops.BitwiseOr(lhs, rhs); }
   public override string ToString() { return " | "; }
 }
 
-public class BitwiseXorOperator : BinaryOperator
+public sealed class BitwiseXorOperator : BinaryOperator
 { public override void Emit(CodeGenerator cg) { cg.EmitCall(typeof(Ops), "BitwiseXor"); }
   public override object Evaluate(object lhs, object rhs) { return Ops.BitwiseXor(lhs, rhs); }
   public override string ToString() { return " ^ "; }
 }
 
-public class LogicalAndOperator : BinaryOperator
+public sealed class LogicalAndOperator : BinaryOperator
 { public override void Emit(CodeGenerator cg) { cg.EmitCall(typeof(Ops), "LogicalAnd"); }
   public override object Evaluate(object lhs, object rhs) { return Ops.LogicalAnd(lhs, rhs); }
   public override string ToString() { return " && "; }
 }
 
-public class LogicalOrOperator : BinaryOperator
+public sealed class LogicalOrOperator : BinaryOperator
 { public override void Emit(CodeGenerator cg) { cg.EmitCall(typeof(Ops), "LogicalOr"); }
   public override object Evaluate(object lhs, object rhs) { return Ops.LogicalOr(lhs, rhs); }
   public override string ToString() { return " || "; }
