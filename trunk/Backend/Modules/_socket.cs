@@ -318,9 +318,9 @@ public sealed class _socket
   public static string gethostname() { return Dns.GetHostName(); }
 
   public static Tuple resolve(string ipOrHost) { return HEntryToTuple(Resolve(ipOrHost)); }
-  
+
   public static int htonl(int i) { return IPAddress.HostToNetworkOrder(i); }
-  public static short htons(short i) { IPAddress.HostToNetworkOrder(i); }
+  public static short htons(short i) { return IPAddress.HostToNetworkOrder(i); }
   public static int ntohl(int i) { return IPAddress.NetworkToHostOrder(i); }
   public static short ntohs(short i) { return IPAddress.NetworkToHostOrder(i); }
 
