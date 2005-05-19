@@ -63,4 +63,4 @@ public sealed class SnippetMaker
   public static AssemblyGenerator Assembly = new AssemblyGenerator("snippets", "snippets.dll");
 }
 
-} // namespace IronPython.AST
+} // namespace Boa.AST
