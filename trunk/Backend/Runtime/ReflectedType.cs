@@ -585,7 +585,7 @@ public abstract class ReflectedMethodBase : ReflectedMember, IFancyCallable
       { if(type!=typeof(object))
         { object[] items = ((Tuple)args[lastRP]).items;
           for(int i=0; i<items.Length; i++)
-          { Conversion conv = Ops.ConvertTo(items[i].GetType(), type);
+          { Conversion conv = Ops.ConvertTo(items[i]==null ? null : items[i].GetType(), type);
             if(conv==Conversion.None) goto notCPA;
           }
         }

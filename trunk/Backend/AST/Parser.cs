@@ -1189,7 +1189,7 @@ public sealed class Parser
           lastChar = c; return Token.BitOr;
         case '^':
           c = ReadChar();
-          if(c=='=') { value=BinaryOperator.BitwiseAnd; return Token.Assign; }
+          if(c=='=') { value=BinaryOperator.BitwiseXor; return Token.Assign; }
           lastChar = c; return Token.BitXor;
         case '+':
           c = ReadChar();
