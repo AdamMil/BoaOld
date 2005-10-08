@@ -25,6 +25,8 @@ Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 using System;
 using Boa.AST;
 
+[assembly: System.Reflection.AssemblyKeyFile("Z:/code/RosArt.snk")]
+
 namespace Boa
 {
 
@@ -82,5 +84,4 @@ public sealed class Options
   public static bool Debug, Optimize, Interactive, NoStdLib;
 }
 
-}
-
+} // namespace Boa

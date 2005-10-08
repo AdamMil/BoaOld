@@ -149,13 +149,16 @@ public class Text
           { sys.path[0] = Path.GetDirectoryName(Path.GetFullPath(filename));
             parser = Parser.FromFile(filename);
           }
+
+          Statement stmt = parser.Parse();
+          stmt.PostProcessForCompile();
           if(outfile!=null)
           { Console.Error.WriteLine("Compiling...");
-            ModuleGenerator.Generate(basename, outfile, parser.Parse(), exeType);
+            ModuleGenerator.Generate(basename, outfile, stmt, exeType);
             Console.Error.WriteLine("Successfully wrote "+outfile);
           }
           else
-          { Snippet s = SnippetMaker.Generate(parser.Parse(), basename);
+          { Snippet s = SnippetMaker.Generate(stmt, basename);
             if(WriteSnippets) SnippetMaker.DumpAssembly();
             s.Run(PrepareFrame());
           }
