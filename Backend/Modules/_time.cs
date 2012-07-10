@@ -198,7 +198,7 @@ public sealed class _time
   static readonly string[] months = new string[] { "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep",
                                                    "Oct", "Nov", "Dec" };
   static readonly string[] weekdays = new string[] { "Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat" };
-  static Regex pctre = new Regex(@"%(.)", RegexOptions.Singleline);
+  static readonly Regex pctre = new Regex(@"%(.)", RegexOptions.Singleline);
 }
 
 } // namespace Boa.Modules

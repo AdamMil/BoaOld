@@ -134,7 +134,7 @@ public sealed class TypeMaker
   }
 
   static HybridDictionary types = new HybridDictionary();
-  static Regex namere = new Regex(@"(?<!\\)\+", RegexOptions.Singleline);
+  static readonly Regex namere = new Regex(@"(?<!\\)\+", RegexOptions.Singleline);
 }
 
 } // namespace Boa.AST
