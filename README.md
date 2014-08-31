@@ -1,1 +1,1 @@
-This is an obsolete python compiler for .NET. It was better than IronPython 0.7, but IronPython is now much better than this, since I stopped updating it. The Boa project is more technically sophisticated, but less functional.
+This is an obsolete python compiler for .NET. It was better than IronPython 0.7, but IronPython is now much better than this, since I stopped updating it. The Boa project is more technically sophisticated but less functional than my other python compiler.
